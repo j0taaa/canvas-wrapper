@@ -24,6 +24,27 @@ bun run dev
 
 Open http://localhost:3000.
 
+
+### Run with Docker Compose
+
+1. Create runtime env file:
+
+```bash
+cp .env.example .env.local
+```
+
+2. Build and start the container:
+
+```bash
+docker compose up --build
+```
+
+3. Open http://localhost:3000.
+
+### Container image CI
+
+A GitHub Actions workflow at `.github/workflows/docker-image.yml` builds the Docker image on pull requests and builds + publishes to `ghcr.io/<owner>/<repo>` for pushes to `main` and `v*` tags.
+
 ### Environment variables
 
 - `CANVAS_KEY` (recommended): Canvas API token.
