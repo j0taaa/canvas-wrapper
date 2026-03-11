@@ -1,15 +1,13 @@
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
-import { unstable_cache } from "next/cache";
 
 const execFileAsync = promisify(execFile);
 
 const DEFAULT_CANVAS_API_BASE = "https://pucminas.instructure.com/api/v1";
-
-const canvasApiBase = process.env.CANVAS_API_BASE ?? DEFAULT_CANVAS_API_BASE;
-const canvasApiKey = process.env.CANVAS_KEY ?? process.env.CANVAS_API_KEY;
-
 const DATA_REVALIDATE_SECONDS = 300;
+
+export const canvasApiBase = process.env.CANVAS_API_BASE ?? DEFAULT_CANVAS_API_BASE;
+const envCanvasApiKey = process.env.CANVAS_KEY ?? process.env.CANVAS_API_KEY;
 
 type CanvasCourse = {
   id: number;
@@ -47,29 +45,33 @@ type CanvasDashboardCard = {
   href?: string;
 };
 
-async function canvasCurlFetch<T>(path: string): Promise<T> {
+export type CanvasDashboardData = {
+  apiBase: string;
+  profile: CanvasProfile;
+  courses: CanvasCourse[];
+  todo: CanvasTodoItem[];
+  dashboardCards: CanvasDashboardCard[];
+};
+
+async function canvasCurlFetch<T>(path: string, apiKey: string): Promise<T> {
   const { stdout } = await execFileAsync("curl", [
     "-sS",
     "--fail",
     "-H",
-    `Authorization: Bearer ${canvasApiKey}`,
+    `Authorization: Bearer ${apiKey}`,
     `${canvasApiBase}${path}`,
   ]);
 
   return JSON.parse(stdout) as T;
 }
 
-async function canvasFetch<T>(path: string): Promise<T> {
-  if (!canvasApiKey) {
-    throw new Error("Missing CANVAS_KEY (or CANVAS_API_KEY) environment variable");
-  }
-
+async function canvasFetch<T>(path: string, apiKey: string): Promise<T> {
   try {
     const response = await fetch(`${canvasApiBase}${path}`, {
       headers: {
-        Authorization: `Bearer ${canvasApiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
-      cache: "force-cache",
+      cache: "no-store",
       next: {
         revalidate: DATA_REVALIDATE_SECONDS,
         tags: ["canvas", `canvas:${path}`],
@@ -85,37 +87,32 @@ async function canvasFetch<T>(path: string): Promise<T> {
     const message = error instanceof Error ? error.message : "Unknown fetch error";
 
     if (message.includes("fetch failed")) {
-      return canvasCurlFetch<T>(path);
+      return canvasCurlFetch<T>(path, apiKey);
     }
 
     throw error;
   }
 }
 
-const loadDashboardData = unstable_cache(
-  async () => {
-    const [profile, courses, todo, dashboardCards] = await Promise.all([
-      canvasFetch<CanvasProfile>("/users/self/profile"),
-      canvasFetch<CanvasCourse[]>("/courses?per_page=12&enrollment_state=active&state[]=available"),
-      canvasFetch<CanvasTodoItem[]>("/users/self/todo?per_page=10"),
-      canvasFetch<CanvasDashboardCard[]>("/dashboard/dashboard_cards"),
-    ]);
+export async function getDashboardData(apiKey?: string): Promise<CanvasDashboardData> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
 
-    return {
-      apiBase: canvasApiBase,
-      profile,
-      courses,
-      todo,
-      dashboardCards,
-    };
-  },
-  ["canvas-dashboard-data", canvasApiBase],
-  {
-    revalidate: DATA_REVALIDATE_SECONDS,
-    tags: ["canvas", "canvas:dashboard"],
-  },
-);
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
 
-export async function getDashboardData() {
-  return loadDashboardData();
+  const [profile, courses, todo, dashboardCards] = await Promise.all([
+    canvasFetch<CanvasProfile>("/users/self/profile", resolvedApiKey),
+    canvasFetch<CanvasCourse[]>("/courses?per_page=12&enrollment_state=active&state[]=available", resolvedApiKey),
+    canvasFetch<CanvasTodoItem[]>("/users/self/todo?per_page=10", resolvedApiKey),
+    canvasFetch<CanvasDashboardCard[]>("/dashboard/dashboard_cards", resolvedApiKey),
+  ]);
+
+  return {
+    apiBase: canvasApiBase,
+    profile,
+    courses,
+    todo,
+    dashboardCards,
+  };
 }
