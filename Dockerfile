@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM oven/bun:1.2.22-alpine AS base
+FROM oven/bun:1.2.22 AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -13,12 +13,12 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN bun run build
 
-FROM oven/bun:1.2.22-alpine AS runner
+FROM oven/bun:1.2.22 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup -S bunjs && adduser -S bunuser -G bunjs
+RUN groupadd --system bunjs && useradd --system --gid bunjs bunuser
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
