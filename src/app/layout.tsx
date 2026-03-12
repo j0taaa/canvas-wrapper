@@ -7,8 +7,8 @@ export const metadata: Metadata = {
   description: "A simple Canvas dashboard clone built with Next.js and shadcn/ui.",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/window.svg",
-    apple: "/window.svg",
+    icon: "/canvas-icon.svg",
+    apple: "/canvas-icon.svg",
   },
   appleWebApp: {
     capable: true,
