@@ -136,9 +136,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    min-height: 100dvh;
   }
   html {
-    @apply font-sans;
+    @apply bg-background font-sans text-foreground;
+    min-height: 100%;
   }
 }
 

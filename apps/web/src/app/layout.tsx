@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import "./globals.css";
+import { GlobalHaptics } from "@/components/global-haptics";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { ThemeSync } from "@/components/theme-sync";
 import {
@@ -23,6 +24,16 @@ export const metadata: Metadata = {
     title: "Canvas Wrapper",
     statusBarStyle: "default",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#10141c" },
+  ],
 };
 
 export default function RootLayout({
@@ -56,9 +67,17 @@ async function RootLayoutInner({
       var resolved = preference === "system"
         ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
         : preference;
+      var themeColor = resolved === "dark" ? "#10141c" : "#ffffff";
+
       root.dataset.themePreference = preference;
       root.classList.toggle("dark", resolved === "dark");
       root.style.colorScheme = resolved;
+      root.style.backgroundColor = themeColor;
+
+      var themeMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeMeta) {
+        themeMeta.setAttribute("content", themeColor);
+      }
     })();
   `;
 
@@ -74,6 +93,7 @@ async function RootLayoutInner({
       </head>
       <body className="antialiased">
         {children}
+        <GlobalHaptics />
         <ThemeSync initialPreference={initialThemePreference as ThemePreference} />
         <ServiceWorkerRegister />
       </body>

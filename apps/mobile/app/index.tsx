@@ -13,8 +13,10 @@ import {
   useColorScheme,
   View,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
-import { WebView } from "react-native-webview";
+import { WebView, type WebViewMessageEvent } from "react-native-webview";
+import { isHapticsBridgeMessage } from "@canvas/shared";
 import {
   clearStoredWebAppUrl,
   getDefaultWebAppUrl,
@@ -91,6 +93,24 @@ export default function IndexScreen() {
     setDraftUrl(getDefaultWebAppUrl());
     setWebViewError(null);
     setShowSetup(true);
+  }, []);
+
+  const handleWebViewMessage = useCallback((event: WebViewMessageEvent) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+
+      if (!isHapticsBridgeMessage(message)) {
+        return;
+      }
+
+      setTimeout(() => {
+        void Haptics.selectionAsync().catch(() => {
+          // Silent failure keeps navigation responsive on unsupported devices.
+        });
+      }, 0);
+    } catch {
+      // Ignore unrelated bridge messages.
+    }
   }, []);
 
   if (loadingStoredUrl) {
@@ -177,6 +197,7 @@ export default function IndexScreen() {
         pullToRefreshEnabled
         setSupportMultipleWindows={false}
         startInLoadingState
+        onMessage={handleWebViewMessage}
         onLoadEnd={() => {
           setWebViewError(null);
         }}

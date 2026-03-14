@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { EyeOff, MonitorCog, MoonStar, Palette, SunMedium } from "lucide-react";
+import { EyeOff, MonitorCog, MoonStar, Palette, Smartphone, SunMedium } from "lucide-react";
 import { formatSubjectName, getSubjectColorHex, getSubjectColorStyle } from "@/lib/utils";
+import {
+  readHapticsPreference,
+  writeHapticsPreference,
+} from "@/lib/haptics-preference";
 import {
   DEFAULT_SUBJECT_PREFERENCES,
   readSubjectPreferences,
@@ -77,6 +81,58 @@ function ThemePreferenceSelector() {
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
         Use the system theme by default, or force light or dark mode for the whole app.
+      </p>
+    </div>
+  );
+}
+
+function HapticsPreferenceSelector() {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    const syncPreference = () => setEnabled(readHapticsPreference());
+
+    syncPreference();
+    window.addEventListener("storage", syncPreference);
+    window.addEventListener("canvas-haptics-preference-changed", syncPreference);
+
+    return () => {
+      window.removeEventListener("storage", syncPreference);
+      window.removeEventListener("canvas-haptics-preference-changed", syncPreference);
+    };
+  }, []);
+
+  return (
+    <div className="rounded-2xl border border-border/70 bg-muted/35 p-4">
+      <p className="mb-3 text-sm font-medium text-foreground">Haptic feedback</p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => writeHapticsPreference(false)}
+          className={
+            !enabled
+              ? "inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              : "inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
+          }
+        >
+          <Smartphone className="h-4 w-4" />
+          <span>Off</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => writeHapticsPreference(true)}
+          className={
+            enabled
+              ? "inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              : "inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
+          }
+        >
+          <Smartphone className="h-4 w-4" />
+          <span>On</span>
+        </button>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Optional tap feedback for supported phones and touch devices. It is queued asynchronously so it never waits on navigation.
       </p>
     </div>
   );
@@ -205,8 +261,9 @@ export function ProfilePreferences({ courses }: ProfilePreferencesProps) {
   return (
     <div className="space-y-6">
       <ThemePreferenceSelector />
+      <HapticsPreferenceSelector />
       <div className="rounded-2xl border border-border/70 bg-muted/35 p-4 text-sm text-muted-foreground">
-        Hide subjects from the dashboard and navigation, or choose your own subject colors.
+        Hide subjects from the dashboard and navigation, choose your own subject colors, or enable optional haptic feedback.
       </div>
       <SubjectPreferenceList courses={courses} />
     </div>
