@@ -1,19 +1,20 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { CanvasBootstrapData, getAssignmentCacheKey } from "@/lib/app-bootstrap";
-import {
-  getAssignmentDetails,
-  getCalendarData,
-  getCourseContent,
-  getCourseGradeData,
-  getDashboardData,
-  getInboxData,
-} from "@/lib/canvas";
+import { getAssignmentDetails, getAppShellData, getCalendarData, getCourseContent, getCourseGradeData, getInboxData } from "@/lib/canvas";
 import { buildCalendarEntries, getMonthLabel, getMonthRange, getZonedDateParts } from "@/lib/calendar";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
 
-export async function GET() {
+type BootstrapRequestBody = {
+  courseIds?: number[];
+  todoAssignments?: Array<{
+    assignmentId?: number;
+    courseId?: number;
+  }>;
+};
+
+export async function POST(request: Request) {
   try {
     const cookieStore = await cookies();
     const apiKey = cookieStore.get(CANVAS_API_KEY_COOKIE)?.value;
@@ -22,45 +23,63 @@ export async function GET() {
       return NextResponse.json({ error: "Missing Canvas API key" }, { status: 401 });
     }
 
-    const dashboardData = await getDashboardData(apiKey);
+    const body = (await request.json().catch(() => ({}))) as BootstrapRequestBody;
+    let courseIds = Array.from(
+      new Set(
+        (body.courseIds ?? [])
+          .map((courseId) => Number(courseId))
+          .filter((courseId) => Number.isFinite(courseId)),
+      ),
+    );
+
+    if (courseIds.length === 0) {
+      const fallbackShellData = await getAppShellData(apiKey);
+      courseIds = fallbackShellData.courses.map((course) => course.id);
+    }
+
+    const todoAssignments = Array.from(
+      new Map(
+        (body.todoAssignments ?? [])
+          .map((item) => ({
+            assignmentId: Number(item.assignmentId),
+            courseId: Number(item.courseId),
+          }))
+          .filter((item) => Number.isFinite(item.assignmentId) && Number.isFinite(item.courseId))
+          .map((item) => [`${item.courseId}:${item.assignmentId}`, item]),
+      ).values(),
+    );
     const today = getZonedDateParts(new Date());
     const calendarRange = getMonthRange(today.year, today.month);
 
     const [calendarResult, inboxResult, courseResults, assignmentResults] = await Promise.all([
       Promise.allSettled([
         getCalendarData(
-          dashboardData.courses.map((course) => course.id),
+          courseIds,
           calendarRange,
           apiKey,
         ),
       ]),
       Promise.allSettled([getInboxData(apiKey)]),
       Promise.allSettled(
-        dashboardData.courses.map(async (course) => [
-          String(course.id),
+        courseIds.map(async (courseId) => [
+          String(courseId),
           {
-            content: await getCourseContent(course.id, apiKey),
-            grades: await getCourseGradeData(course.id, apiKey),
+            content: await getCourseContent(courseId, apiKey),
+            grades: await getCourseGradeData(courseId, apiKey),
           },
         ] as const),
       ),
       Promise.allSettled(
-        dashboardData.todo.flatMap((item) => {
-          if (!item.assignment?.id || !item.assignment.course_id) {
-            return [];
-          }
-
-          return [
-            getAssignmentDetails(
-              item.assignment.course_id,
-              item.assignment.id,
-              apiKey,
-            ).then((assignment) => [
-              getAssignmentCacheKey(item.assignment?.course_id as number, item.assignment?.id as number),
-              assignment,
-            ] as const),
-          ];
-        }),
+        todoAssignments.map((item) =>
+          getAssignmentDetails(
+            item.courseId as number,
+            item.assignmentId as number,
+            apiKey,
+          ).then((assignment) => [
+            getAssignmentCacheKey(item.courseId as number, item.assignmentId as number),
+            assignment,
+          ] as const),
+        ),
       ),
     ]);
 

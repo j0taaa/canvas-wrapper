@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getCalendarData, getDashboardData } from "@/lib/canvas";
+import { getAppShellData, getCalendarData } from "@/lib/canvas";
 import {
   buildCalendarEntries,
   getMonthLabel,
@@ -29,9 +29,9 @@ export async function GET(request: Request) {
       Number.isFinite(requestedYear) ? requestedYear : fallbackYear,
       Number.isFinite(requestedMonth) ? requestedMonth : fallbackMonth,
     );
-    const dashboardData = await getDashboardData(apiKey);
+    const shellData = await getAppShellData(apiKey);
     const calendarData = await getCalendarData(
-      dashboardData.courses.map((course) => course.id),
+      shellData.courses.map((course) => course.id),
       getMonthRange(displayedMonth.year, displayedMonth.month),
       apiKey,
     );

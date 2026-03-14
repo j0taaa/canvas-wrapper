@@ -7,7 +7,7 @@ import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getAssignmentDetails, getDashboardData } from "@/lib/canvas";
+import { getAssignmentDetails, getSubjectShellData } from "@/lib/canvas";
 import { formatDueDateShort, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
 import { AssignmentSubmissionForm } from "./submission-form";
 
@@ -37,12 +37,11 @@ export default async function AssignmentPage({
     redirect("/");
   }
 
-  const [dashboardData, assignment] = await Promise.all([
-    getDashboardData(apiKey),
+  const [courseShellData, assignment] = await Promise.all([
+    getSubjectShellData(parsedCourseId, apiKey),
     getAssignmentDetails(parsedCourseId, parsedAssignmentId, apiKey),
   ]);
-  const allCourses = [...dashboardData.courses, ...dashboardData.pastCourses];
-  const course = allCourses.find((item) => item.id === parsedCourseId);
+  const course = courseShellData.course;
 
   if (!course || !assignment) {
     notFound();
@@ -54,7 +53,7 @@ export default async function AssignmentPage({
   const isCompleted = isCompletedAssignment(assignment.submission?.workflow_state, assignment.submission?.excused);
 
   return (
-    <DesktopAppShell profile={dashboardData.profile} courses={dashboardData.courses} currentCourseId={parsedCourseId}>
+    <DesktopAppShell profile={courseShellData.profile} courses={courseShellData.courses} currentCourseId={parsedCourseId}>
       <div className="w-full">
         <div className="mb-4 flex items-center justify-between gap-3">
           <HistoryBackButton fallbackHref={`/subjects/${parsedCourseId}`} />

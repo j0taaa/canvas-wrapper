@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -36,6 +36,10 @@ const CANVAS_API_KEY_STORAGE = "canvasApiKey";
 const CANVAS_API_BASE_STORAGE = "canvasApiBase";
 const CANVAS_DASHBOARD_STORAGE = "canvasDashboardData";
 const DISPLAY_TIME_ZONE = "America/Sao_Paulo";
+const DASHBOARD_REFRESH_MIN_AGE_MS = 45_000;
+const BOOTSTRAP_CACHE_MAX_AGE_MS = 5 * 60_000;
+const PREFETCH_SUBJECT_LIMIT = 8;
+const PREFETCH_ASSIGNMENT_LIMIT = 6;
 
 type HomeClientProps = {
   initialData: CanvasDashboardData | null;
@@ -137,14 +141,48 @@ function formatGradePercentage(value: number) {
   }).format(value);
 }
 
-function prefetchAppRoutes(router: ReturnType<typeof useRouter>, data: CanvasDashboardData) {
+function scheduleBackgroundTask(callback: () => void, delay = 0) {
+  let idleId: number | null = null;
+  const timeoutId = window.setTimeout(() => {
+    if ("requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(() => callback(), { timeout: 1500 });
+      return;
+    }
+
+    callback();
+  }, delay);
+
+  return () => {
+    window.clearTimeout(timeoutId);
+
+    if (idleId != null && "cancelIdleCallback" in window) {
+      window.cancelIdleCallback(idleId);
+    }
+  };
+}
+
+function getAgeMs(timestamp?: string) {
+  if (!timestamp) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const parsed = new Date(timestamp).getTime();
+
+  if (!Number.isFinite(parsed)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return Date.now() - parsed;
+}
+
+function prefetchAppRoutes(router: ReturnType<typeof useRouter>, data: CanvasDashboardData, prefetchedRoutes: Set<string>) {
   const routes = new Set<string>(["/calendar", "/inbox", "/profile", "/bookmarks"]);
 
-  for (const course of data.courses) {
+  for (const course of data.courses.slice(0, PREFETCH_SUBJECT_LIMIT)) {
     routes.add(`/subjects/${course.id}`);
   }
 
-  for (const item of data.todo) {
+  for (const item of data.todo.slice(0, PREFETCH_ASSIGNMENT_LIMIT)) {
     if (!item.assignment?.course_id || !item.assignment.id) {
       continue;
     }
@@ -153,12 +191,18 @@ function prefetchAppRoutes(router: ReturnType<typeof useRouter>, data: CanvasDas
   }
 
   for (const route of routes) {
+    if (prefetchedRoutes.has(route)) {
+      continue;
+    }
+
+    prefetchedRoutes.add(route);
     router.prefetch(route);
   }
 }
 
 export default function HomeClient({ initialData, initialPreferences }: HomeClientProps) {
   const router = useRouter();
+  const prefetchedRoutesRef = useRef(new Set<string>());
   const [apiKey, setApiKey] = useState(() => {
     if (typeof window === "undefined") {
       return "";
@@ -232,18 +276,15 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
       return;
     }
 
-    const refreshTimer = window.setTimeout(() => {
+    const refreshDelay = Math.max(0, DASHBOARD_REFRESH_MIN_AGE_MS - getAgeMs(data?.generatedAt));
+    return scheduleBackgroundTask(() => {
       loadDashboard(apiKey, providerUrl).catch((loadError: unknown) => {
         const message = loadError instanceof Error ? loadError.message : "Could not load Canvas data";
         setError(message);
         setLoading(false);
       });
-    }, 0);
-
-    return () => {
-      window.clearTimeout(refreshTimer);
-    };
-  }, [apiKey, providerUrl]);
+    }, refreshDelay);
+  }, [apiKey, data?.generatedAt, providerUrl]);
 
   useEffect(() => {
     const syncPreferences = () => setPreferences(readSubjectPreferences());
@@ -263,14 +304,47 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
       return;
     }
 
-    prefetchAppRoutes(router, data);
+    const cancelPrefetch = scheduleBackgroundTask(() => {
+      prefetchAppRoutes(router, data, prefetchedRoutesRef.current);
+    }, 300);
+
+    const bootstrapCache = (() => {
+      try {
+        const storedValue = localStorage.getItem(CANVAS_BOOTSTRAP_STORAGE);
+        return storedValue ? JSON.parse(storedValue) as { generatedAt?: string } : null;
+      } catch {
+        localStorage.removeItem(CANVAS_BOOTSTRAP_STORAGE);
+        return null;
+      }
+    })();
+
+    if (getAgeMs(bootstrapCache?.generatedAt) < BOOTSTRAP_CACHE_MAX_AGE_MS) {
+      return cancelPrefetch;
+    }
 
     const controller = new AbortController();
-    const warmupTimer = window.setTimeout(async () => {
+    const cancelBootstrap = scheduleBackgroundTask(async () => {
       try {
         const response = await fetch("/api/bootstrap", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
           signal: controller.signal,
           cache: "no-store",
+          body: JSON.stringify({
+            courseIds: data.courses.map((course) => course.id),
+            todoAssignments: data.todo.flatMap((item) => {
+              if (!item.assignment?.course_id || !item.assignment.id) {
+                return [];
+              }
+
+              return [{
+                courseId: item.assignment.course_id,
+                assignmentId: item.assignment.id,
+              }];
+            }),
+          }),
         });
 
         if (!response.ok) {
@@ -279,17 +353,17 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
 
         const payload = await response.json();
         localStorage.setItem(CANVAS_BOOTSTRAP_STORAGE, JSON.stringify(payload));
-        prefetchAppRoutes(router, data);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
       }
-    }, 0);
+    }, 1200);
 
     return () => {
+      cancelPrefetch();
+      cancelBootstrap();
       controller.abort();
-      window.clearTimeout(warmupTimer);
     };
   }, [data, router]);
 

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import CalendarClient from "./calendar-client";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
-import { getCalendarData, getDashboardData } from "@/lib/canvas";
+import { getAppShellData, getCalendarData } from "@/lib/canvas";
 import {
   buildCalendarEntries,
   getMonthLabel,
@@ -23,9 +23,9 @@ export default async function CalendarPage() {
   const displayedMonth = { month: today.month, year: today.year };
   const monthRange = getMonthRange(displayedMonth.year, displayedMonth.month);
 
-  const dashboardData = await getDashboardData(apiKey);
+  const shellData = await getAppShellData(apiKey);
   const calendarData = await getCalendarData(
-    dashboardData.courses.map((course) => course.id),
+    shellData.courses.map((course) => course.id),
     monthRange,
     apiKey,
   );
@@ -34,7 +34,7 @@ export default async function CalendarPage() {
   const monthLabel = getMonthLabel(displayedMonth.year, displayedMonth.month);
 
   return (
-    <DesktopAppShell active="calendar" profile={dashboardData.profile} courses={dashboardData.courses}>
+    <DesktopAppShell active="calendar" profile={shellData.profile} courses={shellData.courses}>
       <div className="w-full">
         <div className="mb-6 flex flex-col gap-3 border-b border-border/80 pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>

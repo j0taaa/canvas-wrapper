@@ -7,7 +7,7 @@ import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getDashboardData, getFileById } from "@/lib/canvas";
+import { getFileById, getSubjectShellData } from "@/lib/canvas";
 import { formatDueDateShort, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
@@ -48,12 +48,11 @@ export default async function SubjectFilePage({
     redirect("/");
   }
 
-  const [dashboardData, file] = await Promise.all([
-    getDashboardData(apiKey),
+  const [courseShellData, file] = await Promise.all([
+    getSubjectShellData(parsedCourseId, apiKey),
     getFileById(parsedFileId, apiKey),
   ]);
-  const allCourses = [...dashboardData.courses, ...dashboardData.pastCourses];
-  const course = allCourses.find((item) => item.id === parsedCourseId);
+  const course = courseShellData.course;
 
   if (!course || !file) {
     notFound();
@@ -67,7 +66,7 @@ export default async function SubjectFilePage({
   const isImage = contentType.startsWith("image/");
 
   return (
-    <DesktopAppShell profile={dashboardData.profile} courses={dashboardData.courses} currentCourseId={parsedCourseId}>
+    <DesktopAppShell profile={courseShellData.profile} courses={courseShellData.courses} currentCourseId={parsedCourseId}>
       <div className="w-full">
         <div className="mb-4 flex items-center justify-between gap-3">
           <HistoryBackButton fallbackHref={`/subjects/${parsedCourseId}?tab=files`} />

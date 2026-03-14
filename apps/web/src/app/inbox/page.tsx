@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getDashboardData, getInboxData } from "@/lib/canvas";
+import { getAppShellData, getInboxData } from "@/lib/canvas";
 import { formatDueDate } from "@/lib/utils";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
@@ -43,13 +43,13 @@ export default async function InboxPage({
     redirect("/");
   }
 
-  const [dashboardData, inboxData] = await Promise.all([
-    getDashboardData(apiKey),
+  const [shellData, inboxData] = await Promise.all([
+    getAppShellData(apiKey),
     getInboxData(apiKey),
   ]);
 
   return (
-    <DesktopAppShell active="inbox" profile={dashboardData.profile} courses={dashboardData.courses}>
+    <DesktopAppShell active="inbox" profile={shellData.profile} courses={shellData.courses}>
       <div className="w-full">
         <div className="mb-6 flex items-end justify-between gap-4 border-b border-border/80 pb-4">
           <div>

@@ -8,6 +8,7 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_CANVAS_API_BASE = "https://pucminas.instructure.com/api/v1";
 const DATA_REVALIDATE_SECONDS = 300;
 const CANVAS_API_BASE_COOKIE = "canvasApiBase";
+const CANVAS_FETCH_CONCURRENCY = 4;
 
 const envCanvasApiKey = process.env.CANVAS_KEY ?? process.env.CANVAS_API_KEY;
 
@@ -252,20 +253,27 @@ type CanvasTodoItem = {
   context_name?: string;
 };
 
-type CanvasDashboardCard = {
-  id: string;
-  shortName: string;
-  originalName: string;
-  href?: string;
-};
-
 export type CanvasDashboardData = {
   apiBase: string;
+  generatedAt: string;
   profile: CanvasProfile;
   courses: CanvasCourse[];
   pastCourses: CanvasCourse[];
   todo: CanvasTodoItem[];
-  dashboardCards: CanvasDashboardCard[];
+};
+
+export type CanvasAppShellData = {
+  apiBase: string;
+  profile: CanvasProfile;
+  courses: CanvasCourse[];
+};
+
+export type CanvasCourseLookupData = CanvasAppShellData & {
+  pastCourses: CanvasCourse[];
+};
+
+export type CanvasSubjectShellData = CanvasCourseLookupData & {
+  course: CanvasCourse | null;
 };
 
 export type CanvasCourseContent = {
@@ -403,6 +411,131 @@ async function canvasFetch<T>(path: string, apiKey: string, apiBase?: string): P
   return cachedCanvasFetch(path, apiKey, resolvedApiBase) as Promise<T>;
 }
 
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T) => Promise<R>,
+): Promise<Array<PromiseSettledResult<R>>> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let nextIndex = 0;
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (true) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+
+        if (currentIndex >= items.length) {
+          return;
+        }
+
+        try {
+          const value = await mapper(items[currentIndex]);
+          results[currentIndex] = { status: "fulfilled", value };
+        } catch (error) {
+          results[currentIndex] = { status: "rejected", reason: error };
+        }
+      }
+    }),
+  );
+
+  return results;
+}
+
+async function getActiveCourses(apiKey: string, apiBase: string) {
+  return canvasFetch<CanvasCourse[]>(
+    "/courses?per_page=24&enrollment_state=active&state[]=available&include[]=enrollments&include[]=total_scores&include[]=current_grading_period_scores",
+    apiKey,
+    apiBase,
+  );
+}
+
+async function getCourseLookupPool(apiKey: string, apiBase: string) {
+  return canvasFetch<CanvasCourse[]>(
+    "/courses?per_page=100&include[]=concluded&state[]=available&state[]=completed",
+    apiKey,
+    apiBase,
+  );
+}
+
+export async function getAppShellData(apiKey?: string, apiBase?: string): Promise<CanvasAppShellData> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+  const resolvedApiBase = await resolveCanvasApiBase(apiBase);
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  const [profile, courses] = await Promise.all([
+    canvasFetch<CanvasProfile>("/users/self/profile", resolvedApiKey, resolvedApiBase),
+    getActiveCourses(resolvedApiKey, resolvedApiBase),
+  ]);
+
+  return {
+    apiBase: resolvedApiBase,
+    profile,
+    courses,
+  };
+}
+
+export async function getCourseLookupData(apiKey?: string, apiBase?: string): Promise<CanvasCourseLookupData> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+  const resolvedApiBase = await resolveCanvasApiBase(apiBase);
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  const [profile, courses, allCourses] = await Promise.all([
+    canvasFetch<CanvasProfile>("/users/self/profile", resolvedApiKey, resolvedApiBase),
+    getActiveCourses(resolvedApiKey, resolvedApiBase),
+    getCourseLookupPool(resolvedApiKey, resolvedApiBase),
+  ]);
+
+  const activeCourseIds = new Set(courses.map((course) => course.id));
+  const pastCourses = allCourses.filter(
+    (course) => !activeCourseIds.has(course.id) && (course.concluded || course.workflow_state === "completed"),
+  );
+
+  return {
+    apiBase: resolvedApiBase,
+    profile,
+    courses,
+    pastCourses,
+  };
+}
+
+export async function getSubjectShellData(
+  courseId: number,
+  apiKey?: string,
+  apiBase?: string,
+): Promise<CanvasSubjectShellData> {
+  const shellData = await getAppShellData(apiKey, apiBase);
+  const activeCourse = shellData.courses.find((course) => course.id === courseId) ?? null;
+
+  if (activeCourse) {
+    return {
+      ...shellData,
+      course: activeCourse,
+      pastCourses: [],
+    };
+  }
+
+  const lookupData = await getCourseLookupData(apiKey, apiBase);
+
+  return {
+    ...lookupData,
+    course:
+      lookupData.courses.find((course) => course.id === courseId) ??
+      lookupData.pastCourses.find((course) => course.id === courseId) ??
+      null,
+  };
+}
+
 function isCompletedSubmission(submission?: CanvasSubmission) {
   if (!submission) {
     return false;
@@ -431,8 +564,10 @@ async function getAssignmentCompletionMap(
     ).values(),
   );
 
-  const submissionResults = await Promise.allSettled(
-    uniqueAssignments.map(async ({ courseId, assignmentId }) => {
+  const submissionResults = await mapWithConcurrency(
+    uniqueAssignments,
+    CANVAS_FETCH_CONCURRENCY,
+    async ({ courseId, assignmentId }) => {
       const assignment = await canvasFetch<CanvasAssignment>(
         `/courses/${courseId}/assignments/${assignmentId}?include[]=submission`,
         apiKey,
@@ -444,7 +579,7 @@ async function getAssignmentCompletionMap(
         completed: isCompletedSubmission(assignment.submission),
         courseId,
       };
-    }),
+    },
   );
 
   const completionMap = new Map<string, boolean>();
@@ -464,8 +599,10 @@ async function getAssignmentCompletionMap(
 }
 
 async function getOverdueTodoItems(courses: CanvasCourse[], apiKey: string, apiBase?: string): Promise<CanvasTodoItem[]> {
-  const overdueAssignments = await Promise.allSettled(
-    courses.map(async (course) => {
+  const overdueAssignments = await mapWithConcurrency(
+    courses,
+    CANVAS_FETCH_CONCURRENCY,
+    async (course) => {
       const assignments = await canvasFetch<CanvasAssignment[]>(
         `/courses/${course.id}/assignments?bucket=overdue&include[]=submission&per_page=20`,
         apiKey,
@@ -484,7 +621,7 @@ async function getOverdueTodoItems(courses: CanvasCourse[], apiKey: string, apiB
         },
         context_name: course.name,
       }));
-    }),
+    },
   );
 
   return overdueAssignments.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
@@ -498,27 +635,16 @@ export async function getDashboardData(apiKey?: string, apiBase?: string): Promi
     throw new Error("Missing Canvas API key");
   }
 
-  const [profile, activeCourses, allCourses, todo, dashboardCards] = await Promise.all([
-    canvasFetch<CanvasProfile>("/users/self/profile", resolvedApiKey, resolvedApiBase),
-    canvasFetch<CanvasCourse[]>(
-      "/courses?per_page=24&enrollment_state=active&state[]=available&include[]=enrollments&include[]=total_scores&include[]=current_grading_period_scores",
-      resolvedApiKey,
-      resolvedApiBase,
-    ),
-    canvasFetch<CanvasCourse[]>("/courses?per_page=100&include[]=concluded&state[]=available&state[]=completed", resolvedApiKey, resolvedApiBase),
+  const [courseLookupData, todo] = await Promise.all([
+    getCourseLookupData(resolvedApiKey, resolvedApiBase),
     canvasFetch<CanvasTodoItem[]>("/users/self/todo?per_page=10", resolvedApiKey, resolvedApiBase),
-    canvasFetch<CanvasDashboardCard[]>("/dashboard/dashboard_cards", resolvedApiKey, resolvedApiBase),
   ]);
-  const courses = activeCourses;
-  const activeCourseIds = new Set(activeCourses.map((course) => course.id));
-  const pastCourses = allCourses.filter(
-    (course) => !activeCourseIds.has(course.id) && (course.concluded || course.workflow_state === "completed"),
-  );
+  const { courses, pastCourses, profile } = courseLookupData;
   const overdueTodo = await getOverdueTodoItems(courses, resolvedApiKey, resolvedApiBase);
 
   const completionMap = await getAssignmentCompletionMap(
-    [...todo, ...overdueTodo].flatMap((item) => {
-      if (!item.assignment?.id || !item.assignment.course_id) {
+    todo.flatMap((item) => {
+      if (!item.assignment?.id || !item.assignment.course_id || item.assignment.completed) {
         return [];
       }
 
@@ -533,6 +659,7 @@ export async function getDashboardData(apiKey?: string, apiBase?: string): Promi
 
   return {
     apiBase: resolvedApiBase,
+    generatedAt: new Date().toISOString(),
     profile,
     courses,
     pastCourses,
@@ -569,7 +696,6 @@ export async function getDashboardData(apiKey?: string, apiBase?: string): Promi
         const rightDate = right.assignment?.due_at ?? "";
         return leftDate.localeCompare(rightDate);
       }),
-    dashboardCards,
   };
 }
 

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
-import { getCoursePeople, getDashboardData } from "@/lib/canvas";
+import { getAppShellData, getCoursePeople } from "@/lib/canvas";
 import { ComposeMessageForm } from "./compose-message-form";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
@@ -14,15 +14,15 @@ export default async function NewInboxMessagePage() {
     redirect("/");
   }
 
-  const dashboardData = await getDashboardData(apiKey);
-  const initialCourseId = dashboardData.courses[0]?.id ?? null;
+  const shellData = await getAppShellData(apiKey);
+  const initialCourseId = shellData.courses[0]?.id ?? null;
   const initialCoursePeople = initialCourseId ? await getCoursePeople(initialCourseId, apiKey).catch(() => []) : [];
 
   return (
-    <DesktopAppShell active="inbox" profile={dashboardData.profile} courses={dashboardData.courses}>
+    <DesktopAppShell active="inbox" profile={shellData.profile} courses={shellData.courses}>
       <ComposeMessageForm
-        courses={dashboardData.courses}
-        currentUserId={dashboardData.profile.id}
+        courses={shellData.courses}
+        currentUserId={shellData.profile.id}
         initialCoursePeople={initialCoursePeople}
       />
     </DesktopAppShell>

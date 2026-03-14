@@ -19,7 +19,7 @@ import {
   getCourseGradeData,
   getCourseGroups,
   getCoursePeople,
-  getDashboardData,
+  getSubjectShellData,
 } from "@/lib/canvas";
 import { formatDueDateShort, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
 
@@ -159,9 +159,14 @@ export default async function SubjectPage({
     redirect("/");
   }
 
-  const [dashboardData, courseContent] = await Promise.all([
-    getDashboardData(apiKey),
-    getCourseContent(parsedCourseId, apiKey),
+  const shouldLoadOverviewContent =
+    activeTab === "overview" || activeTab === "modules" || activeTab === "assignments";
+
+  const [courseShellData, courseContent] = await Promise.all([
+    getSubjectShellData(parsedCourseId, apiKey),
+    shouldLoadOverviewContent
+      ? getCourseContent(parsedCourseId, apiKey)
+      : Promise.resolve({ assignments: [], courseId: parsedCourseId, modules: [] }),
   ]);
   const [gradeDataResult, peopleResult, groupsResult, discussionsResult, filesResult] = await Promise.allSettled([
     activeTab === "grades" ? getCourseGradeData(parsedCourseId, apiKey) : Promise.resolve(null),
@@ -170,9 +175,7 @@ export default async function SubjectPage({
     activeTab === "forums" ? getCourseDiscussions(parsedCourseId, apiKey) : Promise.resolve([]),
     activeTab === "files" ? getCourseFiles(parsedCourseId, apiKey) : Promise.resolve([]),
   ]);
-  const allCourses = [...dashboardData.courses, ...dashboardData.pastCourses];
-
-  const course = allCourses.find((item) => item.id === parsedCourseId);
+  const course = courseShellData.course;
 
   if (!course) {
     notFound();
@@ -200,7 +203,7 @@ export default async function SubjectPage({
   const gradeTrendPath = buildTrendPath(gradeTrendPoints);
 
   return (
-    <DesktopAppShell profile={dashboardData.profile} courses={dashboardData.courses} currentCourseId={parsedCourseId}>
+    <DesktopAppShell profile={courseShellData.profile} courses={courseShellData.courses} currentCourseId={parsedCourseId}>
       <div className="w-full">
         <div className="mb-6 overflow-hidden rounded-2xl border border-black/15 bg-gradient-to-br from-white via-white to-black/[0.03]">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-5 py-5 sm:px-6">

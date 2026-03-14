@@ -4,7 +4,7 @@ import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getConversationData, getDashboardData } from "@/lib/canvas";
+import { getAppShellData, getConversationData } from "@/lib/canvas";
 import { formatDueDate } from "@/lib/utils";
 import { ReplyForm } from "./reply-form";
 
@@ -41,15 +41,15 @@ export default async function InboxConversationPage({
     redirect("/");
   }
 
-  const [dashboardData, conversation] = await Promise.all([
-    getDashboardData(apiKey),
+  const [shellData, conversation] = await Promise.all([
+    getAppShellData(apiKey),
     getConversationData(parsedConversationId, apiKey),
   ]);
 
   const messages = [...(conversation.messages ?? [])].reverse();
 
   return (
-    <DesktopAppShell active="inbox" profile={dashboardData.profile} courses={dashboardData.courses}>
+    <DesktopAppShell active="inbox" profile={shellData.profile} courses={shellData.courses}>
       <div className="w-full">
         <div className="mb-6 border-b border-border/80 pb-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
