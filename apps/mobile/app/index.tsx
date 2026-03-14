@@ -103,11 +103,11 @@ export default function IndexScreen() {
         return;
       }
 
-      setTimeout(() => {
-        void Haptics.selectionAsync().catch(() => {
+      queueMicrotask(() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {
           // Silent failure keeps navigation responsive on unsupported devices.
         });
-      }, 0);
+      });
     } catch {
       // Ignore unrelated bridge messages.
     }
