@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
@@ -20,6 +20,7 @@ import { formatDueDate, getSubjectColorStyle } from "@/lib/utils";
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MOBILE_WEEK_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const CALENDAR_VIEW_STORAGE_KEY = "canvasCalendarViewMode";
+const CALENDAR_MONTH_CACHE_KEY = "canvasCalendarMonthCache";
 
 type CalendarEntry = {
   id: string;
@@ -38,6 +39,13 @@ type CalendarClientProps = {
   initialMonth: number;
   initialYear: number;
   monthLabel: string;
+};
+
+type CalendarMonthPayload = {
+  entries: CalendarEntry[];
+  month: number;
+  monthLabel: string;
+  year: number;
 };
 
 const DISPLAY_TIME_ZONE = "America/Sao_Paulo";
@@ -109,12 +117,55 @@ function getDayLabel(value: string) {
   }).format(new Date(value));
 }
 
+function getMonthCacheEntryKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function readCalendarMonthCache() {
+  if (typeof window === "undefined") {
+    return {} as Record<string, CalendarMonthPayload>;
+  }
+
+  const storedValue = window.localStorage.getItem(CALENDAR_MONTH_CACHE_KEY);
+
+  if (!storedValue) {
+    return {} as Record<string, CalendarMonthPayload>;
+  }
+
+  try {
+    return JSON.parse(storedValue) as Record<string, CalendarMonthPayload>;
+  } catch {
+    window.localStorage.removeItem(CALENDAR_MONTH_CACHE_KEY);
+    return {} as Record<string, CalendarMonthPayload>;
+  }
+}
+
+function readCalendarMonthFromCache(year: number, month: number) {
+  const cache = readCalendarMonthCache();
+  return cache[getMonthCacheEntryKey(year, month)] ?? null;
+}
+
+function writeCalendarMonthToCache(payload: CalendarMonthPayload) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const cache = readCalendarMonthCache();
+  cache[getMonthCacheEntryKey(payload.year, payload.month)] = payload;
+  window.localStorage.setItem(CALENDAR_MONTH_CACHE_KEY, JSON.stringify(cache));
+}
+
+function isSameMonthPayload(left: CalendarMonthPayload, right: CalendarMonthPayload) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 export default function CalendarClient({
   initialEntries,
   initialMonth,
   initialYear,
   monthLabel,
 }: CalendarClientProps) {
+  const latestRequestKey = useRef<string | null>(null);
   const [displayedMonth, setDisplayedMonth] = useState({ month: initialMonth, year: initialYear });
   const [currentMonthLabel, setCurrentMonthLabel] = useState(monthLabel);
   const [entries, setEntries] = useState(initialEntries);
@@ -132,6 +183,12 @@ export default function CalendarClient({
   );
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   useEffect(() => {
+    writeCalendarMonthToCache({
+      entries: initialEntries,
+      month: initialMonth,
+      monthLabel,
+      year: initialYear,
+    });
     setDisplayedMonth({ month: initialMonth, year: initialYear });
     setEntries(initialEntries);
     setCurrentMonthLabel(monthLabel);
@@ -181,32 +238,107 @@ export default function CalendarClient({
       .sort((left, right) => left.key.localeCompare(right.key));
   }, [visibleEntries]);
 
-  const loadMonth = async (year: number, month: number) => {
+  const applyMonthPayload = useCallback((payload: CalendarMonthPayload) => {
+    setDisplayedMonth({ month: payload.month, year: payload.year });
+    setEntries(payload.entries);
+    setCurrentMonthLabel(payload.monthLabel);
+    setCurrentUpcomingEntries(payload.entries.slice(0, 8));
+  }, []);
+
+  const fetchMonth = useCallback(async (
+    year: number,
+    month: number,
+    options?: { applyIfLatest?: boolean },
+  ) => {
     const nextMonth = normalizeMonth(year, month);
-    setLoadingMonth(true);
+    const requestKey = getMonthCacheEntryKey(nextMonth.year, nextMonth.month);
+
+    if (options?.applyIfLatest) {
+      latestRequestKey.current = requestKey;
+      setLoadingMonth(true);
+    }
 
     try {
       const response = await fetch(`/api/calendar?month=${nextMonth.month}&year=${nextMonth.year}`);
-      const payload = (await response.json()) as {
-        entries?: CalendarEntry[];
-        error?: string;
-        month?: number;
-        monthLabel?: string;
-        year?: number;
-      };
+      const payload = (await response.json()) as Partial<CalendarMonthPayload> & { error?: string };
 
       if (!response.ok || !payload.entries || !payload.month || !payload.year || !payload.monthLabel) {
         throw new Error(payload.error ?? "Could not load calendar month");
       }
 
-      setDisplayedMonth({ month: payload.month, year: payload.year });
-      setEntries(payload.entries);
-      setCurrentMonthLabel(payload.monthLabel);
-      setCurrentUpcomingEntries(payload.entries.slice(0, 8));
+      const normalizedPayload: CalendarMonthPayload = {
+        entries: payload.entries,
+        month: payload.month,
+        monthLabel: payload.monthLabel,
+        year: payload.year,
+      };
+      const cachedPayload = readCalendarMonthFromCache(normalizedPayload.year, normalizedPayload.month);
+
+      if (!cachedPayload || !isSameMonthPayload(cachedPayload, normalizedPayload)) {
+        writeCalendarMonthToCache(normalizedPayload);
+      }
+
+      if (!options?.applyIfLatest || latestRequestKey.current === requestKey) {
+        applyMonthPayload(normalizedPayload);
+      }
+
+      return normalizedPayload;
     } finally {
-      setLoadingMonth(false);
+      if (!options?.applyIfLatest || latestRequestKey.current === requestKey) {
+        setLoadingMonth(false);
+      }
     }
-  };
+  }, [applyMonthPayload]);
+
+  const prefetchMonth = useCallback((year: number, month: number) => {
+    const normalized = normalizeMonth(year, month);
+
+    if (readCalendarMonthFromCache(normalized.year, normalized.month)) {
+      return;
+    }
+
+    void fetchMonth(normalized.year, normalized.month).catch(() => {
+      // Background month warmup is best-effort only.
+    });
+  }, [fetchMonth]);
+
+  const loadMonth = useCallback(async (year: number, month: number) => {
+    const nextMonth = normalizeMonth(year, month);
+    const cachedPayload = readCalendarMonthFromCache(nextMonth.year, nextMonth.month);
+
+    setSelectedDay(null);
+    setDisplayedMonth({ month: nextMonth.month, year: nextMonth.year });
+    setCurrentMonthLabel(cachedPayload?.monthLabel ?? new Intl.DateTimeFormat("en-US", {
+      timeZone: DISPLAY_TIME_ZONE,
+      month: "long",
+      year: "numeric",
+    }).format(new Date(Date.UTC(nextMonth.year, nextMonth.month - 1, 1, 12))));
+
+    if (cachedPayload) {
+      applyMonthPayload(cachedPayload);
+    } else {
+      setEntries([]);
+      setCurrentUpcomingEntries([]);
+    }
+
+    void fetchMonth(nextMonth.year, nextMonth.month, { applyIfLatest: true })
+      .then((payload) => {
+        if (!payload) {
+          return;
+        }
+
+        prefetchMonth(payload.year, payload.month - 1);
+        prefetchMonth(payload.year, payload.month + 1);
+      })
+      .catch(() => {
+        // Keep showing cached or previous optimistic state if refresh fails.
+      });
+  }, [applyMonthPayload, fetchMonth, prefetchMonth]);
+
+  useEffect(() => {
+    prefetchMonth(displayedMonth.year, displayedMonth.month - 1);
+    prefetchMonth(displayedMonth.year, displayedMonth.month + 1);
+  }, [displayedMonth.month, displayedMonth.year, prefetchMonth]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.45fr_0.75fr]">

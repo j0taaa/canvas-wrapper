@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { EyeOff, MonitorCog, MoonStar, Palette, Smartphone, SunMedium } from "lucide-react";
+import { ChevronDown, EyeOff, MonitorCog, MoonStar, Palette, Smartphone, SunMedium } from "lucide-react";
 import { formatSubjectName, getSubjectColorHex, getSubjectColorStyle } from "@/lib/utils";
 import {
   readHapticsPreference,
@@ -138,8 +138,59 @@ function HapticsPreferenceSelector() {
   );
 }
 
+function MobileSubjectBarSelector() {
+  const [enabled, setEnabled] = useState(true);
+
+  useEffect(() => {
+    const syncPreferences = () => setEnabled(readSubjectPreferences().showMobileSubjectBar);
+
+    syncPreferences();
+    window.addEventListener("storage", syncPreferences);
+    window.addEventListener(SUBJECT_PREFERENCES_EVENT, syncPreferences);
+
+    return () => {
+      window.removeEventListener("storage", syncPreferences);
+      window.removeEventListener(SUBJECT_PREFERENCES_EVENT, syncPreferences);
+    };
+  }, []);
+
+  return (
+    <div className="rounded-2xl border border-border/70 bg-muted/35 p-4">
+      <p className="mb-3 text-sm font-medium text-foreground">Mobile subject bar</p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => writeSubjectPreferences({ ...readSubjectPreferences(), showMobileSubjectBar: true })}
+          className={
+            enabled
+              ? "inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              : "inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
+          }
+        >
+          <span>Show</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => writeSubjectPreferences({ ...readSubjectPreferences(), showMobileSubjectBar: false })}
+          className={
+            !enabled
+              ? "inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              : "inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
+          }
+        >
+          <span>Hide</span>
+        </button>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Show or hide the horizontal subject shortcuts above the mobile bottom navigation.
+      </p>
+    </div>
+  );
+}
+
 function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["courses"] }) {
   const [preferences, setPreferences] = useState(DEFAULT_SUBJECT_PREFERENCES);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     const syncPreferences = () => setPreferences(readSubjectPreferences());
@@ -165,94 +216,110 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
 
   return (
     <div>
-      <div className="space-y-3">
-        {visibleCourses.map((course) => {
-          const isHidden = preferences.hiddenCourseIds.includes(course.id);
-          const preferredColor = preferences.colors[course.id];
-          const colorStyle = getSubjectColorStyle(course.name, preferredColor);
-          const inputColor = preferredColor ?? getSubjectColorHex(course.name);
+      <button
+        type="button"
+        onClick={() => setIsExpanded((current) => !current)}
+        className="flex w-full items-center justify-between rounded-2xl border border-border/70 bg-muted/35 p-4 text-left transition hover:border-border hover:bg-muted/50"
+      >
+        <div>
+          <p className="text-sm font-medium text-foreground">Subjects</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Hide subjects and customize their colors.
+          </p>
+        </div>
+        <ChevronDown className={`h-4 w-4 text-muted-foreground transition ${isExpanded ? "rotate-180" : ""}`} />
+      </button>
 
-          return (
-            <div key={course.id} className="rounded-2xl border border-border/70 bg-card p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: colorStyle.borderColor }}
-                    />
-                    <p className="truncate text-sm font-medium text-foreground">{formatSubjectName(course.name)}</p>
+      {isExpanded && (
+        <div className="mt-3 space-y-3">
+          {visibleCourses.map((course) => {
+            const isHidden = preferences.hiddenCourseIds.includes(course.id);
+            const preferredColor = preferences.colors[course.id];
+            const colorStyle = getSubjectColorStyle(course.name, preferredColor);
+            const inputColor = preferredColor ?? getSubjectColorHex(course.name);
+
+            return (
+              <div key={course.id} className="rounded-2xl border border-border/70 bg-card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: colorStyle.borderColor }}
+                      />
+                      <p className="truncate text-sm font-medium text-foreground">{formatSubjectName(course.name)}</p>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{course.course_code ?? "Subject"}</p>
                   </div>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">{course.course_code ?? "Subject"}</p>
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={!isHidden}
+                      onChange={(event) => {
+                        const nextHiddenIds = event.target.checked
+                          ? preferences.hiddenCourseIds.filter((courseId) => courseId !== course.id)
+                          : [...preferences.hiddenCourseIds, course.id];
+
+                        writeSubjectPreferences({
+                          ...preferences,
+                          hiddenCourseIds: Array.from(new Set(nextHiddenIds)),
+                        });
+                      }}
+                      className="h-4 w-4 rounded border-border/70 bg-background"
+                    />
+                    Visible
+                  </label>
                 </div>
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={!isHidden}
-                    onChange={(event) => {
-                      const nextHiddenIds = event.target.checked
-                        ? preferences.hiddenCourseIds.filter((courseId) => courseId !== course.id)
-                        : [...preferences.hiddenCourseIds, course.id];
 
-                      writeSubjectPreferences({
-                        ...preferences,
-                        hiddenCourseIds: Array.from(new Set(nextHiddenIds)),
-                      });
-                    }}
-                    className="h-4 w-4 rounded border-border/70 bg-background"
-                  />
-                  Visible
-                </label>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Palette className="h-4 w-4" />
+                    Color
+                    <input
+                      type="color"
+                      value={inputColor}
+                      onChange={(event) => {
+                        writeSubjectPreferences({
+                          ...preferences,
+                          colors: {
+                            ...preferences.colors,
+                            [course.id]: event.target.value,
+                          },
+                        });
+                      }}
+                      className="h-8 w-10 rounded border border-border/70 bg-transparent p-0"
+                      aria-label={`Choose color for ${formatSubjectName(course.name)}`}
+                    />
+                  </label>
+                  {preferredColor && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextColors = { ...preferences.colors };
+                        delete nextColors[course.id];
+
+                        writeSubjectPreferences({
+                          ...preferences,
+                          colors: nextColors,
+                        });
+                      }}
+                      className="text-xs text-muted-foreground transition hover:text-foreground"
+                    >
+                      Reset color
+                    </button>
+                  )}
+                  {isHidden && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/50 px-2 py-1 text-[11px] text-muted-foreground">
+                      <EyeOff className="h-3 w-3" />
+                      Hidden
+                    </span>
+                  )}
+                </div>
               </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Palette className="h-4 w-4" />
-                  Color
-                  <input
-                    type="color"
-                    value={inputColor}
-                    onChange={(event) => {
-                      writeSubjectPreferences({
-                        ...preferences,
-                        colors: {
-                          ...preferences.colors,
-                          [course.id]: event.target.value,
-                        },
-                      });
-                    }}
-                    className="h-8 w-10 rounded border border-border/70 bg-transparent p-0"
-                    aria-label={`Choose color for ${formatSubjectName(course.name)}`}
-                  />
-                </label>
-                {preferredColor && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextColors = { ...preferences.colors };
-                      delete nextColors[course.id];
-
-                      writeSubjectPreferences({
-                        ...preferences,
-                        colors: nextColors,
-                      });
-                    }}
-                    className="text-xs text-muted-foreground transition hover:text-foreground"
-                  >
-                    Reset color
-                  </button>
-                )}
-                {isHidden && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/50 px-2 py-1 text-[11px] text-muted-foreground">
-                    <EyeOff className="h-3 w-3" />
-                    Hidden
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -262,10 +329,36 @@ export function ProfilePreferences({ courses }: ProfilePreferencesProps) {
     <div className="space-y-6">
       <ThemePreferenceSelector />
       <HapticsPreferenceSelector />
+      <MobileSubjectBarSelector />
       <div className="rounded-2xl border border-border/70 bg-muted/35 p-4 text-sm text-muted-foreground">
         Hide subjects from the dashboard and navigation, choose your own subject colors, or enable optional haptic feedback.
       </div>
       <SubjectPreferenceList courses={courses} />
+      <div className="rounded-2xl border border-border/70 bg-muted/35 p-4 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">Made by Gabriel Jota Lizardo</p>
+        <p className="mt-2">
+          Suggestions, fixes, or feedback:
+          {" "}
+          <a
+            href="mailto:gabrieljotalizardo@gmail.com"
+            className="text-foreground underline underline-offset-4 transition hover:opacity-75"
+          >
+            gabrieljotalizardo@gmail.com
+          </a>
+        </p>
+        <p className="mt-2">
+          LinkedIn:
+          {" "}
+          <a
+            href="https://www.linkedin.com/in/gabriel-jota-lizardo-4587a427b/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-foreground underline underline-offset-4 transition hover:opacity-75"
+          >
+            Gabriel Jota Lizardo
+          </a>
+        </p>
+      </div>
     </div>
   );
 }

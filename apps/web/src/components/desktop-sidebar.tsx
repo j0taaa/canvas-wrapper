@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Bookmark, CalendarDays, House, Inbox, LibraryBig, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  DEFAULT_SUBJECT_PREFERENCES,
   readSubjectPreferences,
   type SubjectPreferences,
   SUBJECT_PREFERENCES_EVENT,
@@ -66,7 +67,7 @@ export function DesktopSidebar({
   profile,
   courses,
   currentCourseId,
-  initialPreferences = { colors: {}, hiddenCourseIds: [] },
+  initialPreferences = DEFAULT_SUBJECT_PREFERENCES,
 }: DesktopSidebarProps) {
   const router = useRouter();
   const [preferences, setPreferences] = useState(initialPreferences);
@@ -96,7 +97,7 @@ export function DesktopSidebar({
   };
 
   return (
-    <aside className="hidden border-r border-border/80 bg-background/90 p-4 md:block">
+    <aside className="hidden border-r border-border/80 bg-background/90 p-4 md:sticky md:top-0 md:block md:h-screen md:overflow-y-auto">
       {profile && (
         <Link
           href="/profile"
@@ -170,7 +171,7 @@ export function MobileBottomNav({
   active,
   courses,
   currentCourseId,
-  initialPreferences = { colors: {}, hiddenCourseIds: [] },
+  initialPreferences = DEFAULT_SUBJECT_PREFERENCES,
 }: Omit<DesktopSidebarProps, "profile">) {
   const [preferences, setPreferences] = useState(initialPreferences);
 
@@ -190,7 +191,7 @@ export function MobileBottomNav({
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-background/95 backdrop-blur md:hidden">
-      {visibleCourses && visibleCourses.length > 0 && (
+      {preferences.showMobileSubjectBar && visibleCourses && visibleCourses.length > 0 && (
         <div className="overflow-x-auto border-b border-border/70 px-3 py-2">
           <div className="flex min-w-max items-center gap-2">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/70 bg-muted/60 text-muted-foreground">

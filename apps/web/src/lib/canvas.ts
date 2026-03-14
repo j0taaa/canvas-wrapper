@@ -884,18 +884,20 @@ export async function getCalendarData(
 
 export async function getInboxData(apiKey?: string): Promise<CanvasInboxData> {
   const resolvedApiKey = apiKey ?? envCanvasApiKey;
+  const resolvedApiBase = await resolveCanvasApiBase();
 
   if (!resolvedApiKey) {
     throw new Error("Missing Canvas API key");
   }
 
-  const conversations = await canvasFetch<CanvasConversation[]>(
+  const conversations = await rawCanvasFetch(
     "/conversations?include[]=participant_avatars",
     resolvedApiKey,
+    resolvedApiBase,
   );
 
   return {
-    conversations,
+    conversations: conversations as CanvasConversation[],
   };
 }
 
@@ -904,13 +906,100 @@ export async function getConversationData(
   apiKey?: string,
 ): Promise<CanvasConversationDetail> {
   const resolvedApiKey = apiKey ?? envCanvasApiKey;
+  const resolvedApiBase = await resolveCanvasApiBase();
 
   if (!resolvedApiKey) {
     throw new Error("Missing Canvas API key");
   }
 
-  return canvasFetch<CanvasConversationDetail>(
+  return rawCanvasFetch(
     `/conversations/${conversationId}?auto_mark_as_read=true&include[]=participant_avatars`,
     resolvedApiKey,
+    resolvedApiBase,
   );
+}
+
+export async function createConversation(
+  options: {
+    body: string;
+    courseId: number;
+    groupConversation: boolean;
+    recipientIds: number[];
+    subject: string;
+  },
+  apiKey?: string,
+): Promise<CanvasConversation | null> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+  const resolvedApiBase = await resolveCanvasApiBase();
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  const params = new URLSearchParams();
+  for (const recipientId of options.recipientIds) {
+    params.append("recipients[]", String(recipientId));
+  }
+  params.set("subject", options.subject);
+  params.set("body", options.body);
+  params.set("context_code", `course_${options.courseId}`);
+  params.set("group_conversation", String(options.groupConversation));
+
+  if (!options.groupConversation) {
+    params.set("mode", "async");
+  }
+
+  const response = await fetch(`${resolvedApiBase}/conversations`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resolvedApiKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Canvas conversation request failed (${response.status})`);
+  }
+
+  const payload = (await response.json()) as CanvasConversation | CanvasConversation[];
+
+  if (Array.isArray(payload)) {
+    return payload[0] ?? null;
+  }
+
+  return payload ?? null;
+}
+
+export async function addConversationMessage(
+  conversationId: number,
+  body: string,
+  apiKey?: string,
+): Promise<CanvasConversationDetail> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+  const resolvedApiBase = await resolveCanvasApiBase();
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  const params = new URLSearchParams();
+  params.set("body", body);
+
+  const response = await fetch(`${resolvedApiBase}/conversations/${conversationId}/add_message`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resolvedApiKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Canvas add-message request failed (${response.status})`);
+  }
+
+  return (await response.json()) as CanvasConversationDetail;
 }

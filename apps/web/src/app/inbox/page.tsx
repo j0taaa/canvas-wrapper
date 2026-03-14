@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { MessageSquarePlus, Plus } from "lucide-react";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,10 @@ import { getDashboardData, getInboxData } from "@/lib/canvas";
 import { formatDueDate } from "@/lib/utils";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
+const primaryLinkButtonClassName =
+  "hidden h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 sm:inline-flex";
+const floatingComposeButtonClassName =
+  "fixed bottom-36 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:opacity-90 md:hidden";
 
 function getInitials(name: string) {
   return name
@@ -25,7 +30,12 @@ function getInitials(name: string) {
     .join("");
 }
 
-export default async function InboxPage() {
+export default async function InboxPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string; sent?: string }>;
+}) {
+  const { mode, sent } = await searchParams;
   const cookieStore = await cookies();
   const apiKey = cookieStore.get(CANVAS_API_KEY_COOKIE)?.value;
 
@@ -44,10 +54,24 @@ export default async function InboxPage() {
         <div className="mb-6 flex items-end justify-between gap-4 border-b border-border/80 pb-4">
           <div>
             <h1 className="text-2xl font-bold">Inbox</h1>
-            <p className="text-sm text-muted-foreground">Recent Canvas conversations.</p>
+            <p className="text-sm text-muted-foreground">Recent Canvas conversations and course-wide messages.</p>
           </div>
-          <span className="text-sm font-medium text-muted-foreground">{inboxData.conversations.length}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-muted-foreground">{inboxData.conversations.length}</span>
+            <Link href="/inbox/new" className={primaryLinkButtonClassName}>
+              <MessageSquarePlus className="h-4 w-4" />
+              <span>New message</span>
+            </Link>
+          </div>
         </div>
+
+        {sent === "1" && (
+          <div className="mb-4 rounded-3xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+            {mode === "queued"
+              ? "Message queued. Canvas is sending the individual copies in the background."
+              : "Message sent."}
+          </div>
+        )}
 
         <Card className="border-border/80 bg-card/95">
           <CardHeader>
@@ -93,6 +117,14 @@ export default async function InboxPage() {
             })}
           </CardContent>
         </Card>
+
+        <Link
+          href="/inbox/new"
+          aria-label="New message"
+          className={floatingComposeButtonClassName}
+        >
+          <Plus className="h-6 w-6" />
+        </Link>
       </div>
     </DesktopAppShell>
   );

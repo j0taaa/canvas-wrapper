@@ -5,11 +5,13 @@ export const SUBJECT_PREFERENCES_EVENT = "canvas-subject-preferences-changed";
 export type SubjectPreferences = {
   colors: Record<number, string>;
   hiddenCourseIds: number[];
+  showMobileSubjectBar: boolean;
 };
 
 export const DEFAULT_SUBJECT_PREFERENCES: SubjectPreferences = {
   colors: {},
   hiddenCourseIds: [],
+  showMobileSubjectBar: true,
 };
 
 export function parseSubjectPreferences(value?: string | null): SubjectPreferences {
@@ -23,6 +25,7 @@ export function parseSubjectPreferences(value?: string | null): SubjectPreferenc
     return {
       colors: parsed.colors ?? {},
       hiddenCourseIds: Array.isArray(parsed.hiddenCourseIds) ? parsed.hiddenCourseIds : [],
+      showMobileSubjectBar: parsed.showMobileSubjectBar ?? true,
     };
   } catch {
     return DEFAULT_SUBJECT_PREFERENCES;
