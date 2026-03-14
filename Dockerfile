@@ -1,19 +1,22 @@
 # syntax=docker/dockerfile:1.7
 
-FROM oven/bun:1.2.22 AS deps
+FROM oven/bun:1.3.3 AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
+COPY apps/web/package.json ./apps/web/package.json
+COPY apps/mobile/package.json ./apps/mobile/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
 RUN bun install --frozen-lockfile
 
-FROM node:22-bookworm-slim AS builder
+FROM oven/bun:1.3.3 AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN ./node_modules/.bin/next build
+RUN bun run build:web
 
 FROM node:22-bookworm-slim AS runner
-WORKDIR /app
+WORKDIR /app/apps/web
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
@@ -21,9 +24,9 @@ ENV HOSTNAME=0.0.0.0
 
 RUN groupadd --system nodejs && useradd --system --gid nodejs nextjs
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder /app/apps/web/.next/standalone /app
+COPY --from=builder /app/apps/web/.next/static ./.next/static
 
 USER nextjs
 EXPOSE 3000

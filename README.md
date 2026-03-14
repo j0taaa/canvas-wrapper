@@ -1,72 +1,83 @@
-## Canvas Wrapper
+# Canvas Wrapper Monorepo
 
-A simple Canvas-like dashboard built with **Next.js**, **Bun**, and **shadcn/ui**.
+This repository is a monorepo with:
 
-### Setup
+- `apps/web`: the Next.js web app
+- `apps/mobile`: the React Native app built with Expo
+- `packages/shared`: shared cross-platform types and pure utilities
 
-1. Install dependencies:
+The repo-level parity rules live in `AGENTS.md`. Web and mobile are expected to evolve together and stay feature-aligned.
+
+## Setup
+
+Install dependencies from the repo root:
 
 ```bash
 bun install
 ```
 
-2. Configure environment variables:
+## Development
+
+Run the web app:
 
 ```bash
-cp .env.example .env.local
+bun run dev:web
 ```
 
-3. Run dev server:
+Run the mobile app:
 
 ```bash
-bun run dev
+bun run dev:mobile
 ```
 
-Open http://localhost:3000.
-
-
-### Run with Docker Compose
-
-1. Create runtime env file:
+Extra mobile shortcuts:
 
 ```bash
-cp .env.example .env.local
+bun run ios:mobile
+bun run android:mobile
+bun run typecheck:mobile
 ```
 
-2. Build and start the container:
+## Structure
+
+```text
+apps/
+  mobile/   Expo + React Native app
+  web/      Next.js app
+packages/
+  shared/   Shared cross-platform helpers
+```
+
+## Web build and validation
+
+From the repo root:
+
+```bash
+bun run lint
+bun run build
+```
+
+## Docker
+
+The Docker setup builds and runs the web app from the monorepo root:
 
 ```bash
 docker compose up --build
 ```
 
-3. Open http://localhost:3000.
+Then open [http://localhost:3000](http://localhost:3000).
 
-### Container image CI
+## Environment variables
 
-A GitHub Actions workflow at `.github/workflows/docker-image.yml` builds the Docker image on pull requests and builds + publishes to `ghcr.io/<owner>/<repo>` for pushes to `main` and `v*` tags.
+The app can work without fixed env credentials because users can connect with their own Canvas URL and API token in the UI, but these server-side envs are still supported:
 
-### Environment variables
+- `CANVAS_KEY`
+- `CANVAS_API_KEY`
+- `CANVAS_API_BASE`
 
-- `CANVAS_KEY` (recommended): Canvas API token.
-- `CANVAS_API_KEY` (fallback): Alternative token variable name.
-- `CANVAS_API_BASE` (optional): Defaults to `https://pucminas.instructure.com/api/v1`.
+## Notes
 
-### PWA support
-
-- App includes `manifest.webmanifest` and a service worker (`/sw.js`).
-- Installable in browsers that support PWA install prompts.
-- Static app assets are cached offline-first by the service worker.
-
-### Data caching
-
-- Canvas API requests use `force-cache` with revalidation.
-- Dashboard data is memoized with Next.js `unstable_cache` and tags.
-- Profile/courses/todo/dashboard cards revalidate every 5 minutes by default.
-
-### Quick validation
-
-```bash
-CANVAS_KEY=your_token_here bun run dev
-```
-
-This app reads your profile, dashboard cards, active courses, and to-do list directly from Canvas API.
+- The shared package is the right place for domain types, formatters, and pure mapping logic used by both apps.
+- Platform-specific UI and native integrations should stay inside `apps/web` or `apps/mobile`.
+- The mobile app is an Expo + React Native shell around the real web app so mobile and web stay in lockstep on features, behavior, and design.
+- Set `EXPO_PUBLIC_WEB_APP_URL` for the mobile app, or enter the website URL on first launch inside the app.

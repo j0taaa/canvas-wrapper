@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Canvas Wrapper",
+    "slug": "canvas-wrapper-mobile",
+    "scheme": "canvaswrapper",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#111827"
+      }
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
