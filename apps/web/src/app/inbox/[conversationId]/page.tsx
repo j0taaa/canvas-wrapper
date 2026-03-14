@@ -104,7 +104,7 @@ export default async function InboxConversationPage({
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div
-                    className="prose prose-sm max-w-none prose-p:my-0 dark:prose-invert dark:prose-a:text-white"
+                    className="rich-content prose prose-sm max-w-none prose-p:my-0 dark:prose-invert"
                     dangerouslySetInnerHTML={{
                       __html: rewriteCanvasHtmlLinks(
                         message.body || "<p>No message content.</p>",

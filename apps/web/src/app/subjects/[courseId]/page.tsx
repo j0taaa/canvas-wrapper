@@ -237,7 +237,7 @@ export default async function SubjectPage({
                       ? "inline-block md:hidden"
                       : "inline-block"
                 } ${
-                  activeTab === item
+                  activeTab === item || (activeTab === "overview" && item === "modules")
                     ? "rounded-full bg-black px-4 py-2 text-sm font-medium text-white"
                     : "rounded-full border border-black/15 bg-white px-4 py-2 text-sm text-black/65 transition hover:border-black/45 hover:bg-black/[0.03] hover:text-black"
                 }`
@@ -262,7 +262,7 @@ export default async function SubjectPage({
 
         {(activeTab === "overview" || activeTab === "modules" || activeTab === "assignments") && (
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-              <Card className={activeTab === "assignments" ? "hidden border-black/15 bg-white/90 lg:block" : "border-black/15 bg-white/90"}>
+              <Card className={activeTab === "assignments" ? "hidden border-black/15 bg-white/90 lg:block" : activeTab === "overview" ? "border-black/15 bg-white/90" : "border-black/15 bg-white/90"}>
               <CardHeader className="border-b border-black/10">
                 <CardTitle>Modules</CardTitle>
                 <CardDescription>Lessons and organized course materials</CardDescription>
@@ -326,7 +326,7 @@ export default async function SubjectPage({
               </CardContent>
             </Card>
 
-              <Card className={activeTab === "modules" ? "hidden border-black/15 bg-white/90 lg:block" : "border-black/15 bg-white/90"}>
+              <Card className={activeTab === "modules" || activeTab === "overview" ? "hidden border-black/15 bg-white/90 lg:block" : "border-black/15 bg-white/90"}>
               <CardHeader className="border-b border-black/10">
                 <CardTitle>Assignments</CardTitle>
                 <CardDescription>Upcoming and recent work for this subject</CardDescription>

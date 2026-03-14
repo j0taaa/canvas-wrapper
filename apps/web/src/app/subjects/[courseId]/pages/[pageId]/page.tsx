@@ -106,7 +106,7 @@ export default async function SubjectContentPage({
           </CardHeader>
           <CardContent>
             <div
-              className="prose prose-sm max-w-none prose-p:my-3 dark:prose-invert dark:prose-a:text-white"
+              className="rich-content prose prose-sm max-w-none prose-p:my-3 dark:prose-invert"
               dangerouslySetInnerHTML={{ __html: renderedBody }}
             />
           </CardContent>

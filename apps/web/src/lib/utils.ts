@@ -48,7 +48,12 @@ export function getSubjectColorStyle(name?: string | null, preferredColor?: stri
   return getSubjectColorPalette(name, preferredColor)
 }
 
-function buildWrappedCanvasPath(pathname: string, currentCourseId?: number) {
+type WrappedCanvasLink = {
+  kind: "assignment" | "file" | "forum" | "grade" | "module" | "page" | "people" | "quiz" | "subject"
+  path: string
+}
+
+function buildWrappedCanvasLink(pathname: string, currentCourseId?: number): WrappedCanvasLink | null {
   const normalizedPath = pathname.replace(/\/+$/, "")
 
   if (!normalizedPath) {
@@ -65,39 +70,42 @@ function buildWrappedCanvasPath(pathname: string, currentCourseId?: number) {
     }
 
     if (segments.length === 2) {
-      return `/subjects/${courseId}`
+      return { kind: "subject", path: `/subjects/${courseId}` }
     }
 
     if (segments[2] === "pages" && segments[3]) {
-      return `/subjects/${courseId}/pages/${encodeURIComponent(segments.slice(3).join("/"))}`
+      return {
+        kind: "page",
+        path: `/subjects/${courseId}/pages/${encodeURIComponent(segments.slice(3).join("/"))}`,
+      }
     }
 
     if (segments[2] === "assignments" && segments[3]) {
-      return `/subjects/${courseId}/assignments/${segments[3]}`
+      return { kind: "assignment", path: `/subjects/${courseId}/assignments/${segments[3]}` }
     }
 
     if (segments[2] === "quizzes" && segments[3]) {
-      return `/subjects/${courseId}/quizzes/${segments[3]}`
+      return { kind: "quiz", path: `/subjects/${courseId}/quizzes/${segments[3]}` }
     }
 
     if (segments[2] === "files" && segments[3]) {
-      return `/subjects/${courseId}/files/${segments[3]}`
+      return { kind: "file", path: `/subjects/${courseId}/files/${segments[3]}` }
     }
 
     if (segments[2] === "modules") {
-      return `/subjects/${courseId}?tab=modules`
+      return { kind: "module", path: `/subjects/${courseId}?tab=modules` }
     }
 
     if (segments[2] === "grades") {
-      return `/subjects/${courseId}?tab=grades`
+      return { kind: "grade", path: `/subjects/${courseId}?tab=grades` }
     }
 
     if (segments[2] === "users") {
-      return `/subjects/${courseId}?tab=people`
+      return { kind: "people", path: `/subjects/${courseId}?tab=people` }
     }
 
     if (segments[2] === "discussion_topics") {
-      return `/subjects/${courseId}?tab=forums`
+      return { kind: "forum", path: `/subjects/${courseId}?tab=forums` }
     }
   }
 
@@ -106,7 +114,7 @@ function buildWrappedCanvasPath(pathname: string, currentCourseId?: number) {
       return null
     }
 
-    return `/subjects/${currentCourseId}/files/${segments[1]}`
+    return { kind: "file", path: `/subjects/${currentCourseId}/files/${segments[1]}` }
   }
 
   return null
@@ -145,23 +153,75 @@ export function rewriteCanvasHref(href: string, apiBase?: string, currentCourseI
     return href
   }
 
-  const wrappedPath = buildWrappedCanvasPath(parsedUrl.pathname, currentCourseId)
+  const wrappedLink = buildWrappedCanvasLink(parsedUrl.pathname, currentCourseId)
 
-  if (!wrappedPath) {
+  if (!wrappedLink) {
     return href
   }
 
-  return `${wrappedPath}${parsedUrl.search}${parsedUrl.hash}`
+  return `${wrappedLink.path}${parsedUrl.search}${parsedUrl.hash}`
+}
+
+function appendAnchorClass(anchorAttributes: string, className: string) {
+  if (/\bclass=(["']).*?\1/i.test(anchorAttributes)) {
+    return anchorAttributes.replace(/\bclass=(["'])(.*?)\1/i, (match, quote: string, existingClasses: string) => {
+      const nextClasses = new Set(existingClasses.split(/\s+/).filter(Boolean))
+      nextClasses.add(className)
+      return `class=${quote}${Array.from(nextClasses).join(" ")}${quote}`
+    })
+  }
+
+  return `${anchorAttributes} class="${className}"`
+}
+
+function appendAnchorAttribute(anchorAttributes: string, attributeName: string, attributeValue: string) {
+  if (new RegExp(`\\b${attributeName}=`, "i").test(anchorAttributes)) {
+    return anchorAttributes.replace(new RegExp(`\\b${attributeName}=(["']).*?\\1`, "i"), `${attributeName}="${attributeValue}"`)
+  }
+
+  return `${anchorAttributes} ${attributeName}="${attributeValue}"`
 }
 
 export function rewriteCanvasHtmlLinks(html: string, apiBase?: string, currentCourseId?: number) {
-  return html.replace(/href=(["'])(.*?)\1/gi, (match, quote: string, href: string) => {
-    const rewrittenHref = rewriteCanvasHref(href, apiBase, currentCourseId)
+  return html.replace(/<a\b([^>]*?)href=(["'])(.*?)\2([^>]*)>/gi, (match, beforeHref: string, quote: string, href: string, afterHref: string) => {
+    const trimmedHref = href.trim()
+    const canvasOrigin = apiBase
+      ? (() => {
+          try {
+            return new URL(apiBase).origin
+          } catch {
+            return null
+          }
+        })()
+      : null
 
-    if (rewrittenHref === href) {
+    let parsedUrl: URL
+
+    try {
+      parsedUrl = canvasOrigin
+        ? new URL(trimmedHref, canvasOrigin)
+        : new URL(trimmedHref, "https://canvas-wrapper.local")
+    } catch {
       return match
     }
 
-    return `href=${quote}${rewrittenHref}${quote}`
+    const isCanvasOrigin = parsedUrl.origin === "https://canvas-wrapper.local" || (canvasOrigin != null && parsedUrl.origin === canvasOrigin)
+
+    if (!isCanvasOrigin) {
+      return match
+    }
+
+    const wrappedLink = buildWrappedCanvasLink(parsedUrl.pathname, currentCourseId)
+
+    if (!wrappedLink) {
+      return match
+    }
+
+    const rewrittenHref = `${wrappedLink.path}${parsedUrl.search}${parsedUrl.hash}`
+
+    let nextAttributes = appendAnchorClass(`${beforeHref}${afterHref}`, "canvas-wrapper-link")
+    nextAttributes = appendAnchorAttribute(nextAttributes, "data-canvas-kind", wrappedLink.kind)
+
+    return `<a${nextAttributes} href=${quote}${rewrittenHref}${quote}>`
   })
 }

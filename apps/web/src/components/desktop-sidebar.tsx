@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Bookmark, CalendarDays, House, Inbox, LibraryBig, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -17,6 +17,8 @@ const CANVAS_API_KEY_STORAGE = "canvasApiKey";
 const CANVAS_API_BASE_STORAGE = "canvasApiBase";
 const CANVAS_DASHBOARD_STORAGE = "canvasDashboardData";
 const CANVAS_BOOTSTRAP_STORAGE = "canvasBootstrapData";
+const MOBILE_SUBJECT_BAR_SCROLL_STORAGE = "canvasMobileSubjectBarScrollLeft";
+const LAST_DASHBOARD_ROUTE_STORAGE = "canvasLastDashboardRoute";
 
 type SidebarProfile = {
   name: string;
@@ -173,7 +175,17 @@ export function MobileBottomNav({
   currentCourseId,
   initialPreferences = DEFAULT_SUBJECT_PREFERENCES,
 }: Omit<DesktopSidebarProps, "profile">) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const subjectBarRef = useRef<HTMLDivElement | null>(null);
   const [preferences, setPreferences] = useState(initialPreferences);
+  const [lastDashboardRoute, setLastDashboardRoute] = useState(() => {
+    if (typeof window === "undefined") {
+      return "/";
+    }
+
+    return window.sessionStorage.getItem(LAST_DASHBOARD_ROUTE_STORAGE) || "/";
+  });
 
   useEffect(() => {
     const syncPreferences = () => setPreferences(readSubjectPreferences());
@@ -188,11 +200,116 @@ export function MobileBottomNav({
     };
   }, []);
   const visibleCourses = courses?.filter((course) => !preferences.hiddenCourseIds.includes(course.id));
+  const visibleCourseKey = visibleCourses?.map((course) => course.id).join(",") ?? "";
+  const isDashboardSection = pathname === "/" || pathname.startsWith("/subjects/");
+  const effectiveActive: SidebarActiveItem | undefined = isDashboardSection ? "dashboard" : active;
+
+  useEffect(() => {
+    if (!isDashboardSection) {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      const storedRoute = window.sessionStorage.getItem(LAST_DASHBOARD_ROUTE_STORAGE) || "/";
+      window.setTimeout(() => {
+        setLastDashboardRoute((current) => (current === storedRoute ? current : storedRoute));
+      }, 0);
+      return;
+    }
+
+    const query = searchParams.toString();
+    const nextRoute = query ? `${pathname}?${query}` : pathname;
+    window.sessionStorage.setItem(LAST_DASHBOARD_ROUTE_STORAGE, nextRoute);
+
+    window.setTimeout(() => {
+      setLastDashboardRoute((current) => (current === nextRoute ? current : nextRoute));
+    }, 0);
+  }, [isDashboardSection, pathname, searchParams]);
+
+  useLayoutEffect(() => {
+    if (!preferences.showMobileSubjectBar || !subjectBarRef.current) {
+      return;
+    }
+
+    const savedScrollLeft = window.sessionStorage.getItem(MOBILE_SUBJECT_BAR_SCROLL_STORAGE);
+
+    if (!savedScrollLeft) {
+      return;
+    }
+
+    const parsedScrollLeft = Number(savedScrollLeft);
+
+    if (!Number.isFinite(parsedScrollLeft)) {
+      return;
+    }
+
+    let animationFrameId = 0;
+    let nestedAnimationFrameId = 0;
+
+    animationFrameId = window.requestAnimationFrame(() => {
+      nestedAnimationFrameId = window.requestAnimationFrame(() => {
+        if (!subjectBarRef.current) {
+          return;
+        }
+
+        subjectBarRef.current.scrollLeft = parsedScrollLeft;
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      window.cancelAnimationFrame(nestedAnimationFrameId);
+    };
+  }, [pathname, preferences.showMobileSubjectBar, visibleCourseKey]);
+
+  useEffect(() => {
+    const subjectBar = subjectBarRef.current;
+
+    if (!preferences.showMobileSubjectBar || !subjectBar) {
+      return;
+    }
+
+    const handleScroll = () => {
+      window.sessionStorage.setItem(
+        MOBILE_SUBJECT_BAR_SCROLL_STORAGE,
+        String(subjectBar.scrollLeft),
+      );
+    };
+
+    subjectBar.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      subjectBar.removeEventListener("scroll", handleScroll);
+    };
+  }, [preferences.showMobileSubjectBar, visibleCourseKey]);
+
+  const persistSubjectBarScroll = () => {
+    if (!subjectBarRef.current) {
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      MOBILE_SUBJECT_BAR_SCROLL_STORAGE,
+      String(subjectBarRef.current.scrollLeft),
+    );
+  };
+
+  const getMobileNavHref = (item: typeof mobileNavItems[number]) => {
+    if (item.key !== "dashboard") {
+      return item.href;
+    }
+
+    if (isDashboardSection) {
+      return "/";
+    }
+
+    return lastDashboardRoute || "/";
+  };
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-background/95 backdrop-blur md:hidden">
       {preferences.showMobileSubjectBar && visibleCourses && visibleCourses.length > 0 && (
-        <div className="overflow-x-auto border-b border-border/70 px-3 py-2">
+        <div ref={subjectBarRef} className="overflow-x-auto border-b border-border/70 px-3 py-2">
           <div className="flex min-w-max items-center gap-2">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/70 bg-muted/60 text-muted-foreground">
               <LibraryBig className="h-4 w-4" />
@@ -201,6 +318,7 @@ export function MobileBottomNav({
               <Link
                 key={course.id}
                 href={`/subjects/${course.id}`}
+                onClick={persistSubjectBarScroll}
                 className={
                   currentCourseId === course.id
                     ? "flex shrink-0 items-center gap-2 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
@@ -220,13 +338,14 @@ export function MobileBottomNav({
       <nav className="grid grid-cols-5 gap-1 px-2 py-2">
         {mobileNavItems.map((item) => {
           const Icon = item.icon;
+          const href = getMobileNavHref(item);
 
           return (
             <Link
               key={item.key}
-              href={item.href}
+              href={href}
               className={
-                active === item.key
+                effectiveActive === item.key
                   ? "flex flex-col items-center gap-1 rounded-2xl bg-primary px-2 py-2 text-[11px] font-medium text-primary-foreground"
                   : "flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-medium text-muted-foreground"
               }

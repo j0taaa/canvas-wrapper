@@ -115,7 +115,7 @@ export default async function QuizPage({
             </CardHeader>
             <CardContent className="space-y-4">
               <div
-                className="prose prose-sm max-w-none prose-p:my-3 dark:prose-invert dark:prose-a:text-white"
+                className="rich-content prose prose-sm max-w-none prose-p:my-3 dark:prose-invert"
                 dangerouslySetInnerHTML={{ __html: renderedDescription }}
               />
               {quizResult.html_url && (
@@ -147,7 +147,7 @@ export default async function QuizPage({
                     )}
                   </div>
                   <div
-                    className="prose prose-sm max-w-none prose-p:my-0 dark:prose-invert"
+                    className="rich-content prose prose-sm max-w-none prose-p:my-0 dark:prose-invert"
                     dangerouslySetInnerHTML={{
                       __html: rewriteCanvasHtmlLinks(
                         question.question_text || "<p>No question text available.</p>",

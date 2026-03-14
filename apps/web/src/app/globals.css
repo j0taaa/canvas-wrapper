@@ -145,6 +145,171 @@
 }
 
 @layer utilities {
+  .rich-content a,
+  .rich-content a:visited {
+    color: rgb(37 99 235);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 3px;
+    text-decoration-color: rgb(37 99 235 / 0.4);
+    font-weight: 500;
+    transition:
+      color 160ms ease,
+      text-decoration-color 160ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .rich-content a:hover,
+  .rich-content a:focus-visible {
+    color: rgb(29 78 216);
+    text-decoration-color: rgb(29 78 216 / 0.72);
+  }
+
+  .rich-content a:focus-visible {
+    border-radius: 0.25rem;
+    outline: 2px solid rgb(var(--app-foreground-rgb) / 0.18);
+    outline-offset: 2px;
+  }
+
+  .dark .rich-content a,
+  .dark .rich-content a:visited {
+    color: rgb(147 197 253);
+    text-decoration-color: rgb(147 197 253 / 0.45);
+  }
+
+  .dark .rich-content a:hover,
+  .dark .rich-content a:focus-visible {
+    color: rgb(191 219 254);
+    text-decoration-color: rgb(191 219 254 / 0.78);
+  }
+
+  .rich-content a.canvas-wrapper-link,
+  .rich-content a.canvas-wrapper-link:visited {
+    background-color: rgb(var(--app-overlay-rgb) / 0.06);
+    border: 1px solid rgb(var(--app-overlay-rgb) / 0.12);
+    border-radius: 0.7rem;
+    color: rgb(var(--app-foreground-rgb) / 0.92);
+    display: inline-block;
+    padding: 0.14rem 0.7rem 0.14rem 1.95rem;
+    position: relative;
+    text-decoration: none;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  .rich-content a.canvas-wrapper-link::before {
+    background-color: currentColor;
+    content: "";
+    height: 0.95rem;
+    left: 0.65rem;
+    mask-image: var(--canvas-link-icon);
+    mask-position: center;
+    mask-repeat: no-repeat;
+    mask-size: contain;
+    -webkit-mask-image: var(--canvas-link-icon);
+    -webkit-mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    opacity: 0.82;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0.95rem;
+  }
+
+  .rich-content a.canvas-wrapper-link[data-canvas-kind="page"] {
+    --canvas-link-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/><path d="M9 9h1"/></svg>');
+  }
+
+  .rich-content a.canvas-wrapper-link[data-canvas-kind="file"] {
+    --canvas-link-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H8a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M10 13h4"/><path d="M10 17h4"/></svg>');
+  }
+
+  .rich-content a.canvas-wrapper-link[data-canvas-kind="assignment"] {
+    --canvas-link-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 4.5h6"/><path d="M9 10h6"/><path d="M9 14h6"/><path d="m9.5 18 1.5 1.5 3-3"/></svg>');
+  }
+
+  .rich-content a.canvas-wrapper-link[data-canvas-kind="quiz"] {
+    --canvas-link-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 1 1 5.8 1c-.5 1-1.7 1.4-2.3 2.2-.3.4-.4.8-.4 1.3"/><path d="M12 17h.01"/></svg>');
+  }
+
+  .rich-content a.canvas-wrapper-link[data-canvas-kind="subject"] {
+    --canvas-link-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>');
+  }
+
+  .rich-content a.canvas-wrapper-link[data-canvas-kind="module"] {
+    --canvas-link-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>');
+  }
+
+  .rich-content a.canvas-wrapper-link[data-canvas-kind="grade"] {
+    --canvas-link-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-6"/></svg>');
+  }
+
+  .rich-content a.canvas-wrapper-link[data-canvas-kind="people"] {
+    --canvas-link-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>');
+  }
+
+  .rich-content a.canvas-wrapper-link[data-canvas-kind="forum"] {
+    --canvas-link-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>');
+  }
+
+  .rich-content a.canvas-wrapper-link:hover,
+  .rich-content a.canvas-wrapper-link:focus-visible {
+    background-color: rgb(var(--app-overlay-rgb) / 0.1);
+    border-color: rgb(var(--app-overlay-rgb) / 0.2);
+    color: rgb(var(--app-foreground-rgb));
+    text-decoration: none;
+  }
+
+  .dark .rich-content a.canvas-wrapper-link,
+  .dark .rich-content a.canvas-wrapper-link:visited {
+    background-color: rgb(255 255 255 / 0.06);
+    border-color: rgb(255 255 255 / 0.12);
+    color: rgb(var(--app-foreground-rgb) / 0.94);
+  }
+
+  .dark .rich-content a.canvas-wrapper-link:hover,
+  .dark .rich-content a.canvas-wrapper-link:focus-visible {
+    background-color: rgb(255 255 255 / 0.1);
+    border-color: rgb(255 255 255 / 0.2);
+    color: rgb(var(--app-foreground-rgb));
+  }
+
+  .rich-content {
+    overflow-x: hidden;
+  }
+
+  .rich-content iframe,
+  .rich-content video,
+  .rich-content embed,
+  .rich-content object,
+  .rich-content img {
+    max-width: 100%;
+  }
+
+  .rich-content iframe {
+    width: min(100%, 100%);
+  }
+
+  .rich-content iframe[src*="youtube.com"],
+  .rich-content iframe[src*="youtu.be"],
+  .rich-content iframe[src*="youtube-nocookie.com"],
+  .rich-content iframe[src*="player.vimeo.com"] {
+    aspect-ratio: 16 / 9;
+    display: block;
+    height: auto;
+    width: 100%;
+  }
+
+  .rich-content table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
   .bg-white {
     background-color: rgb(var(--app-surface-rgb)) !important;
   }

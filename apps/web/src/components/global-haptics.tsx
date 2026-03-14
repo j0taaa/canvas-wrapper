@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { WebHaptics } from "web-haptics";
 import {
   createHapticsBridgeMessage,
   HAPTICS_PREFERENCE_EVENT,
-  type HapticsBridgeMessage,
 } from "@canvas/shared";
 import { readHapticsPreference } from "@/lib/haptics-preference";
 
@@ -28,21 +28,6 @@ function isInteractiveTarget(target: EventTarget | null) {
   );
 }
 
-function sendHapticsMessage(message: HapticsBridgeMessage) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  if (window.ReactNativeWebView?.postMessage) {
-    window.ReactNativeWebView.postMessage(JSON.stringify(message));
-    return;
-  }
-
-  if ("vibrate" in navigator) {
-    navigator.vibrate(8);
-  }
-}
-
 function scheduleHaptics(callback: () => void) {
   if (typeof queueMicrotask === "function") {
     queueMicrotask(callback);
@@ -57,6 +42,7 @@ function scheduleHaptics(callback: () => void) {
 export function GlobalHaptics() {
   const [enabled, setEnabled] = useState(false);
   const lastTriggeredAt = useRef(0);
+  const webHapticsRef = useRef<WebHaptics | null>(null);
 
   useEffect(() => {
     const syncPreference = () => setEnabled(readHapticsPreference());
@@ -68,6 +54,19 @@ export function GlobalHaptics() {
     return () => {
       window.removeEventListener("storage", syncPreference);
       window.removeEventListener(HAPTICS_PREFERENCE_EVENT, syncPreference);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || window.ReactNativeWebView?.postMessage || !WebHaptics.isSupported) {
+      return;
+    }
+
+    webHapticsRef.current = new WebHaptics();
+
+    return () => {
+      webHapticsRef.current?.destroy();
+      webHapticsRef.current = null;
     };
   }, []);
 
@@ -87,7 +86,18 @@ export function GlobalHaptics() {
 
       // Fire on the next microtask so taps stay responsive without losing user-gesture context.
       scheduleHaptics(() => {
-        sendHapticsMessage(createHapticsBridgeMessage("selection"));
+        if (typeof window === "undefined") {
+          return;
+        }
+
+        if (window.ReactNativeWebView?.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify(createHapticsBridgeMessage("selection")));
+          return;
+        }
+
+        void webHapticsRef.current?.trigger("selection").catch(() => {
+          // Keep interactions silent on unsupported browsers rather than blocking.
+        });
       });
     };
 
