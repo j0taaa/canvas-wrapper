@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAppShellData, getConversationData } from "@/lib/canvas";
-import { formatDueDate } from "@/lib/utils";
+import { formatDueDate, rewriteCanvasHtmlLinks } from "@/lib/utils";
 import { ReplyForm } from "./reply-form";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
@@ -105,7 +105,12 @@ export default async function InboxConversationPage({
                 <CardContent className="space-y-3">
                   <div
                     className="prose prose-sm max-w-none prose-p:my-0 dark:prose-invert dark:prose-a:text-white"
-                    dangerouslySetInnerHTML={{ __html: message.body || "<p>No message content.</p>" }}
+                    dangerouslySetInnerHTML={{
+                      __html: rewriteCanvasHtmlLinks(
+                        message.body || "<p>No message content.</p>",
+                        shellData.apiBase,
+                      ),
+                    }}
                   />
                   {message.attachments && message.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2">

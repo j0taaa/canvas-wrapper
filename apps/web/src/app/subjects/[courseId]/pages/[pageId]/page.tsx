@@ -8,7 +8,7 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCoursePage, getSubjectShellData } from "@/lib/canvas";
-import { formatDueDateShort, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
+import { formatDueDateShort, formatSubjectName, getSubjectColorStyle, rewriteCanvasHtmlLinks } from "@/lib/utils";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
 
@@ -42,6 +42,11 @@ export default async function SubjectContentPage({
   }
 
   const subjectStyle = getSubjectColorStyle(course.name);
+  const renderedBody = rewriteCanvasHtmlLinks(
+    page.body || "<p>No content available for this page.</p>",
+    courseShellData.apiBase,
+    parsedCourseId,
+  );
 
   return (
     <DesktopAppShell profile={courseShellData.profile} courses={courseShellData.courses} currentCourseId={parsedCourseId}>
@@ -102,7 +107,7 @@ export default async function SubjectContentPage({
           <CardContent>
             <div
               className="prose prose-sm max-w-none prose-p:my-3 dark:prose-invert dark:prose-a:text-white"
-              dangerouslySetInnerHTML={{ __html: page.body || "<p>No content available for this page.</p>" }}
+              dangerouslySetInnerHTML={{ __html: renderedBody }}
             />
           </CardContent>
         </Card>

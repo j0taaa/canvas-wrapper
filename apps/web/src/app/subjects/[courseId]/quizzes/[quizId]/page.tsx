@@ -8,7 +8,7 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getQuizDetails, getQuizQuestions, getSubjectShellData } from "@/lib/canvas";
-import { formatDueDateShort, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
+import { formatDueDateShort, formatSubjectName, getSubjectColorStyle, rewriteCanvasHtmlLinks } from "@/lib/utils";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
 
@@ -44,6 +44,11 @@ export default async function QuizPage({
   }
 
   const subjectStyle = getSubjectColorStyle(course.name);
+  const renderedDescription = rewriteCanvasHtmlLinks(
+    quizResult.description || "<p>No quiz description available.</p>",
+    courseShellData.apiBase,
+    parsedCourseId,
+  );
 
   return (
     <DesktopAppShell profile={courseShellData.profile} courses={courseShellData.courses} currentCourseId={parsedCourseId}>
@@ -111,7 +116,7 @@ export default async function QuizPage({
             <CardContent className="space-y-4">
               <div
                 className="prose prose-sm max-w-none prose-p:my-3 dark:prose-invert dark:prose-a:text-white"
-                dangerouslySetInnerHTML={{ __html: quizResult.description || "<p>No quiz description available.</p>" }}
+                dangerouslySetInnerHTML={{ __html: renderedDescription }}
               />
               {quizResult.html_url && (
                 <Link href={quizResult.html_url} target="_blank" className="inline-flex text-sm text-black/60 underline-offset-4 hover:underline">
@@ -143,7 +148,13 @@ export default async function QuizPage({
                   </div>
                   <div
                     className="prose prose-sm max-w-none prose-p:my-0 dark:prose-invert"
-                    dangerouslySetInnerHTML={{ __html: question.question_text || "<p>No question text available.</p>" }}
+                    dangerouslySetInnerHTML={{
+                      __html: rewriteCanvasHtmlLinks(
+                        question.question_text || "<p>No question text available.</p>",
+                        courseShellData.apiBase,
+                        parsedCourseId,
+                      ),
+                    }}
                   />
                   {question.answers && question.answers.length > 0 && (
                     <div className="mt-3 space-y-2">
