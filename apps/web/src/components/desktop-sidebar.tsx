@@ -19,6 +19,8 @@ const CANVAS_DASHBOARD_STORAGE = "canvasDashboardData";
 const CANVAS_BOOTSTRAP_STORAGE = "canvasBootstrapData";
 const MOBILE_SUBJECT_BAR_SCROLL_STORAGE = "canvasMobileSubjectBarScrollLeft";
 const LAST_DASHBOARD_ROUTE_STORAGE = "canvasLastDashboardRoute";
+const DASHBOARD_SCROLL_STORAGE_PREFIX = "canvasDashboardScroll:";
+const PENDING_DASHBOARD_SCROLL_RESTORE_STORAGE = "canvasPendingDashboardScrollRestore";
 
 type SidebarProfile = {
   name: string;
@@ -203,6 +205,7 @@ export function MobileBottomNav({
   const visibleCourseKey = visibleCourses?.map((course) => course.id).join(",") ?? "";
   const isDashboardSection = pathname === "/" || pathname.startsWith("/subjects/");
   const effectiveActive: SidebarActiveItem | undefined = isDashboardSection ? "dashboard" : active;
+  const currentRoute = searchParams.size > 0 ? `${pathname}?${searchParams.toString()}` : pathname;
 
   useEffect(() => {
     if (!isDashboardSection) {
@@ -217,14 +220,88 @@ export function MobileBottomNav({
       return;
     }
 
-    const query = searchParams.toString();
-    const nextRoute = query ? `${pathname}?${query}` : pathname;
+    const nextRoute = currentRoute;
     window.sessionStorage.setItem(LAST_DASHBOARD_ROUTE_STORAGE, nextRoute);
 
     window.setTimeout(() => {
       setLastDashboardRoute((current) => (current === nextRoute ? current : nextRoute));
     }, 0);
-  }, [isDashboardSection, pathname, searchParams]);
+  }, [currentRoute, isDashboardSection]);
+
+  useEffect(() => {
+    if (!isDashboardSection) {
+      return;
+    }
+
+    const storageKey = `${DASHBOARD_SCROLL_STORAGE_PREFIX}${currentRoute}`;
+    const persistScroll = () => {
+      window.sessionStorage.setItem(storageKey, String(window.scrollY));
+    };
+
+    persistScroll();
+    window.addEventListener("scroll", persistScroll, { passive: true });
+
+    return () => {
+      persistScroll();
+      window.removeEventListener("scroll", persistScroll);
+    };
+  }, [currentRoute, isDashboardSection]);
+
+  useLayoutEffect(() => {
+    if (!isDashboardSection) {
+      return;
+    }
+
+    const pendingRestoreRoute = window.sessionStorage.getItem(PENDING_DASHBOARD_SCROLL_RESTORE_STORAGE);
+    const savedScrollY = window.sessionStorage.getItem(`${DASHBOARD_SCROLL_STORAGE_PREFIX}${currentRoute}`);
+
+    if (!savedScrollY) {
+      if (pendingRestoreRoute === currentRoute) {
+        window.sessionStorage.removeItem(PENDING_DASHBOARD_SCROLL_RESTORE_STORAGE);
+      }
+      return;
+    }
+
+    const parsedScrollY = Number(savedScrollY);
+
+    if (!Number.isFinite(parsedScrollY)) {
+      return;
+    }
+
+    let animationFrameId = 0;
+    let nestedAnimationFrameId = 0;
+    let timeoutId = 0;
+    let nestedTimeoutAnimationFrameId = 0;
+
+    const restoreScroll = () => {
+      window.scrollTo({
+        top: parsedScrollY,
+        behavior: "auto",
+      });
+    };
+
+    animationFrameId = window.requestAnimationFrame(() => {
+      nestedAnimationFrameId = window.requestAnimationFrame(() => {
+        restoreScroll();
+      });
+    });
+
+    if (pendingRestoreRoute === currentRoute) {
+      timeoutId = window.setTimeout(() => {
+        nestedTimeoutAnimationFrameId = window.requestAnimationFrame(() => {
+          restoreScroll();
+          window.sessionStorage.removeItem(PENDING_DASHBOARD_SCROLL_RESTORE_STORAGE);
+        });
+      }, 120);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      window.cancelAnimationFrame(nestedAnimationFrameId);
+      window.cancelAnimationFrame(nestedTimeoutAnimationFrameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [currentRoute, isDashboardSection]);
 
   useLayoutEffect(() => {
     if (!preferences.showMobileSubjectBar || !subjectBarRef.current) {
@@ -294,6 +371,17 @@ export function MobileBottomNav({
     );
   };
 
+  const persistDashboardScroll = () => {
+    if (!isDashboardSection) {
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      `${DASHBOARD_SCROLL_STORAGE_PREFIX}${currentRoute}`,
+      String(window.scrollY),
+    );
+  };
+
   const getMobileNavHref = (item: typeof mobileNavItems[number]) => {
     if (item.key !== "dashboard") {
       return item.href;
@@ -344,6 +432,14 @@ export function MobileBottomNav({
             <Link
               key={item.key}
               href={href}
+              scroll={item.key === "dashboard" ? false : undefined}
+              onClick={() => {
+                if (item.key === "dashboard" && !isDashboardSection) {
+                  window.sessionStorage.setItem(PENDING_DASHBOARD_SCROLL_RESTORE_STORAGE, href);
+                }
+
+                persistDashboardScroll();
+              }}
               className={
                 effectiveActive === item.key
                   ? "flex flex-col items-center gap-1 rounded-2xl bg-primary px-2 py-2 text-[11px] font-medium text-primary-foreground"

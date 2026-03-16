@@ -101,38 +101,17 @@ export function GlobalHaptics() {
       });
     };
 
-    const handlePointerDown = (event: PointerEvent) => {
+    const handleClick = (event: MouseEvent) => {
       if (!isInteractiveTarget(event.target)) {
         return;
       }
 
       enqueueHaptic();
     };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.key !== "Enter" && event.key !== " ") || !isInteractiveTarget(event.target)) {
-        return;
-      }
-
-      enqueueHaptic();
-    };
-
-    const handleTouchStart = (event: TouchEvent) => {
-      if (!isInteractiveTarget(event.target)) {
-        return;
-      }
-
-      enqueueHaptic();
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown, { capture: true, passive: true });
-    document.addEventListener("touchstart", handleTouchStart, { capture: true, passive: true });
-    document.addEventListener("keydown", handleKeyDown, { capture: true });
+    document.addEventListener("click", handleClick, { capture: true, passive: true });
 
     return () => {
-      document.removeEventListener("pointerdown", handlePointerDown, true);
-      document.removeEventListener("touchstart", handleTouchStart, true);
-      document.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("click", handleClick, true);
     };
   }, [enabled]);
 

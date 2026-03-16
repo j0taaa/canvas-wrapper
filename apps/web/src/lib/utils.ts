@@ -48,6 +48,24 @@ export function getSubjectColorStyle(name?: string | null, preferredColor?: stri
   return getSubjectColorPalette(name, preferredColor)
 }
 
+export function formatGroupJoinLevel(value?: string | null) {
+  if (!value) {
+    return "Managed"
+  }
+
+  const normalized = value.replace(/[_-]+/g, " ").trim()
+
+  if (!normalized) {
+    return "Managed"
+  }
+
+  return normalized
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
 type WrappedCanvasLink = {
   kind: "assignment" | "file" | "forum" | "grade" | "module" | "page" | "people" | "quiz" | "subject"
   path: string

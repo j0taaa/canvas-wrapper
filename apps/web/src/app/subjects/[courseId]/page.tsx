@@ -1,8 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { BookOpen, CircleDot } from "lucide-react";
+import { ArrowRight, BookOpen, CircleDot, LockKeyhole } from "lucide-react";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
+import { GroupCreateForm } from "@/app/subjects/[courseId]/group-create-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,11 +18,12 @@ import {
   getCourseDiscussions,
   getCourseFiles,
   getCourseGradeData,
+  getCourseGroupCreateAccess,
   getCourseGroups,
   getCoursePeople,
   getSubjectShellData,
 } from "@/lib/canvas";
-import { formatDueDateShort, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
+import { formatDueDateShort, formatGroupJoinLevel, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
 const SUBJECT_TABS = ["overview", "modules", "assignments", "grades", "people", "forums", "files"] as const;
@@ -185,6 +187,10 @@ export default async function SubjectPage({
   const gradeData = gradeDataResult.status === "fulfilled" ? gradeDataResult.value : null;
   const people = peopleResult.status === "fulfilled" ? peopleResult.value : [];
   const groups = groupsResult.status === "fulfilled" ? groupsResult.value : [];
+  const groupCreateAccess =
+    activeTab === "people" && activePeopleView === "groups" && groupsResult.status === "fulfilled"
+      ? await getCourseGroupCreateAccess(groups, apiKey).catch(() => ({ canCreate: false, groupCategoryId: null }))
+      : { canCreate: false, groupCategoryId: null };
   const discussions = discussionsResult.status === "fulfilled" ? discussionsResult.value : [];
   const files = filesResult.status === "fulfilled" ? filesResult.value : [];
   const filesUnavailable = activeTab === "files" && filesResult.status === "rejected";
@@ -523,10 +529,17 @@ export default async function SubjectPage({
 
             <Card className="border-black/15 bg-white/90">
               <CardHeader className="border-b border-black/10">
-                <CardTitle>{activePeopleView === "groups" ? "Groups" : "People"}</CardTitle>
-                <CardDescription>
-                  {activePeopleView === "groups" ? "All groups visible in this subject" : "Everyone currently visible in this subject"}
-                </CardDescription>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle>{activePeopleView === "groups" ? "Groups" : "People"}</CardTitle>
+                    <CardDescription>
+                      {activePeopleView === "groups" ? "All groups visible in this subject" : "Everyone currently visible in this subject"}
+                    </CardDescription>
+                  </div>
+                  {activePeopleView === "groups" && (
+                    <GroupCreateForm canCreate={groupCreateAccess.canCreate} courseId={parsedCourseId} />
+                  )}
+                </div>
               </CardHeader>
               <CardContent className={activePeopleView === "groups" ? "space-y-3" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-3"}>
                 {activePeopleView === "people" && people.length === 0 && (
@@ -550,8 +563,9 @@ export default async function SubjectPage({
                   <p className="text-sm text-black/70">{groupsUnavailable ? "Groups are not available for this subject." : "No groups available for this subject."}</p>
                 )}
                 {activePeopleView === "groups" && groups.map((group) => {
-                  const content = (
+                  return (
                     <div
+                      key={group.id}
                       className="rounded-xl border border-black/10 bg-white p-4 transition hover:border-black/30 hover:bg-black/[0.03]"
                       style={{ boxShadow: `inset 3px 0 0 ${subjectStyle.borderColor}` }}
                     >
@@ -560,22 +574,56 @@ export default async function SubjectPage({
                           <p className="truncate text-sm font-medium">{group.name}</p>
                           <p className="mt-1 text-xs text-black/55">{group.description || "Canvas group"}</p>
                         </div>
-                        <div className="shrink-0 text-right text-xs text-black/55">
-                          <p>{group.members_count ?? 0} members</p>
-                          <p>{group.join_level ?? "managed"}</p>
+                        <div className="shrink-0 text-right">
+                          <div className="text-xs text-black/55">
+                            <p>{group.members_count ?? 0} members</p>
+                            <p>{formatGroupJoinLevel(group.join_level)}</p>
+                          </div>
+                          {group.canOpen ? (
+                            <Link
+                              href={`/subjects/${parsedCourseId}/groups/${group.id}`}
+                              className="mt-2 inline-flex items-center gap-1 text-xs text-black/65 underline-offset-2 transition hover:text-black hover:underline"
+                            >
+                              <span>Enter group</span>
+                              <ArrowRight className="h-3.5 w-3.5" />
+                            </Link>
+                          ) : (
+                            <span className="mt-2 inline-flex items-center gap-1 text-xs text-black/45">
+                              <LockKeyhole className="h-3.5 w-3.5" />
+                              <span>Locked</span>
+                            </span>
+                          )}
                         </div>
                       </div>
+                      <details className="mt-4 rounded-lg border border-black/8 bg-black/[0.02] px-3 py-2 open:bg-black/[0.03]">
+                        <summary className="cursor-pointer list-none text-sm font-medium text-black/75">
+                          <span className="inline-flex items-center gap-2">
+                            <CircleDot className="h-3.5 w-3.5" />
+                            View members
+                          </span>
+                        </summary>
+                        <div className="mt-3 space-y-2">
+                          {group.users && group.users.length > 0 ? (
+                            group.users.map((person) => (
+                              <div key={person.id} className="flex items-center gap-3 rounded-lg border border-black/8 bg-white/85 px-3 py-2">
+                                <Avatar className="border border-black/15">
+                                  <AvatarImage src={person.avatar_url} alt={person.name} />
+                                  <AvatarFallback>{getInitials(person.name)}</AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-medium">{person.name}</p>
+                                  <p className="truncate text-xs text-black/55">{person.short_name ?? person.sortable_name ?? "Canvas user"}</p>
+                                </div>
+                              </div>
+                            ))
+                          ) : group.usersAccessDenied ? (
+                            <p className="text-xs text-black/55">Canvas only exposes member lists for groups you are allowed to view. For this account, that appears to be only your own group.</p>
+                          ) : (
+                            <p className="text-xs text-black/55">No member list available for this group.</p>
+                          )}
+                        </div>
+                      </details>
                     </div>
-                  );
-
-                  if (!group.html_url) {
-                    return <div key={group.id}>{content}</div>;
-                  }
-
-                  return (
-                    <Link key={group.id} href={group.html_url} target="_blank" className="block">
-                      {content}
-                    </Link>
                   );
                 })}
               </CardContent>

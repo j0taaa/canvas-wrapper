@@ -189,6 +189,18 @@ export type CanvasCourseGroup = {
   members_count?: number;
   join_level?: string;
   html_url?: string;
+  users?: CanvasCourseUser[];
+  usersAccessDenied?: boolean;
+  canOpen?: boolean;
+  group_category_id?: number;
+  role?: string | null;
+  is_public?: boolean;
+  max_membership?: number | null;
+};
+
+export type CanvasGroupCreateAccess = {
+  canCreate: boolean;
+  groupCategoryId: number | null;
 };
 
 type CanvasConversationParticipant = {
@@ -946,10 +958,175 @@ export async function getCourseGroups(courseId: number, apiKey?: string): Promis
     throw new Error("Missing Canvas API key");
   }
 
-  return canvasFetch<CanvasCourseGroup[]>(
+  const groups = await canvasFetch<CanvasCourseGroup[]>(
     `/courses/${courseId}/groups?per_page=50`,
     resolvedApiKey,
   );
+
+  const groupUsersResults = await mapWithConcurrency(
+    groups,
+    CANVAS_FETCH_CONCURRENCY,
+    async (group) => {
+      const users = await canvasFetch<CanvasCourseUser[]>(
+        `/groups/${group.id}/users?include[]=avatar_url&per_page=100&sort=username`,
+        resolvedApiKey,
+      );
+
+      return {
+        groupId: group.id,
+        users,
+      };
+    },
+  );
+
+  const usersByGroupId = new Map<number, CanvasCourseUser[]>();
+  const accessDeniedGroupIds = new Set<number>();
+
+  groupUsersResults.forEach((result, index) => {
+    const groupId = groups[index]?.id;
+
+    if (!groupId) {
+      return;
+    }
+
+    if (result.status === "fulfilled") {
+      usersByGroupId.set(result.value.groupId, result.value.users);
+      return;
+    }
+
+    if (result.reason instanceof Error && result.reason.message.includes("(403)")) {
+      accessDeniedGroupIds.add(groupId);
+    }
+  });
+
+  return groups.map((group) => ({
+    ...group,
+    users: usersByGroupId.get(group.id) ?? [],
+    usersAccessDenied: accessDeniedGroupIds.has(group.id),
+    canOpen: usersByGroupId.has(group.id),
+  }));
+}
+
+export async function getGroupDetails(groupId: number, apiKey?: string): Promise<CanvasCourseGroup> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  return canvasFetch<CanvasCourseGroup>(`/groups/${groupId}`, resolvedApiKey);
+}
+
+export async function getGroupUsers(groupId: number, apiKey?: string): Promise<CanvasCourseUser[]> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  return canvasFetch<CanvasCourseUser[]>(
+    `/groups/${groupId}/users?include[]=avatar_url&per_page=100&sort=username`,
+    resolvedApiKey,
+  );
+}
+
+async function probeGroupCategoryCreatePermission(groupCategoryId: number, apiKey: string, apiBase?: string) {
+  const resolvedApiBase = await resolveCanvasApiBase(apiBase);
+  const response = await fetch(`${resolvedApiBase}/group_categories/${groupCategoryId}/groups`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "",
+    cache: "no-store",
+  });
+
+  if (response.status === 400 || response.status === 422) {
+    return true;
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return false;
+  }
+
+  throw new Error(`Canvas group create permission probe failed (${response.status}) for category ${groupCategoryId}`);
+}
+
+export async function getCourseGroupCreateAccess(
+  groups: CanvasCourseGroup[],
+  apiKey?: string,
+): Promise<CanvasGroupCreateAccess> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  const candidateCategoryIds = Array.from(
+    new Set(
+      groups
+        .filter((group) => typeof group.group_category_id === "number")
+        .sort((left, right) => (left.role === "student_organized" ? -1 : 1) - (right.role === "student_organized" ? -1 : 1))
+        .map((group) => group.group_category_id as number),
+    ),
+  );
+
+  for (const groupCategoryId of candidateCategoryIds) {
+    if (await probeGroupCategoryCreatePermission(groupCategoryId, resolvedApiKey)) {
+      return {
+        canCreate: true,
+        groupCategoryId,
+      };
+    }
+  }
+
+  return {
+    canCreate: false,
+    groupCategoryId: null,
+  };
+}
+
+export async function createCourseGroup(
+  groups: CanvasCourseGroup[],
+  input: { description?: string; name: string },
+  apiKey?: string,
+): Promise<CanvasCourseGroup> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  const access = await getCourseGroupCreateAccess(groups, resolvedApiKey);
+
+  if (!access.groupCategoryId) {
+    throw new Error("You are not allowed to create groups in this subject.");
+  }
+
+  const resolvedApiBase = await resolveCanvasApiBase();
+  const body = new URLSearchParams();
+  body.set("name", input.name.trim());
+
+  if (input.description?.trim()) {
+    body.set("description", input.description.trim());
+  }
+
+  const response = await fetch(`${resolvedApiBase}/group_categories/${access.groupCategoryId}/groups`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resolvedApiKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Canvas group creation failed (${response.status}) for category ${access.groupCategoryId}`);
+  }
+
+  return (await response.json()) as CanvasCourseGroup;
 }
 
 export async function getCalendarData(

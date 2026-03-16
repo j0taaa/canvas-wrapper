@@ -11,7 +11,7 @@ export type HapticsBridgeMessage = {
 };
 
 export function parseHapticsEnabled(value?: string | null) {
-  return value === "true";
+  return value !== "false";
 }
 
 export function createHapticsBridgeMessage(
