@@ -1,4 +1,4 @@
-const CACHE_NAME = "canvas-wrapper-v5";
+const CACHE_NAME = "canvas-wrapper-v6";
 const STATIC_ASSETS = ["/manifest.webmanifest", "/canvas-icon.svg"];
 
 self.addEventListener("install", (event) => {

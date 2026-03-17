@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { LockKeyhole, UsersRound } from "lucide-react";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
@@ -120,7 +121,11 @@ export default async function SubjectGroupPage({
               <p className="text-sm text-black/70">No members available for this group.</p>
             ) : (
               members.map((person) => (
-                <div key={person.id} className="rounded-xl border border-black/10 bg-white p-4">
+                <Link
+                  key={person.id}
+                  href={`/subjects/${parsedCourseId}/people/${person.id}`}
+                  className="rounded-xl border border-black/10 bg-white p-4 transition hover:border-black/30 hover:bg-black/[0.03]"
+                >
                   <div className="flex items-center gap-3">
                     <Avatar className="border border-black/15">
                       <AvatarImage src={person.avatar_url} alt={person.name} />
@@ -131,7 +136,7 @@ export default async function SubjectGroupPage({
                       <p className="truncate text-xs text-black/55">{person.short_name ?? person.sortable_name ?? "Canvas user"}</p>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))
             )}
           </CardContent>

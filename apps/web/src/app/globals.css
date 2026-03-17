@@ -142,6 +142,12 @@
     @apply bg-background font-sans text-foreground;
     min-height: 100%;
   }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+  input[type="file"]::file-selector-button {
+    cursor: pointer;
+  }
 }
 
 @layer utilities {
@@ -279,6 +285,30 @@
 
   .rich-content {
     overflow-x: hidden;
+  }
+
+  .rich-content p {
+    margin-block: 1rem;
+  }
+
+  .rich-content h1,
+  .rich-content h2,
+  .rich-content h3,
+  .rich-content h4,
+  .rich-content h5,
+  .rich-content h6 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .rich-content ul,
+  .rich-content ol {
+    margin-block: 1rem;
+    padding-left: 1.25rem;
+  }
+
+  .rich-content li + li {
+    margin-top: 0.35rem;
   }
 
   .rich-content iframe,

@@ -442,6 +442,27 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
   const visibleCourses = data.courses.filter((course) => !preferences.hiddenCourseIds.includes(course.id));
   const visiblePastCourses = data.pastCourses.filter((course) => !preferences.hiddenCourseIds.includes(course.id));
   const visibleTodo = data.todo.filter((item) => !item.assignment?.course_id || !preferences.hiddenCourseIds.includes(item.assignment.course_id));
+  const isCompactMobileSubjectGrid = preferences.compactMobileDashboardSubjects;
+  const subjectGridClassName = isCompactMobileSubjectGrid ? "grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-3";
+  const subjectCardClassName = isCompactMobileSubjectGrid
+    ? "border-border/80 transition hover:border-foreground/20 hover:bg-muted/85 hover:ring-foreground/15"
+    : "border-border/80 transition hover:border-foreground/20 hover:bg-muted/85 hover:ring-foreground/15";
+  const subjectCardHeaderClassName = isCompactMobileSubjectGrid ? "space-y-0 p-2 sm:p-6" : undefined;
+  const subjectTitleClassName = isCompactMobileSubjectGrid ? "flex min-w-0 flex-1 items-start gap-2 text-sm sm:text-base" : "flex items-center gap-2 text-base";
+  const subjectIconWrapperClassName = isCompactMobileSubjectGrid ? "rounded-md border p-1.5 sm:p-1.5" : "rounded-md border p-1.5";
+  const subjectIconClassName = isCompactMobileSubjectGrid ? "h-3.5 w-3.5 sm:h-4 sm:w-4" : "h-4 w-4";
+  const subjectNameClassName = isCompactMobileSubjectGrid ? "min-w-0 line-clamp-2 min-h-9 flex-1 leading-tight sm:min-h-0" : "line-clamp-1";
+  const subjectGradeClassName = isCompactMobileSubjectGrid ? "shrink-0 text-xs font-medium text-muted-foreground sm:text-sm" : "shrink-0 text-sm font-medium text-muted-foreground";
+  const subjectDescriptionClassName = isCompactMobileSubjectGrid ? "hidden" : "line-clamp-1";
+  const todoCardClassName = isCompactMobileSubjectGrid ? "rounded-md border p-2.5 transition sm:p-3" : "rounded-md border p-3 transition";
+  const todoTitleClassName = isCompactMobileSubjectGrid ? "min-w-0 flex-1 text-[13px] font-medium leading-tight sm:text-sm" : "min-w-0 flex-1 text-sm font-medium";
+  const todoBadgeClassName = isCompactMobileSubjectGrid ? "whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium sm:text-[11px]" : "whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium";
+  const todoDoneBadgeClassName = isCompactMobileSubjectGrid ? "whitespace-nowrap rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 sm:text-[11px]" : "whitespace-nowrap rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700";
+  const todoMetaClassName = isCompactMobileSubjectGrid ? "flex items-center gap-2 text-[11px] text-muted-foreground sm:text-xs" : "flex items-center gap-2 text-xs text-muted-foreground";
+  const todoCompactMetaRowClassName = isCompactMobileSubjectGrid ? "mt-0.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground sm:text-xs" : "";
+  const todoCompactSubjectClassName = isCompactMobileSubjectGrid ? "flex min-w-0 items-center gap-2" : "";
+  const todoCompactSubjectTextClassName = isCompactMobileSubjectGrid ? "truncate" : "";
+  const todoDueClassName = isCompactMobileSubjectGrid ? "mt-0.5 text-[11px] sm:text-xs" : "mt-1 text-xs";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -456,7 +477,7 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
         </div>
 
         <main className="order-0 flex flex-col p-6 pb-32 md:order-1 md:pb-6">
-          <section className="order-0 mb-6">
+          <section className={`order-0 ${isCompactMobileSubjectGrid ? "mb-3 sm:mb-6" : "mb-6"}`}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">Subjects</h2>
               {data.pastCourses.length > 0 && (
@@ -469,7 +490,7 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
                 </button>
               )}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className={subjectGridClassName}>
               {visibleCourses.map((course) => {
                 const subjectName = formatSubjectName(course.name);
                 const Icon = getCourseIcon(course.name);
@@ -477,20 +498,22 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
                 const gradePercentage = getCourseGradePercentage(course);
                 return (
                   <Link key={course.id} href={`/subjects/${course.id}`} className="block">
-                    <Card className="border-border/80 transition hover:border-foreground/20 hover:bg-muted/85 hover:ring-foreground/15">
-                      <CardHeader>
+                    <Card className={subjectCardClassName}>
+                      <CardHeader className={subjectCardHeaderClassName}>
                         <div className="flex items-start justify-between gap-3">
-                          <CardTitle className="flex items-center gap-2 text-base">
-                            <span className="rounded-md border p-1.5" style={iconStyle}><Icon className="h-4 w-4" /></span>
-                            <span className="line-clamp-1">{subjectName}</span>
+                          <CardTitle className={subjectTitleClassName}>
+                            <span className={subjectIconWrapperClassName} style={iconStyle}><Icon className={subjectIconClassName} /></span>
+                            <span className={subjectNameClassName}>{subjectName}</span>
                           </CardTitle>
                           {gradePercentage != null && (
-                            <span className="shrink-0 text-sm font-medium text-muted-foreground">
+                            <span className={subjectGradeClassName}>
                               {formatGradePercentage(gradePercentage)}%
                             </span>
                           )}
                         </div>
-                        <CardDescription className="line-clamp-1">{course.course_code ?? "No code"}</CardDescription>
+                        {!isCompactMobileSubjectGrid && (
+                          <CardDescription className={subjectDescriptionClassName}>{course.course_code ?? "No code"}</CardDescription>
+                        )}
                       </CardHeader>
                     </Card>
                   </Link>
@@ -500,7 +523,7 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
               {showPastCourses && visiblePastCourses.length > 0 && (
               <div className="mt-4">
                 <p className="mb-3 text-sm font-medium text-muted-foreground">Old subjects</p>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className={subjectGridClassName}>
                   {visiblePastCourses.map((course) => {
                     const subjectName = formatSubjectName(course.name);
                     const Icon = getCourseIcon(course.name);
@@ -508,14 +531,16 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
                     return (
                       <Link key={course.id} href={`/subjects/${course.id}`} className="block">
                         <Card className="border-border/70 bg-muted/25 transition hover:border-foreground/15 hover:bg-muted/70">
-                          <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                              <span className="rounded-md border p-1.5" style={iconStyle}><Icon className="h-4 w-4" /></span>
-                              <span className="line-clamp-1">{subjectName}</span>
+                          <CardHeader className={subjectCardHeaderClassName}>
+                            <CardTitle className={subjectTitleClassName}>
+                              <span className={subjectIconWrapperClassName} style={iconStyle}><Icon className={subjectIconClassName} /></span>
+                              <span className={subjectNameClassName}>{subjectName}</span>
                             </CardTitle>
-                            <CardDescription className="line-clamp-1">
-                              {course.course_code ?? "Old subject"}
-                            </CardDescription>
+                            {!isCompactMobileSubjectGrid && (
+                              <CardDescription className={subjectDescriptionClassName}>
+                                {course.course_code ?? "Old subject"}
+                              </CardDescription>
+                            )}
                           </CardHeader>
                         </Card>
                       </Link>
@@ -547,28 +572,43 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
                   );
                   const activityAccent = getActivityAccent(item.assignment?.due_at);
                   const activityContent = (
-                    <div className={`rounded-md border p-3 transition ${activityAccent.className}`}>
+                    <div className={`${todoCardClassName} ${activityAccent.className}`}>
                       <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-medium">{item.assignment?.name ?? "Untitled task"}</p>
-                        <div className="flex items-center gap-2">
+                        <p className={todoTitleClassName}>{item.assignment?.name ?? "Untitled task"}</p>
+                        <div className="flex shrink-0 items-center gap-2">
                           {item.assignment?.completed && (
-                            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                            <span className={todoDoneBadgeClassName}>
                               Done
                             </span>
                           )}
-                          <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${activityAccent.badgeClassName}`}>
+                          <span className={`${todoBadgeClassName} ${activityAccent.badgeClassName}`}>
                             {activityAccent.label}
                           </span>
                         </div>
                       </div>
-                      <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: subjectColor.borderColor }}
-                        />
-                        <span>{subjectName}</span>
-                      </p>
-                      <p className="mt-1 text-xs">Due: {formatDueDateShort(item.assignment?.due_at)}</p>
+                      {isCompactMobileSubjectGrid ? (
+                        <div className={todoCompactMetaRowClassName}>
+                          <p className={todoCompactSubjectClassName}>
+                            <span
+                              className="h-2 w-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: subjectColor.borderColor }}
+                            />
+                            <span className={todoCompactSubjectTextClassName}>{subjectName}</span>
+                          </p>
+                          <p className="shrink-0">Due: {formatDueDateShort(item.assignment?.due_at)}</p>
+                        </div>
+                      ) : (
+                        <>
+                          <p className={todoMetaClassName}>
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: subjectColor.borderColor }}
+                            />
+                            <span>{subjectName}</span>
+                          </p>
+                          <p className={todoDueClassName}>Due: {formatDueDateShort(item.assignment?.due_at)}</p>
+                        </>
+                      )}
                     </div>
                   );
 

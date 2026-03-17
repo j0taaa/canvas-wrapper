@@ -39,6 +39,7 @@ type CalendarClientProps = {
   initialMonth: number;
   initialYear: number;
   monthLabel: string;
+  todayKey: string;
 };
 
 type CalendarMonthPayload = {
@@ -164,12 +165,12 @@ export default function CalendarClient({
   initialMonth,
   initialYear,
   monthLabel,
+  todayKey,
 }: CalendarClientProps) {
   const latestRequestKey = useRef<string | null>(null);
   const [displayedMonth, setDisplayedMonth] = useState({ month: initialMonth, year: initialYear });
   const [currentMonthLabel, setCurrentMonthLabel] = useState(monthLabel);
   const [entries, setEntries] = useState(initialEntries);
-  const [currentUpcomingEntries, setCurrentUpcomingEntries] = useState(initialEntries.slice(0, 8));
   const [loadingMonth, setLoadingMonth] = useState(false);
   const [preferences, setPreferences] = useState(DEFAULT_SUBJECT_PREFERENCES);
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
@@ -192,7 +193,6 @@ export default function CalendarClient({
     setDisplayedMonth({ month: initialMonth, year: initialYear });
     setEntries(initialEntries);
     setCurrentMonthLabel(monthLabel);
-    setCurrentUpcomingEntries(initialEntries.slice(0, 8));
   }, [initialEntries, initialMonth, initialYear, monthLabel]);
 
   useEffect(() => {
@@ -218,7 +218,10 @@ export default function CalendarClient({
   }, [viewMode]);
 
   const selectedCell = calendarCells.find((cell) => cell?.dayNumber === selectedDay) ?? null;
-  const visibleUpcomingEntries = visibleEntries.slice(0, 8);
+  const visibleUpcomingEntries = useMemo(
+    () => visibleEntries.filter((entry) => getDayKey(entry.date) >= todayKey).slice(0, 8),
+    [todayKey, visibleEntries],
+  );
   const groupedEntries = useMemo(() => {
     const groups = new Map<string, CalendarEntry[]>();
 
@@ -242,7 +245,6 @@ export default function CalendarClient({
     setDisplayedMonth({ month: payload.month, year: payload.year });
     setEntries(payload.entries);
     setCurrentMonthLabel(payload.monthLabel);
-    setCurrentUpcomingEntries(payload.entries.slice(0, 8));
   }, []);
 
   const fetchMonth = useCallback(async (
@@ -318,7 +320,6 @@ export default function CalendarClient({
       applyMonthPayload(cachedPayload);
     } else {
       setEntries([]);
-      setCurrentUpcomingEntries([]);
     }
 
     void fetchMonth(nextMonth.year, nextMonth.month, { applyIfLatest: true })
@@ -579,7 +580,7 @@ export default function CalendarClient({
           </CardHeader>
           <CardContent className="space-y-3">
             {!selectedCell ? (
-              currentUpcomingEntries.length === 0 ? (
+              visibleUpcomingEntries.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No upcoming items found.</p>
               ) : (
                 visibleUpcomingEntries.map((entry) => {

@@ -6,12 +6,14 @@ export type SubjectPreferences = {
   colors: Record<number, string>;
   hiddenCourseIds: number[];
   showMobileSubjectBar: boolean;
+  compactMobileDashboardSubjects: boolean;
 };
 
 export const DEFAULT_SUBJECT_PREFERENCES: SubjectPreferences = {
   colors: {},
   hiddenCourseIds: [],
   showMobileSubjectBar: true,
+  compactMobileDashboardSubjects: false,
 };
 
 export function parseSubjectPreferences(value?: string | null): SubjectPreferences {
@@ -26,6 +28,7 @@ export function parseSubjectPreferences(value?: string | null): SubjectPreferenc
       colors: parsed.colors ?? {},
       hiddenCourseIds: Array.isArray(parsed.hiddenCourseIds) ? parsed.hiddenCourseIds : [],
       showMobileSubjectBar: parsed.showMobileSubjectBar ?? true,
+      compactMobileDashboardSubjects: parsed.compactMobileDashboardSubjects ?? false,
     };
   } catch {
     return DEFAULT_SUBJECT_PREFERENCES;

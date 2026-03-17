@@ -200,8 +200,22 @@ function appendAnchorAttribute(anchorAttributes: string, attributeName: string, 
   return `${anchorAttributes} ${attributeName}="${attributeValue}"`
 }
 
+function getVisibleHtmlText(html: string) {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 export function rewriteCanvasHtmlLinks(html: string, apiBase?: string, currentCourseId?: number) {
-  return html.replace(/<a\b([^>]*?)href=(["'])(.*?)\2([^>]*)>/gi, (match, beforeHref: string, quote: string, href: string, afterHref: string) => {
+  return html.replace(/<a\b([^>]*?)href=(["'])(.*?)\2([^>]*)>([\s\S]*?)<\/a>/gi, (match, beforeHref: string, quote: string, href: string, afterHref: string, innerHtml: string) => {
     const trimmedHref = href.trim()
     const canvasOrigin = apiBase
       ? (() => {
@@ -235,11 +249,15 @@ export function rewriteCanvasHtmlLinks(html: string, apiBase?: string, currentCo
       return match
     }
 
+    if (wrappedLink.kind === "file" && !getVisibleHtmlText(innerHtml)) {
+      return ""
+    }
+
     const rewrittenHref = `${wrappedLink.path}${parsedUrl.search}${parsedUrl.hash}`
 
     let nextAttributes = appendAnchorClass(`${beforeHref}${afterHref}`, "canvas-wrapper-link")
     nextAttributes = appendAnchorAttribute(nextAttributes, "data-canvas-kind", wrappedLink.kind)
 
-    return `<a${nextAttributes} href=${quote}${rewrittenHref}${quote}>`
+    return `<a${nextAttributes} href=${quote}${rewrittenHref}${quote}>${innerHtml}</a>`
   })
 }

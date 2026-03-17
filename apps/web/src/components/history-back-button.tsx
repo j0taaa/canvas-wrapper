@@ -22,7 +22,7 @@ export function HistoryBackButton({ fallbackHref }: HistoryBackButtonProps) {
 
         router.push(fallbackHref);
       }}
-      className="inline-flex rounded-full border border-border/80 bg-card p-2 text-muted-foreground transition hover:border-foreground/15 hover:bg-muted/85 hover:text-foreground"
+      className="inline-flex cursor-pointer rounded-full border border-border/80 bg-card p-2 text-muted-foreground transition hover:border-foreground/15 hover:bg-muted/85 hover:text-foreground"
     >
       <ArrowLeft className="h-4 w-4" />
     </button>

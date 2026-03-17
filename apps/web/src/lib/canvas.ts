@@ -49,7 +49,7 @@ async function resolveCanvasApiBase(apiBase?: string) {
   return normalizeCanvasProviderUrl(process.env.CANVAS_API_BASE ?? DEFAULT_CANVAS_API_BASE);
 }
 
-type CanvasCourse = {
+export type CanvasCourse = {
   id: number;
   name: string;
   course_code?: string;
@@ -130,6 +130,9 @@ type CanvasSubmission = {
   body?: string;
   url?: string;
   attempt?: number;
+  submission_type?: string;
+  attachments?: CanvasSubmissionAttachment[];
+  submission_comments?: CanvasSubmissionComment[];
 };
 
 type CanvasEnrollmentGrades = {
@@ -154,6 +157,10 @@ export type CanvasCourseUser = {
   short_name?: string;
   sortable_name?: string;
   avatar_url?: string;
+  created_at?: string;
+  sis_user_id?: string;
+  integration_id?: string | null;
+  enrollments?: CanvasEnrollment[];
 };
 
 export type CanvasCourseFile = {
@@ -228,6 +235,24 @@ type CanvasConversationAttachment = {
   display_name?: string;
   filename?: string;
   url?: string;
+};
+
+export type CanvasSubmissionAttachment = {
+  id?: number;
+  "content-type"?: string;
+  display_name?: string;
+  filename?: string;
+  url?: string;
+  size?: number;
+};
+
+export type CanvasSubmissionComment = {
+  id?: number;
+  author_name?: string;
+  author_id?: number;
+  comment?: string;
+  created_at?: string;
+  attachments?: CanvasSubmissionAttachment[];
 };
 
 export type CanvasConversationMessage = {
@@ -791,16 +816,33 @@ export async function getAssignmentDetails(
     throw new Error("Missing Canvas API key");
   }
 
-  return canvasFetch<CanvasAssignment>(
-    `/courses/${courseId}/assignments/${assignmentId}?include[]=submission`,
-    resolvedApiKey,
-  );
+  const [assignment, submission] = await Promise.all([
+    canvasFetch<CanvasAssignment>(
+      `/courses/${courseId}/assignments/${assignmentId}?include[]=submission`,
+      resolvedApiKey,
+    ),
+    canvasFetch<CanvasSubmission>(
+      `/courses/${courseId}/assignments/${assignmentId}/submissions/self?include[]=submission_comments`,
+      resolvedApiKey,
+    ).catch(() => null),
+  ]);
+
+  return {
+    ...assignment,
+    submission: submission ?? assignment.submission,
+  };
 }
 
 export async function submitAssignment(
   courseId: number,
   assignmentId: number,
-  submission: { submissionType: "online_text_entry" | "online_url"; body?: string; url?: string },
+  submission: {
+    submissionType: "online_text_entry" | "online_url" | "online_upload";
+    body?: string;
+    url?: string;
+    fileIds?: number[];
+    comment?: string;
+  },
   apiKey?: string,
 ): Promise<CanvasSubmission> {
   const resolvedApiKey = apiKey ?? envCanvasApiKey;
@@ -821,6 +863,16 @@ export async function submitAssignment(
     params.set("submission[url]", submission.url ?? "");
   }
 
+  if (submission.submissionType === "online_upload") {
+    for (const fileId of submission.fileIds ?? []) {
+      params.append("submission[file_ids][]", String(fileId));
+    }
+  }
+
+  if (submission.comment?.trim()) {
+    params.set("comment[text_comment]", submission.comment.trim());
+  }
+
   const response = await fetch(`${resolvedApiBase}/courses/${courseId}/assignments/${assignmentId}/submissions`, {
     method: "POST",
     headers: {
@@ -836,6 +888,123 @@ export async function submitAssignment(
   }
 
   return (await response.json()) as CanvasSubmission;
+}
+
+export async function addAssignmentComment(
+  courseId: number,
+  assignmentId: number,
+  comment: string,
+  apiKey?: string,
+): Promise<CanvasSubmission> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+  const resolvedApiBase = await resolveCanvasApiBase();
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  const trimmedComment = comment.trim();
+
+  if (!trimmedComment) {
+    throw new Error("Comment cannot be empty");
+  }
+
+  const params = new URLSearchParams();
+  params.set("comment[text_comment]", trimmedComment);
+
+  const response = await fetch(`${resolvedApiBase}/courses/${courseId}/assignments/${assignmentId}/submissions/self`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${resolvedApiKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Canvas comment submission failed (${response.status}) for assignment ${assignmentId}`);
+  }
+
+  return (await response.json()) as CanvasSubmission;
+}
+
+export async function uploadAssignmentSubmissionFiles(
+  courseId: number,
+  assignmentId: number,
+  files: Array<{ contentType?: string; data: Buffer; name: string; size: number }>,
+  apiKey?: string,
+): Promise<number[]> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+  const resolvedApiBase = await resolveCanvasApiBase();
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  const uploadedFileIds: number[] = [];
+
+  for (const file of files) {
+    const prepResponse = await fetch(`${resolvedApiBase}/courses/${courseId}/assignments/${assignmentId}/submissions/self/files`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resolvedApiKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        name: file.name,
+        size: String(file.size),
+        ...(file.contentType ? { content_type: file.contentType } : {}),
+      }).toString(),
+      cache: "no-store",
+    });
+
+    if (!prepResponse.ok) {
+      throw new Error(`Canvas file upload preparation failed (${prepResponse.status}) for assignment ${assignmentId}`);
+    }
+
+    const prepPayload = (await prepResponse.json()) as {
+      upload_params?: Record<string, string>;
+      upload_url?: string;
+    };
+
+    if (!prepPayload.upload_url) {
+      throw new Error("Canvas did not return an upload URL for the file submission");
+    }
+
+    const formData = new FormData();
+
+    for (const [key, value] of Object.entries(prepPayload.upload_params ?? {})) {
+      formData.append(key, value);
+    }
+
+    formData.append(
+      "file",
+      new Blob([new Uint8Array(file.data)], { type: file.contentType || "application/octet-stream" }),
+      file.name,
+    );
+
+    const uploadResponse = await fetch(prepPayload.upload_url, {
+      method: "POST",
+      body: formData,
+      cache: "no-store",
+      redirect: "follow",
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(`Canvas file upload failed (${uploadResponse.status}) for ${file.name}`);
+    }
+
+    const uploadPayload = (await uploadResponse.json()) as { id?: number };
+
+    if (!uploadPayload.id || !Number.isFinite(uploadPayload.id)) {
+      throw new Error(`Canvas did not return a valid file id for ${file.name}`);
+    }
+
+    uploadedFileIds.push(uploadPayload.id);
+  }
+
+  return uploadedFileIds;
 }
 
 export async function getQuizDetails(
@@ -880,6 +1049,78 @@ export async function getCoursePeople(courseId: number, apiKey?: string): Promis
     `/courses/${courseId}/users?include[]=avatar_url&per_page=50&sort=username`,
     resolvedApiKey,
   );
+}
+
+export async function getCoursePerson(courseId: number, userId: number, apiKey?: string): Promise<CanvasCourseUser | null> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  try {
+    return await canvasFetch<CanvasCourseUser>(
+      `/courses/${courseId}/users/${userId}?include[]=avatar_url&include[]=enrollments`,
+      resolvedApiKey,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (message.includes("(404)")) {
+      return null;
+    }
+
+    const people = await canvasFetch<CanvasCourseUser[]>(
+      `/courses/${courseId}/users?include[]=avatar_url&include[]=enrollments&per_page=100&sort=username`,
+      resolvedApiKey,
+    );
+
+    return people.find((person) => person.id === userId) ?? null;
+  }
+}
+
+export async function getUserActiveCourses(userId: number, apiKey?: string): Promise<CanvasCourse[]> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  return canvasFetch<CanvasCourse[]>(
+    `/users/${userId}/courses?enrollment_state=active&per_page=100`,
+    resolvedApiKey,
+  );
+}
+
+export async function getSharedActiveCourses(
+  currentCourses: CanvasCourse[],
+  userId: number,
+  apiKey?: string,
+): Promise<CanvasCourse[]> {
+  const resolvedApiKey = apiKey ?? envCanvasApiKey;
+
+  if (!resolvedApiKey) {
+    throw new Error("Missing Canvas API key");
+  }
+
+  const membershipResults = await mapWithConcurrency(
+    currentCourses,
+    CANVAS_FETCH_CONCURRENCY,
+    async (course) => {
+      const person = await getCoursePerson(course.id, userId, resolvedApiKey);
+
+      if (!person) {
+        return null;
+      }
+
+      return course;
+    },
+  );
+
+  return membershipResults
+    .filter((result): result is PromiseFulfilledResult<CanvasCourse | null> => result.status === "fulfilled")
+    .map((result) => result.value)
+    .filter((course): course is CanvasCourse => course != null);
 }
 
 export async function getCourseFiles(courseId: number, apiKey?: string): Promise<CanvasCourseFile[]> {

@@ -121,22 +121,6 @@ function getModuleItemHref(courseId: number, item: { type?: string; page_url?: s
   return item.html_url;
 }
 
-function isPreviewableFile(contentType?: string, filename?: string) {
-  const normalizedType = (contentType ?? "").toLowerCase();
-  const normalizedName = (filename ?? "").toLowerCase();
-
-  return (
-    normalizedType === "application/pdf" ||
-    normalizedType.startsWith("image/") ||
-    normalizedName.endsWith(".pdf") ||
-    normalizedName.endsWith(".png") ||
-    normalizedName.endsWith(".jpg") ||
-    normalizedName.endsWith(".jpeg") ||
-    normalizedName.endsWith(".gif") ||
-    normalizedName.endsWith(".webp")
-  );
-}
-
 export default async function SubjectPage({
   params,
   searchParams,
@@ -291,6 +275,26 @@ export default async function SubjectPage({
                     <div className="space-y-2">
                       {module.items?.slice(0, 12).map((item) => {
                         const itemHref = getModuleItemHref(parsedCourseId, item);
+
+                        if (item.type === "SubHeader") {
+                          return (
+                            <div
+                              key={item.id}
+                              className="rounded-lg border border-black/8 bg-black/[0.03] px-3 py-2.5"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className="h-2 w-2 shrink-0 rounded-full"
+                                  style={{ backgroundColor: subjectStyle.borderColor }}
+                                />
+                                <h3 className="text-sm font-semibold text-black/80">
+                                  {item.title ?? "Section"}
+                                </h3>
+                              </div>
+                            </div>
+                          );
+                        }
+
                         const itemContent = (
                           <div className="flex items-start justify-between gap-3 rounded-lg border border-black/8 bg-white/80 px-3 py-2.5 text-sm transition hover:border-black/30 hover:bg-black/[0.03]">
                             <div className="min-w-0">
@@ -546,7 +550,11 @@ export default async function SubjectPage({
                   <p className="text-sm text-black/70">{peopleUnavailable ? "People are not available for this subject." : "No people available for this subject."}</p>
                 )}
                 {activePeopleView === "people" && people.map((person) => (
-                  <div key={person.id} className="rounded-xl border border-black/10 bg-white p-4">
+                  <Link
+                    key={person.id}
+                    href={`/subjects/${parsedCourseId}/people/${person.id}`}
+                    className="rounded-xl border border-black/10 bg-white p-4 transition hover:border-black/30 hover:bg-black/[0.03]"
+                  >
                     <div className="flex items-center gap-3">
                       <Avatar className="border border-black/15">
                         <AvatarImage src={person.avatar_url} alt={person.name} />
@@ -557,7 +565,7 @@ export default async function SubjectPage({
                         <p className="truncate text-xs text-black/55">{person.short_name ?? person.sortable_name ?? "Canvas user"}</p>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
                 {activePeopleView === "groups" && groups.length === 0 && (
                   <p className="text-sm text-black/70">{groupsUnavailable ? "Groups are not available for this subject." : "No groups available for this subject."}</p>
@@ -605,7 +613,11 @@ export default async function SubjectPage({
                         <div className="mt-3 space-y-2">
                           {group.users && group.users.length > 0 ? (
                             group.users.map((person) => (
-                              <div key={person.id} className="flex items-center gap-3 rounded-lg border border-black/8 bg-white/85 px-3 py-2">
+                              <Link
+                                key={person.id}
+                                href={`/subjects/${parsedCourseId}/people/${person.id}`}
+                                className="flex items-center gap-3 rounded-lg border border-black/8 bg-white/85 px-3 py-2 transition hover:border-black/20 hover:bg-black/[0.03]"
+                              >
                                 <Avatar className="border border-black/15">
                                   <AvatarImage src={person.avatar_url} alt={person.name} />
                                   <AvatarFallback>{getInitials(person.name)}</AvatarFallback>
@@ -614,7 +626,7 @@ export default async function SubjectPage({
                                   <p className="truncate text-sm font-medium">{person.name}</p>
                                   <p className="truncate text-xs text-black/55">{person.short_name ?? person.sortable_name ?? "Canvas user"}</p>
                                 </div>
-                              </div>
+                              </Link>
                             ))
                           ) : group.usersAccessDenied ? (
                             <p className="text-xs text-black/55">Canvas only exposes member lists for groups you are allowed to view. For this account, that appears to be only your own group.</p>
@@ -682,9 +694,7 @@ export default async function SubjectPage({
             <CardContent className="space-y-3">
               {files.length === 0 && <p className="text-sm text-black/70">{filesUnavailable ? "Files are not available for this subject." : "No files available for this subject."}</p>}
               {files.map((file) => {
-                const previewHref = isPreviewableFile(file["content-type"], file.filename ?? file.display_name)
-                  ? `/subjects/${parsedCourseId}/files/${file.id}`
-                  : file.url;
+                const fileHref = `/subjects/${parsedCourseId}/files/${file.id}`;
                 const content = (
                   <div
                     className="rounded-xl border border-black/10 bg-white p-4 transition hover:border-black/30 hover:bg-black/[0.03]"
@@ -703,15 +713,14 @@ export default async function SubjectPage({
                   </div>
                 );
 
-                if (!previewHref) {
+                if (!fileHref) {
                   return <div key={file.id}>{content}</div>;
                 }
 
                 return (
                   <Link
                     key={file.id}
-                    href={previewHref}
-                    target={previewHref.startsWith("/subjects/") ? undefined : "_blank"}
+                    href={fileHref}
                     className="block"
                   >
                     {content}

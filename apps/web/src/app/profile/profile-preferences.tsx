@@ -188,6 +188,56 @@ function MobileSubjectBarSelector() {
   );
 }
 
+function MobileDashboardSubjectSizeSelector() {
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    const syncPreferences = () => setCompact(readSubjectPreferences().compactMobileDashboardSubjects);
+
+    syncPreferences();
+    window.addEventListener("storage", syncPreferences);
+    window.addEventListener(SUBJECT_PREFERENCES_EVENT, syncPreferences);
+
+    return () => {
+      window.removeEventListener("storage", syncPreferences);
+      window.removeEventListener(SUBJECT_PREFERENCES_EVENT, syncPreferences);
+    };
+  }, []);
+
+  return (
+    <div className="rounded-2xl border border-border/70 bg-muted/35 p-4">
+      <p className="mb-3 text-sm font-medium text-foreground">Mobile dashboard subjects</p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => writeSubjectPreferences({ ...readSubjectPreferences(), compactMobileDashboardSubjects: false })}
+          className={
+            !compact
+              ? "inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              : "inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
+          }
+        >
+          <span>Default</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => writeSubjectPreferences({ ...readSubjectPreferences(), compactMobileDashboardSubjects: true })}
+          className={
+            compact
+              ? "inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              : "inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
+          }
+        >
+          <span>Compact</span>
+        </button>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Make dashboard subject cards smaller on mobile so two subjects fit per row.
+      </p>
+    </div>
+  );
+}
+
 function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["courses"] }) {
   const [preferences, setPreferences] = useState(DEFAULT_SUBJECT_PREFERENCES);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -330,6 +380,7 @@ export function ProfilePreferences({ courses }: ProfilePreferencesProps) {
       <ThemePreferenceSelector />
       <HapticsPreferenceSelector />
       <MobileSubjectBarSelector />
+      <MobileDashboardSubjectSizeSelector />
       <div className="rounded-2xl border border-border/70 bg-muted/35 p-4 text-sm text-muted-foreground">
         Hide subjects from the dashboard and navigation, choose your own subject colors, or enable optional haptic feedback.
       </div>

@@ -32,6 +32,7 @@ export default async function CalendarPage() {
   const entries = buildCalendarEntries(calendarData);
 
   const monthLabel = getMonthLabel(displayedMonth.year, displayedMonth.month);
+  const todayKey = `${today.year}-${String(today.month).padStart(2, "0")}-${String(today.day).padStart(2, "0")}`;
 
   return (
     <DesktopAppShell active="calendar" profile={shellData.profile} courses={shellData.courses}>
@@ -47,6 +48,7 @@ export default async function CalendarPage() {
           initialMonth={displayedMonth.month}
           monthLabel={monthLabel}
           initialYear={displayedMonth.year}
+          todayKey={todayKey}
         />
       </div>
     </DesktopAppShell>
