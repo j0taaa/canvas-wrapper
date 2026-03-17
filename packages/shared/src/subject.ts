@@ -6,6 +6,33 @@ export function formatSubjectName(name?: string | null) {
   return name.split(" -", 1)[0]?.trim() || name;
 }
 
+export function orderSubjectsByPreference<T extends { id: number }>(
+  subjects: T[],
+  orderedIds: number[] = [],
+) {
+  const uniqueOrderedIds = Array.from(new Set(orderedIds));
+  const orderIndex = new Map<number, number>();
+
+  uniqueOrderedIds.forEach((id, index) => {
+    orderIndex.set(id, index);
+  });
+
+  return subjects
+    .map((subject, index) => ({
+      index,
+      order: orderIndex.get(subject.id) ?? Number.POSITIVE_INFINITY,
+      subject,
+    }))
+    .sort((left, right) => {
+      if (left.order === right.order) {
+        return left.index - right.index;
+      }
+
+      return left.order - right.order;
+    })
+    .map((entry) => entry.subject);
+}
+
 export function getSubjectColorHex(name?: string | null) {
   const safeName = name || "Untitled subject";
   let hash = 0;

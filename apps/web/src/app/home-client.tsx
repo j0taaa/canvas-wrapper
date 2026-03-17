@@ -30,7 +30,7 @@ import {
   SUBJECT_PREFERENCES_EVENT,
 } from "@/lib/subject-preferences";
 import { CANVAS_BOOTSTRAP_STORAGE } from "@/lib/app-bootstrap";
-import { formatDueDateShort, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
+import { formatDueDateShort, formatSubjectName, getSubjectColorStyle, orderSubjectsByPreference } from "@/lib/utils";
 
 const CANVAS_API_KEY_STORAGE = "canvasApiKey";
 const CANVAS_API_BASE_STORAGE = "canvasApiBase";
@@ -439,7 +439,10 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
     );
   }
 
-  const visibleCourses = data.courses.filter((course) => !preferences.hiddenCourseIds.includes(course.id));
+  const visibleCourses = orderSubjectsByPreference(
+    data.courses.filter((course) => !preferences.hiddenCourseIds.includes(course.id)),
+    preferences.orderedCourseIds,
+  );
   const visiblePastCourses = data.pastCourses.filter((course) => !preferences.hiddenCourseIds.includes(course.id));
   const visibleTodo = data.todo.filter((item) => !item.assignment?.course_id || !preferences.hiddenCourseIds.includes(item.assignment.course_id));
   const isCompactMobileSubjectGrid = preferences.compactMobileDashboardSubjects;

@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { getSubjectColorPalette } from "@canvas/shared"
-export { formatSubjectName, getSubjectColorHex } from "@canvas/shared"
+export { formatSubjectName, getSubjectColorHex, orderSubjectsByPreference } from "@canvas/shared"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))

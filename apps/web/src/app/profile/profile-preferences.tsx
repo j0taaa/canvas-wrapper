@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, EyeOff, MonitorCog, MoonStar, Palette, Smartphone, SunMedium } from "lucide-react";
-import { formatSubjectName, getSubjectColorHex, getSubjectColorStyle } from "@/lib/utils";
+import { ArrowDown, ArrowUp, ChevronDown, EyeOff, MonitorCog, MoonStar, Palette, Smartphone, SunMedium } from "lucide-react";
+import { formatSubjectName, getSubjectColorHex, getSubjectColorStyle, orderSubjectsByPreference } from "@/lib/utils";
 import {
   readHapticsPreference,
   writeHapticsPreference,
@@ -259,6 +259,27 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
     () => courses.filter((course) => course.name),
     [courses],
   );
+  const orderedVisibleCourses = useMemo(
+    () => orderSubjectsByPreference(visibleCourses, preferences.orderedCourseIds),
+    [preferences.orderedCourseIds, visibleCourses],
+  );
+
+  const moveCourse = (courseId: number, direction: -1 | 1) => {
+    const nextOrderedIds = orderedVisibleCourses.map((course) => course.id);
+    const currentIndex = nextOrderedIds.indexOf(courseId);
+    const targetIndex = currentIndex + direction;
+
+    if (currentIndex === -1 || targetIndex < 0 || targetIndex >= nextOrderedIds.length) {
+      return;
+    }
+
+    [nextOrderedIds[currentIndex], nextOrderedIds[targetIndex]] = [nextOrderedIds[targetIndex], nextOrderedIds[currentIndex]];
+
+    writeSubjectPreferences({
+      ...preferences,
+      orderedCourseIds: nextOrderedIds,
+    });
+  };
 
   if (visibleCourses.length === 0) {
     return null;
@@ -274,7 +295,7 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
         <div>
           <p className="text-sm font-medium text-foreground">Subjects</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Hide subjects and customize their colors.
+            Hide subjects, change their colors, and reorder them.
           </p>
         </div>
         <ChevronDown className={`h-4 w-4 text-muted-foreground transition ${isExpanded ? "rotate-180" : ""}`} />
@@ -282,7 +303,19 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
 
       {isExpanded && (
         <div className="mt-3 space-y-3">
-          {visibleCourses.map((course) => {
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-muted/35 px-4 py-3 text-xs text-muted-foreground">
+            <span>Use the arrows to reorder how active subjects appear in the dashboard and navigation.</span>
+            {preferences.orderedCourseIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => writeSubjectPreferences({ ...preferences, orderedCourseIds: [] })}
+                className="shrink-0 text-foreground transition hover:opacity-75"
+              >
+                Reset order
+              </button>
+            )}
+          </div>
+          {orderedVisibleCourses.map((course, index) => {
             const isHidden = preferences.hiddenCourseIds.includes(course.id);
             const preferredColor = preferences.colors[course.id];
             const colorStyle = getSubjectColorStyle(course.name, preferredColor);
@@ -301,24 +334,46 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
                     </div>
                     <p className="mt-1 truncate text-xs text-muted-foreground">{course.course_code ?? "Subject"}</p>
                   </div>
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={!isHidden}
-                      onChange={(event) => {
-                        const nextHiddenIds = event.target.checked
-                          ? preferences.hiddenCourseIds.filter((courseId) => courseId !== course.id)
-                          : [...preferences.hiddenCourseIds, course.id];
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center rounded-full border border-border/70 bg-muted/35 p-1">
+                      <button
+                        type="button"
+                        onClick={() => moveCourse(course.id, -1)}
+                        disabled={index === 0}
+                        className="rounded-full p-1 text-muted-foreground transition hover:bg-card hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
+                        aria-label={`Move ${formatSubjectName(course.name)} up`}
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveCourse(course.id, 1)}
+                        disabled={index === orderedVisibleCourses.length - 1}
+                        className="rounded-full p-1 text-muted-foreground transition hover:bg-card hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
+                        aria-label={`Move ${formatSubjectName(course.name)} down`}
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={!isHidden}
+                        onChange={(event) => {
+                          const nextHiddenIds = event.target.checked
+                            ? preferences.hiddenCourseIds.filter((courseId) => courseId !== course.id)
+                            : [...preferences.hiddenCourseIds, course.id];
 
-                        writeSubjectPreferences({
-                          ...preferences,
-                          hiddenCourseIds: Array.from(new Set(nextHiddenIds)),
-                        });
-                      }}
-                      className="h-4 w-4 rounded border-border/70 bg-background"
-                    />
-                    Visible
-                  </label>
+                          writeSubjectPreferences({
+                            ...preferences,
+                            hiddenCourseIds: Array.from(new Set(nextHiddenIds)),
+                          });
+                        }}
+                        className="h-4 w-4 rounded border-border/70 bg-background"
+                      />
+                      Visible
+                    </label>
+                  </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-3">

@@ -11,7 +11,7 @@ import {
   type SubjectPreferences,
   SUBJECT_PREFERENCES_EVENT,
 } from "@/lib/subject-preferences";
-import { formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
+import { formatSubjectName, getSubjectColorStyle, orderSubjectsByPreference } from "@/lib/utils";
 
 const CANVAS_API_KEY_STORAGE = "canvasApiKey";
 const CANVAS_API_BASE_STORAGE = "canvasApiBase";
@@ -88,7 +88,12 @@ export function DesktopSidebar({
       window.removeEventListener(SUBJECT_PREFERENCES_EVENT, syncPreferences);
     };
   }, []);
-  const visibleCourses = courses?.filter((course) => !preferences.hiddenCourseIds.includes(course.id));
+  const visibleCourses = courses
+    ? orderSubjectsByPreference(
+        courses.filter((course) => !preferences.hiddenCourseIds.includes(course.id)),
+        preferences.orderedCourseIds,
+      )
+    : undefined;
 
   const clearKey = async () => {
     await fetch("/api/dashboard", { method: "DELETE" });
@@ -201,7 +206,12 @@ export function MobileBottomNav({
       window.removeEventListener(SUBJECT_PREFERENCES_EVENT, syncPreferences);
     };
   }, []);
-  const visibleCourses = courses?.filter((course) => !preferences.hiddenCourseIds.includes(course.id));
+  const visibleCourses = courses
+    ? orderSubjectsByPreference(
+        courses.filter((course) => !preferences.hiddenCourseIds.includes(course.id)),
+        preferences.orderedCourseIds,
+      )
+    : undefined;
   const visibleCourseKey = visibleCourses?.map((course) => course.id).join(",") ?? "";
   const isDashboardSection = pathname === "/" || pathname.startsWith("/subjects/");
   const effectiveActive: SidebarActiveItem | undefined = isDashboardSection ? "dashboard" : active;

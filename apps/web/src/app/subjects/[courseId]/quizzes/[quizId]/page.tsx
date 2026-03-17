@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getQuizDetails, getQuizQuestions, getSubjectShellData } from "@/lib/canvas";
 import { formatDueDateShort, formatSubjectName, getSubjectColorStyle, rewriteCanvasHtmlLinks } from "@/lib/utils";
+import { OpenInCanvasButton } from "./open-in-canvas-button";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
 
@@ -119,9 +120,7 @@ export default async function QuizPage({
                 dangerouslySetInnerHTML={{ __html: renderedDescription }}
               />
               {quizResult.html_url && (
-                <Link href={quizResult.html_url} target="_blank" className="inline-flex text-sm text-black/60 underline-offset-4 hover:underline">
-                  Open in Canvas
-                </Link>
+                <OpenInCanvasButton canvasUrl={quizResult.html_url} courseId={parsedCourseId} quizId={parsedQuizId} />
               )}
             </CardContent>
           </Card>

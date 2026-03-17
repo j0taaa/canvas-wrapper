@@ -250,7 +250,7 @@ export default function CalendarClient({
   const fetchMonth = useCallback(async (
     year: number,
     month: number,
-    options?: { applyIfLatest?: boolean },
+    options?: { applyIfLatest?: boolean; applyPayload?: boolean },
   ) => {
     const nextMonth = normalizeMonth(year, month);
     const requestKey = getMonthCacheEntryKey(nextMonth.year, nextMonth.month);
@@ -280,7 +280,9 @@ export default function CalendarClient({
         writeCalendarMonthToCache(normalizedPayload);
       }
 
-      if (!options?.applyIfLatest || latestRequestKey.current === requestKey) {
+      const shouldApplyPayload = options?.applyPayload ?? Boolean(options?.applyIfLatest);
+
+      if (shouldApplyPayload && (!options?.applyIfLatest || latestRequestKey.current === requestKey)) {
         applyMonthPayload(normalizedPayload);
       }
 
@@ -299,7 +301,7 @@ export default function CalendarClient({
       return;
     }
 
-    void fetchMonth(normalized.year, normalized.month).catch(() => {
+    void fetchMonth(normalized.year, normalized.month, { applyPayload: false }).catch(() => {
       // Background month warmup is best-effort only.
     });
   }, [fetchMonth]);
