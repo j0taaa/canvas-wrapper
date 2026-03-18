@@ -79,5 +79,5 @@ The app can work without fixed env credentials because users can connect with th
 
 - The shared package is the right place for domain types, formatters, and pure mapping logic used by both apps.
 - Platform-specific UI and native integrations should stay inside `apps/web` or `apps/mobile`.
-- The mobile app is an Expo + React Native shell around the real web app so mobile and web stay in lockstep on features, behavior, and design.
+- The mobile app is a native React Native implementation that shares domain logic and data structures with the web app through `packages/shared`, keeping both platforms in lockstep on features, behavior, and design.
 - Set `EXPO_PUBLIC_WEB_APP_URL` for the mobile app, or enter the website URL on first launch inside the app.

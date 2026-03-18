@@ -23,8 +23,8 @@ If a feature is added, removed, or changed in one app, the other app must be upd
 
 - Prefer sharing pure domain logic, formatting, types, and mapping helpers through `packages/shared`.
 - Do not let one platform drift from the other.
-- The default parity strategy is: `apps/mobile` should render the real `apps/web` experience inside the React Native shell unless the user explicitly asks for a native-only divergence.
-- If a new feature is added to `apps/web`, make sure it remains reachable and working in `apps/mobile` without a separate reimplementation.
+- The default parity strategy is: both apps implement the same features using shared domain logic from `packages/shared`. The mobile app has its own native React Native UI that mirrors the web app's design and behavior.
+- If a new feature is added to one app, it must be implemented in both apps to maintain parity. Use `packages/shared` for shared logic, but both apps have their own UI implementations.
 - If a platform-specific limitation exists, match the behavior and presentation as closely as possible and document the gap in the final response.
 - New screens should be created in both apps together.
 - Design changes must be mirrored across both apps.
