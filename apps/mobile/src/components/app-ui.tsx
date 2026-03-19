@@ -2,7 +2,6 @@ import { PropsWithChildren, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +10,7 @@ import {
 import { normalizeCanvasProviderUrl } from "@canvas/shared";
 import { useAppPreferences } from "../providers/app-preferences";
 import { useCanvasSession } from "../providers/canvas-session";
+import { RestorableScrollView } from "./restorable-scroll-view";
 
 function useAppColors() {
   const { resolvedTheme } = useAppPreferences();
@@ -80,9 +80,9 @@ export function AppScreen({
   return (
     <View style={[styles.screen, { backgroundColor: colors.screen }]}>
       {scroll ? (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <RestorableScrollView contentContainerStyle={styles.scrollContent}>
           {content}
-        </ScrollView>
+        </RestorableScrollView>
       ) : (
         content
       )}
@@ -114,6 +114,42 @@ export function LoadingState({ label = "Loading..." }: { label?: string }) {
       <ActivityIndicator size="large" color={colors.foreground} />
       <Text style={[styles.stateText, { color: colors.subtitle }]}>{label}</Text>
     </View>
+  );
+}
+
+export function InlineLoadingNotice({
+  title = "Loading latest data",
+  description,
+}: {
+  title?: string;
+  description: string;
+}) {
+  const colors = useAppColors();
+  return (
+    <View style={[styles.inlineNotice, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}>
+      <Text style={[styles.inlineNoticeTitle, { color: colors.foreground }]}>{title}</Text>
+      <Text style={[styles.inlineNoticeDescription, { color: colors.subtitle }]}>{description}</Text>
+    </View>
+  );
+}
+
+export function PlaceholderBlock({
+  height = 72,
+}: {
+  height?: number;
+}) {
+  const colors = useAppColors();
+  return (
+    <View
+      style={[
+        styles.placeholderBlock,
+        {
+          backgroundColor: colors.cardMuted,
+          borderColor: colors.border,
+          height,
+        },
+      ]}
+    />
   );
 }
 
@@ -386,12 +422,31 @@ const styles = StyleSheet.create({
     color: "rgba(15,23,42,0.56)",
     fontSize: 13,
   },
+  inlineNotice: {
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  inlineNoticeDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  inlineNoticeTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
   input: {
     borderRadius: 18,
     borderWidth: 1,
     fontSize: 15,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  placeholderBlock: {
+    borderRadius: 18,
+    borderWidth: 1,
   },
   pill: {
     alignSelf: "flex-start",

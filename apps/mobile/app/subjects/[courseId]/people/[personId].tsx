@@ -1,22 +1,26 @@
-import { useCallback, useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, Mail } from "lucide-react-native";
 import {
-  getCoursePerson,
   getSharedActiveCourses,
-  getSubjectShellData,
   formatSubjectName,
   getSubjectColorPalette,
 } from "@canvas/shared";
 import {
   AppScreen,
   ErrorState,
+  PlaceholderBlock,
   LoadingState,
   RequireCanvasConfig,
 } from "../../../../src/components/app-ui";
-import { useAsyncResource } from "../../../../src/hooks/use-async-resource";
+import { useRefreshControl } from "../../../../src/hooks/use-refresh-control";
+import { RestorableScrollView } from "../../../../src/components/restorable-scroll-view";
+import { SubjectLayoutHeader } from "../../../../src/components/subject-layout";
+import { UserAvatar } from "../../../../src/components/user-avatar";
+import { usePerson, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
 import { formatDueDateShort } from "../../../../src/lib/format";
+import { goBackOrPush } from "../../../../src/lib/navigation";
 import { useAppPreferences } from "../../../../src/providers/app-preferences";
 import { useCanvasSession } from "../../../../src/providers/canvas-session";
 
@@ -62,19 +66,12 @@ export default function PersonDetailScreen() {
     };
   }, [resolvedTheme]);
 
-  const loadData = useCallback(async () => {
-    const shell = await getSubjectShellData(courseId, config!);
-    const person = await getCoursePerson(courseId, personId, config!);
-    if (!person) throw new Error("Person not found in this subject");
-    const sharedCourses = await getSharedActiveCourses(shell.courses, personId, config!);
-    return { course: shell.course, person, sharedCourses };
-  }, [config, courseId, personId]);
+  const { data: shellData } = useCourseShell(courseId);
+  const { data: personData, error, isLoading, isFetching, refetch } = usePerson(courseId, personId);
+  const { onRefresh, refreshing } = useRefreshControl(refetch);
 
-  const { data, error, loading, reload } = useAsyncResource(loadData, [config, courseId, personId], config != null);
-
-  const course = data?.course;
-  const person = data?.person;
-  const sharedCourses = data?.sharedCourses ?? [];
+  const course = shellData?.course;
+  const person = personData;
   
   const palette = useMemo(() => {
     if (!course) return { backgroundColor: "rgba(59, 130, 246, 0.16)", borderColor: "#3b82f6", color: "rgba(29, 78, 216, 0.95)" };
@@ -102,23 +99,36 @@ export default function PersonDetailScreen() {
 
   const roleColors = getRoleBadgeColors(primaryEnrollment?.type ?? primaryEnrollment?.role);
   const statusColors = getStatusBadgeColors(enrollmentState);
+  const showColdLoading = isLoading && !course && !person && !error;
+  const showBlockingError = !!error && !course && !person;
+  const showInlineRefresh = !!course && !!person && (isFetching || isLoading);
 
   return (
     <RequireCanvasConfig>
       <AppScreen scroll={false}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <RestorableScrollView 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.mutedForeground}
+            />
+          }
+        >
           <View style={styles.container}>
-            {loading ? <LoadingState label="Loading person..." /> : null}
-            {!loading && error ? <ErrorState error={error} onRetry={reload} /> : null}
+            {showColdLoading ? <LoadingState label="Loading person..." /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+            <SubjectLayoutHeader />
             
-            {!loading && !error && course && person ? (
+            {course && person ? (
               <>
                 {/* Navigation Bar */}
                 <View style={styles.navBar}>
                   <Pressable
                     onPress={() => {
                       triggerSelectionHaptic();
-                      router.push(`/subjects/${courseId}?tab=people`);
+                      goBackOrPush(router, `/subjects/${courseId}?tab=people`);
                     }}
                     style={styles.backButton}
                   >
@@ -131,14 +141,21 @@ export default function PersonDetailScreen() {
                 <View style={[styles.headerCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   <View style={[styles.headerTop, { borderBottomColor: colors.border }]}>
                     <View style={styles.headerContent}>
-                      <View style={[styles.avatarContainer, { borderColor: palette.borderColor, backgroundColor: palette.backgroundColor }]}>
-                        <Text style={[styles.avatarText, { color: palette.color }]}>{getInitials(person.name)}</Text>
-                      </View>
+                      <UserAvatar
+                        backgroundColor={palette.backgroundColor}
+                        borderColor={palette.borderColor}
+                        fallback={getInitials(person.name)}
+                        name={person.name}
+                        size={64}
+                        src={person.avatar_url}
+                        textColor={palette.color}
+                        textSize={24}
+                      />
                       <View style={styles.headerText}>
                         <Text style={[styles.personName, { color: colors.foreground }]} numberOfLines={1}>
                           {person.name}
                         </Text>
-                        <Pressable onPress={() => router.push(`/subjects/${courseId}?tab=people`)}>
+                        <Pressable onPress={() => goBackOrPush(router, `/subjects/${courseId}?tab=people`)}>
                           <Text style={[styles.courseLink, { color: colors.mutedForeground }]}>
                             {formatSubjectName(course.name)}
                           </Text>
@@ -208,37 +225,84 @@ export default function PersonDetailScreen() {
                     </Text>
                   </View>
                   <View style={styles.cardContent}>
-                    {sharedCourses.length === 0 ? (
-                      <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                        No shared active subjects were found.
-                      </Text>
-                    ) : (
-                      sharedCourses.map((sharedCourse) => {
-                        const sharedPalette = getSubjectColorPalette(sharedCourse.name);
-                        return (
-                          <Pressable
-                            key={sharedCourse.id}
-                            onPress={() => router.push(`/subjects/${sharedCourse.id}`)}
-                            style={[styles.sharedCourseCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: sharedPalette.borderColor }]}
-                          >
-                            <Text style={[styles.sharedCourseName, { color: colors.foreground }]} numberOfLines={1}>
-                              {formatSubjectName(sharedCourse.name)}
-                            </Text>
-                            <Text style={[styles.sharedCourseCode, { color: colors.mutedForeground }]} numberOfLines={1}>
-                              {sharedCourse.course_code ?? "Active subject"}
-                            </Text>
-                          </Pressable>
-                        );
-                      })
-                    )}
+                    <SharedCoursesList 
+                      courseId={courseId} 
+                      personId={personId} 
+                      colors={colors} 
+                      router={router}
+                    />
                   </View>
                 </View>
               </>
             ) : null}
           </View>
-        </ScrollView>
+        </RestorableScrollView>
       </AppScreen>
     </RequireCanvasConfig>
+  );
+}
+
+function SharedCoursesList({ 
+  courseId, 
+  personId, 
+  colors, 
+  router 
+}: { 
+  courseId: number; 
+  personId: number; 
+  colors: any;
+  router: any;
+}) {
+  const { data: shellData } = useCourseShell(courseId);
+  const { config } = useCanvasSession();
+  const [sharedCourses, setSharedCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (shellData && config) {
+      getSharedActiveCourses(shellData.courses, personId, config)
+        .then(setSharedCourses)
+        .finally(() => setLoading(false));
+    }
+  }, [shellData, personId, config]);
+
+  if (loading) {
+    return (
+      <>
+        <PlaceholderBlock height={76} />
+        <PlaceholderBlock height={76} />
+      </>
+    );
+  }
+
+  if (sharedCourses.length === 0) {
+    return (
+      <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+        No shared active subjects were found.
+      </Text>
+    );
+  }
+
+  return (
+    <>
+      {sharedCourses.map((sharedCourse) => {
+        const sharedPalette = getSubjectColorPalette(sharedCourse.name);
+        return (
+          <Pressable
+            key={sharedCourse.id}
+            onPress={() => router.push(`/subjects/${sharedCourse.id}`)}
+            style={[styles.sharedCourseCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: sharedPalette.borderColor }]}
+          >
+            <Text style={[styles.sharedCourseName, { color: colors.foreground }]} numberOfLines={1}>
+              {formatSubjectName(sharedCourse.name)}
+            </Text>
+            <Text style={[styles.sharedCourseCode, { color: colors.mutedForeground }]} numberOfLines={1}>
+              {sharedCourse.course_code ?? "Active subject"}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </>
   );
 }
 
@@ -277,18 +341,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     marginBottom: 12,
-  },
-  avatarContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    fontSize: 24,
-    fontWeight: "600",
   },
   headerText: {
     flex: 1,

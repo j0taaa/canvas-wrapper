@@ -1,11 +1,10 @@
 import * as DocumentPicker from "expo-document-picker";
-import { useCallback, useMemo, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useMemo, useState } from "react";
+import { Linking, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { CalendarClock, ChevronLeft, ClipboardCheck, LockKeyhole, Send, Trophy } from "lucide-react-native";
 import {
   addAssignmentComment,
-  getAssignmentDetails,
   getSubjectShellData,
   submitAssignment,
   uploadAssignmentSubmissionFiles,
@@ -15,12 +14,18 @@ import {
 import {
   AppScreen,
   ErrorState,
+  PlaceholderBlock,
   LoadingState,
   RequireCanvasConfig,
 } from "../../../../src/components/app-ui";
+import { BookmarkButton } from "../../../../src/components/bookmark-button";
 import { RichText } from "../../../../src/components/rich-text";
-import { useAsyncResource } from "../../../../src/hooks/use-async-resource";
+import { useRefreshControl } from "../../../../src/hooks/use-refresh-control";
+import { RestorableScrollView } from "../../../../src/components/restorable-scroll-view";
+import { SubjectLayoutHeader } from "../../../../src/components/subject-layout";
+import { useAssignment, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
 import { formatDueDateShort, formatDateTime } from "../../../../src/lib/format";
+import { goBackOrPush } from "../../../../src/lib/navigation";
 import { useAppPreferences } from "../../../../src/providers/app-preferences";
 import { useCanvasSession } from "../../../../src/providers/canvas-session";
 
@@ -68,7 +73,6 @@ export default function AssignmentDetailScreen() {
   const params = useLocalSearchParams<{ assignmentId: string; courseId: string }>();
   const assignmentId = Number(params.assignmentId);
   const courseId = Number(params.courseId);
-  const { config } = useCanvasSession();
   const { resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
   
   const [submissionType, setSubmissionType] = useState<SubmitMode>("online_text_entry");
@@ -98,18 +102,13 @@ export default function AssignmentDetailScreen() {
     };
   }, [resolvedTheme]);
 
-  const loadData = useCallback(async () => {
-    const [shell, assignment] = await Promise.all([
-      getSubjectShellData(courseId, config!),
-      getAssignmentDetails(courseId, assignmentId, config!),
-    ]);
-    return { course: shell.course, assignment };
-  }, [config, courseId, assignmentId]);
+  const { data: shellData } = useCourseShell(courseId);
+  const { data: assignmentData, error, isLoading, isFetching, refetch } = useAssignment(courseId, assignmentId);
+  const { onRefresh, refreshing } = useRefreshControl(refetch);
+  const { config } = useCanvasSession();
 
-  const { data, error, loading, reload } = useAsyncResource(loadData, [config, courseId, assignmentId], config != null);
-
-  const course = data?.course;
-  const assignment = data?.assignment;
+  const course = shellData?.course;
+  const assignment = assignmentData;
   
   const palette = useMemo(() => {
     if (!course) return { backgroundColor: "rgba(59, 130, 246, 0.16)", borderColor: "#3b82f6", color: "rgba(29, 78, 216, 0.95)" };
@@ -132,29 +131,58 @@ export default function AssignmentDetailScreen() {
   const effectiveSubmissionType = availableTypes.includes(submissionType) ? submissionType : availableTypes[0] ?? "online_text_entry";
   const isCompleted = useMemo(() => isCompletedAssignment(assignment?.submission?.workflow_state, assignment?.submission?.excused), [assignment]);
   const submissionStatusText = useMemo(() => formatSubmissionStatus(assignment?.submission?.workflow_state, assignment?.submission?.excused), [assignment]);
+  const showColdLoading = isLoading && !course && !assignment && !error;
+  const showBlockingError = !!error && !course && !assignment;
+  const showInlineRefresh = !!course && !!assignment && (isFetching || isLoading);
 
   return (
     <RequireCanvasConfig>
       <AppScreen scroll={false}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <RestorableScrollView 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.mutedForeground}
+            />
+          }
+        >
           <View style={styles.container}>
-            {loading ? <LoadingState label="Loading assignment..." /> : null}
-            {!loading && error ? <ErrorState error={error} onRetry={reload} /> : null}
+            {showColdLoading ? <LoadingState label="Loading assignment..." /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+            <SubjectLayoutHeader />
             
-            {!loading && !error && course && assignment ? (
+            {course && assignment ? (
               <>
                 {/* Navigation Bar */}
                 <View style={styles.navBar}>
                   <Pressable
                     onPress={() => {
                       triggerSelectionHaptic();
-                      router.push(`/subjects/${courseId}`);
+                      goBackOrPush(router, `/subjects/${courseId}`);
                     }}
                     style={styles.backButton}
                   >
                     <ChevronLeft size={20} color={colors.foreground} />
                     <Text style={[styles.backText, { color: colors.foreground }]}>Back to subject</Text>
                   </Pressable>
+                  {course && assignment ? (
+                    <BookmarkButton
+                      bookmark={{
+                        courseId,
+                        href: `/subjects/${courseId}/assignments/${assignmentId}`,
+                        id: `assignment-${courseId}-${assignmentId}`,
+                        kind: "assignment",
+                        subjectName: course.name,
+                        title: assignment.name ?? "Untitled assignment",
+                      }}
+                      borderColor={colors.border}
+                      fillColor={colors.foreground}
+                      mutedColor={colors.mutedForeground}
+                      textColor={colors.foreground}
+                    />
+                  ) : null}
                 </View>
 
                 {/* Header Card */}
@@ -168,7 +196,7 @@ export default function AssignmentDetailScreen() {
                         <Text style={[styles.assignmentName, { color: colors.foreground }, isCompleted && styles.completedText]} numberOfLines={2}>
                           {assignment.name}
                         </Text>
-                        <Pressable onPress={() => router.push(`/subjects/${courseId}`)}>
+                        <Pressable onPress={() => goBackOrPush(router, `/subjects/${courseId}`)}>
                           <Text style={[styles.courseLink, { color: colors.mutedForeground }]}>
                             {formatSubjectName(course.name)}
                           </Text>
@@ -205,7 +233,16 @@ export default function AssignmentDetailScreen() {
                     <Text style={[styles.cardTitle, { color: colors.foreground }]}>Details</Text>
                   </View>
                   <View style={styles.cardContent}>
-                    <RichText currentCourseId={courseId} html={assignment.description || "<p>No assignment description available.</p>"} providerUrl={config?.apiBase} />
+                    {assignment.description ? (
+                      <RichText currentCourseId={courseId} html={assignment.description} providerUrl={config?.apiBase} />
+                    ) : showInlineRefresh ? (
+                      <>
+                        <PlaceholderBlock height={84} />
+                        <PlaceholderBlock height={144} />
+                      </>
+                    ) : (
+                      <RichText currentCourseId={courseId} html="<p>No assignment description available.</p>" providerUrl={config?.apiBase} />
+                    )}
                     {assignment.html_url && (
                       <Pressable onPress={() => Linking.openURL(assignment.html_url!)}>
                         <Text style={[styles.linkText, { color: colors.mutedForeground }]}>Open in Canvas</Text>
@@ -465,7 +502,7 @@ export default function AssignmentDetailScreen() {
                               setSubmissionComment("");
                               setSelectedFiles([]);
                               setSubmissionStatus("Submitted successfully");
-                              await reload();
+                              await refetch();
                             };
 
                             void run()
@@ -527,7 +564,7 @@ export default function AssignmentDetailScreen() {
                               .then(() => {
                                 setCommentDraft("");
                                 setCommentStatus("Comment sent successfully");
-                                return reload();
+                                return refetch();
                               })
                               .catch((err) => setCommentStatus(err instanceof Error ? err.message : "Could not send comment"))
                               .finally(() => setSubmitting(false));
@@ -550,7 +587,7 @@ export default function AssignmentDetailScreen() {
               </>
             ) : null}
           </View>
-        </ScrollView>
+        </RestorableScrollView>
       </AppScreen>
     </RequireCanvasConfig>
   );
@@ -567,8 +604,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   navBar: {
-    flexDirection: "row",
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 4,
   },
   backButton: {

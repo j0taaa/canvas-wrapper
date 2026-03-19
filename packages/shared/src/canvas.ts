@@ -926,6 +926,10 @@ export async function getQuizDetails(
   return canvasFetch<CanvasQuiz>(`/courses/${courseId}/quizzes/${quizId}`, config);
 }
 
+export async function getCourseQuizzes(courseId: number, config: CanvasClientConfig): Promise<CanvasQuiz[]> {
+  return canvasFetch<CanvasQuiz[]>(`/courses/${courseId}/quizzes?per_page=100`, config);
+}
+
 export async function getQuizQuestions(
   courseId: number,
   quizId: number,

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import {
@@ -9,6 +9,8 @@ import {
   LoadingState,
   RequireCanvasConfig,
 } from "../../src/components/app-ui";
+import { useRefreshControl } from "../../src/hooks/use-refresh-control";
+import { RestorableScrollView } from "../../src/components/restorable-scroll-view";
 import { useInbox } from "../../src/hooks/use-canvas-queries";
 import { formatDateTime } from "../../src/lib/format";
 import { useAppPreferences } from "../../src/providers/app-preferences";
@@ -17,6 +19,10 @@ export default function InboxTab() {
   const router = useRouter();
   const { resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
   const { data, error, isLoading, isFetching, refetch } = useInbox();
+  const { onRefresh, refreshing } = useRefreshControl(refetch);
+  const showColdLoading = isLoading && !data && !error;
+  const showBlockingError = !!error && !data;
+  const showInlineRefresh = !!data && (isFetching || isLoading);
 
   const colors = useMemo(() => {
     const isDark = resolvedTheme === "dark";
@@ -35,13 +41,13 @@ export default function InboxTab() {
   return (
     <RequireCanvasConfig>
       <AppScreen scroll={false}>
-        <ScrollView 
+        <RestorableScrollView 
           showsVerticalScrollIndicator={false} 
           contentContainerStyle={styles.scrollContent}
           refreshControl={
             <RefreshControl
-              refreshing={isFetching}
-              onRefresh={refetch}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
               tintColor={colors.mutedForeground}
             />
           }
@@ -51,9 +57,6 @@ export default function InboxTab() {
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
               <View>
                 <Text style={[styles.title, { color: colors.foreground }]}>Inbox</Text>
-                <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                  Recent Canvas conversations and course-wide messages.
-                </Text>
               </View>
               {data ? (
                 <Text style={[styles.count, { color: colors.mutedForeground }]}>
@@ -62,10 +65,10 @@ export default function InboxTab() {
               ) : null}
             </View>
 
-            {isLoading ? <LoadingState label="Loading inbox..." /> : null}
-            {!isLoading && error ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+            {showColdLoading ? <LoadingState label="Loading inbox..." /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             
-            {!isLoading && !error && data ? (
+            {data ? (
               <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
                 {/* Card Header */}
                 <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
@@ -125,7 +128,7 @@ export default function InboxTab() {
               </View>
             ) : null}
           </View>
-        </ScrollView>
+        </RestorableScrollView>
 
         {/* Floating Compose Button */}
         <Pressable
@@ -151,8 +154,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   container: {
-    padding: 16,
-    gap: 16,
+    gap: 14,
+    paddingHorizontal: 10,
+    paddingTop: 16,
   },
   header: {
     flexDirection: "row",
@@ -164,10 +168,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "700",
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
   },
   count: {
     fontSize: 14,

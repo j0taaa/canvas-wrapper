@@ -1,22 +1,26 @@
-import { useCallback, useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo } from "react";
+import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { BookOpenText, ChevronLeft } from "lucide-react-native";
 import {
-  getCoursePage,
-  getSubjectShellData,
   formatSubjectName,
   getSubjectColorPalette,
 } from "@canvas/shared";
 import {
   AppScreen,
   ErrorState,
+  PlaceholderBlock,
   LoadingState,
   RequireCanvasConfig,
 } from "../../../../src/components/app-ui";
+import { BookmarkButton } from "../../../../src/components/bookmark-button";
 import { RichText } from "../../../../src/components/rich-text";
-import { useAsyncResource } from "../../../../src/hooks/use-async-resource";
+import { useRefreshControl } from "../../../../src/hooks/use-refresh-control";
+import { RestorableScrollView } from "../../../../src/components/restorable-scroll-view";
+import { SubjectLayoutHeader } from "../../../../src/components/subject-layout";
+import { usePage, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
 import { formatDueDateShort } from "../../../../src/lib/format";
+import { goBackOrPush } from "../../../../src/lib/navigation";
 import { useAppPreferences } from "../../../../src/providers/app-preferences";
 import { useCanvasSession } from "../../../../src/providers/canvas-session";
 
@@ -40,18 +44,15 @@ export default function PageDetailScreen() {
     };
   }, [resolvedTheme]);
 
-  const loadData = useCallback(async () => {
-    const [shell, page] = await Promise.all([
-      getSubjectShellData(courseId, config!),
-      getCoursePage(courseId, pageId, config!),
-    ]);
-    return { course: shell.course, page };
-  }, [config, courseId, pageId]);
+  const { data: shellData } = useCourseShell(courseId);
+  const { data: pageData, error, isLoading, isFetching, refetch } = usePage(courseId, pageId);
+  const { onRefresh, refreshing } = useRefreshControl(refetch);
 
-  const { data, error, loading, reload } = useAsyncResource(loadData, [config, courseId, pageId], config != null);
-
-  const course = data?.course;
-  const page = data?.page;
+  const course = shellData?.course;
+  const page = pageData;
+  const showColdLoading = isLoading && !course && !page && !error;
+  const showBlockingError = !!error && !course && !page;
+  const showInlineRefresh = !!course && !!page && (isFetching || isLoading);
   
   const palette = useMemo(() => {
     if (!course) return { backgroundColor: "rgba(59, 130, 246, 0.16)", borderColor: "#3b82f6", color: "rgba(29, 78, 216, 0.95)" };
@@ -61,25 +62,51 @@ export default function PageDetailScreen() {
   return (
     <RequireCanvasConfig>
       <AppScreen scroll={false}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <RestorableScrollView 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.mutedForeground}
+            />
+          }
+        >
           <View style={styles.container}>
-            {loading ? <LoadingState label="Loading page..." /> : null}
-            {!loading && error ? <ErrorState error={error} onRetry={reload} /> : null}
+            {showColdLoading ? <LoadingState label="Loading page..." /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+            <SubjectLayoutHeader />
             
-            {!loading && !error && course && page ? (
+            {course && page ? (
               <>
                 {/* Navigation Bar */}
                 <View style={styles.navBar}>
                   <Pressable
                     onPress={() => {
                       triggerSelectionHaptic();
-                      router.push(`/subjects/${courseId}`);
+                      goBackOrPush(router, `/subjects/${courseId}`);
                     }}
                     style={styles.backButton}
                   >
                     <ChevronLeft size={20} color={colors.foreground} />
                     <Text style={[styles.backText, { color: colors.foreground }]}>Back to subject</Text>
                   </Pressable>
+                  {course && page ? (
+                    <BookmarkButton
+                      bookmark={{
+                        courseId,
+                        href: `/subjects/${courseId}/pages/${encodeURIComponent(pageId)}`,
+                        id: `page-${courseId}-${pageId}`,
+                        kind: "page",
+                        subjectName: course.name,
+                        title: page.title ?? "Untitled page",
+                      }}
+                      borderColor={colors.border}
+                      fillColor={colors.foreground}
+                      mutedColor={colors.mutedForeground}
+                      textColor={colors.foreground}
+                    />
+                  ) : null}
                 </View>
 
                 {/* Header Card */}
@@ -93,7 +120,7 @@ export default function PageDetailScreen() {
                         <Text style={[styles.pageTitle, { color: colors.foreground }]} numberOfLines={2}>
                           {page.title ?? "Untitled page"}
                         </Text>
-                        <Pressable onPress={() => router.push(`/subjects/${courseId}`)}>
+                        <Pressable onPress={() => goBackOrPush(router, `/subjects/${courseId}`)}>
                           <Text style={[styles.courseLink, { color: colors.mutedForeground }]}>
                             {formatSubjectName(course.name)}
                           </Text>
@@ -123,13 +150,22 @@ export default function PageDetailScreen() {
                     <Text style={[styles.cardTitle, { color: colors.foreground }]}>Page content</Text>
                   </View>
                   <View style={styles.cardContent}>
-                    <RichText currentCourseId={courseId} html={page.body || "<p>No content available for this page.</p>"} providerUrl={config?.apiBase} />
+                    {page.body ? (
+                      <RichText currentCourseId={courseId} html={page.body} providerUrl={config?.apiBase} />
+                    ) : showInlineRefresh ? (
+                      <>
+                        <PlaceholderBlock height={84} />
+                        <PlaceholderBlock height={144} />
+                      </>
+                    ) : (
+                      <RichText currentCourseId={courseId} html="<p>No content available for this page.</p>" providerUrl={config?.apiBase} />
+                    )}
                   </View>
                 </View>
               </>
             ) : null}
           </View>
-        </ScrollView>
+        </RestorableScrollView>
       </AppScreen>
     </RequireCanvasConfig>
   );
@@ -142,8 +178,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   navBar: {
-    flexDirection: "row",
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 4,
   },
   backButton: {

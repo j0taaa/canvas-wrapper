@@ -11,16 +11,27 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCalendarsFullAccessUsageDescription": "Canvas Wrapper uses your calendar to sync upcoming assignments and quizzes.",
+        "NSCalendarsUsageDescription": "Canvas Wrapper uses your calendar to sync upcoming assignments and quizzes."
+      }
     },
     "android": {
+      "permissions": [
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#111827"
       }
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-notifications"
     ]
   }
 }

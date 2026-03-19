@@ -3,6 +3,7 @@ export const queryKeys = {
   bootstrap: () => ["bootstrap"] as const,
   
   course: (courseId: number) => ["course", courseId] as const,
+  subject: (courseId: number) => ["course", courseId, "subject"] as const,
   courseContent: (courseId: number) => ["course", courseId, "content"] as const,
   courseFiles: (courseId: number) => ["course", courseId, "files"] as const,
   coursePeople: (courseId: number) => ["course", courseId, "people"] as const,

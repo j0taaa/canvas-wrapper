@@ -1,11 +1,8 @@
-import { useCallback, useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo } from "react";
+import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, LockKeyhole, UsersRound } from "lucide-react-native";
 import {
-  getGroupDetails,
-  getGroupUsers,
-  getSubjectShellData,
   formatSubjectName,
   formatGroupJoinLevel,
   getSubjectColorPalette,
@@ -13,12 +10,17 @@ import {
 import {
   AppScreen,
   ErrorState,
+  PlaceholderBlock,
   LoadingState,
   RequireCanvasConfig,
 } from "../../../../src/components/app-ui";
-import { useAsyncResource } from "../../../../src/hooks/use-async-resource";
+import { useRefreshControl } from "../../../../src/hooks/use-refresh-control";
+import { RestorableScrollView } from "../../../../src/components/restorable-scroll-view";
+import { SubjectLayoutHeader } from "../../../../src/components/subject-layout";
+import { UserAvatar } from "../../../../src/components/user-avatar";
+import { useGroup, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
+import { goBackOrPush } from "../../../../src/lib/navigation";
 import { useAppPreferences } from "../../../../src/providers/app-preferences";
-import { useCanvasSession } from "../../../../src/providers/canvas-session";
 
 function getInitials(name: string) {
   return name
@@ -34,7 +36,6 @@ export default function GroupDetailScreen() {
   const params = useLocalSearchParams<{ courseId: string; groupId: string }>();
   const courseId = Number(params.courseId);
   const groupId = Number(params.groupId);
-  const { config } = useCanvasSession();
   const { resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
 
   const colors = useMemo(() => {
@@ -48,57 +49,51 @@ export default function GroupDetailScreen() {
     };
   }, [resolvedTheme]);
 
-  const loadData = useCallback(async () => {
-    const shell = await getSubjectShellData(courseId, config!);
-    let group = null;
-    let members = [] as Awaited<ReturnType<typeof getGroupUsers>>;
-    let accessDenied = false;
+  const { data: shellData } = useCourseShell(courseId);
+  const { data: groupData, error, isLoading, isFetching, refetch } = useGroup(courseId, groupId);
+  const { onRefresh, refreshing } = useRefreshControl(refetch);
 
-    try {
-      [group, members] = await Promise.all([
-        getGroupDetails(groupId, config!),
-        getGroupUsers(groupId, config!),
-      ]);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      if (message.includes("(403)")) {
-        accessDenied = true;
-      } else {
-        throw error;
-      }
-    }
-
-    return { course: shell.course, group, members, accessDenied };
-  }, [config, courseId, groupId]);
-
-  const { data, error, loading, reload } = useAsyncResource(loadData, [config, courseId, groupId], config != null);
-
-  const course = data?.course;
-  const group = data?.group;
-  const members = data?.members ?? [];
-  const accessDenied = data?.accessDenied ?? false;
+  const course = shellData?.course;
+  const group = groupData?.group;
+  const members = groupData?.members ?? [];
 
   const palette = useMemo(() => {
     if (!course) return { backgroundColor: "rgba(59, 130, 246, 0.16)", borderColor: "#3b82f6", color: "rgba(29, 78, 216, 0.95)" };
     return getSubjectColorPalette(course.name);
   }, [course]);
 
+  // Check if we got an access denied error
+  const accessDenied = error?.message?.includes("(403)") ?? false;
+  const showColdLoading = isLoading && !course && !group && !accessDenied && !error;
+  const showBlockingError = !!error && !course && !group && !accessDenied;
+  const showInlineRefresh = !!course && (!!group || accessDenied) && (isFetching || isLoading);
+
   return (
     <RequireCanvasConfig>
       <AppScreen scroll={false}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <RestorableScrollView 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.mutedForeground}
+            />
+          }
+        >
           <View style={styles.container}>
-            {loading ? <LoadingState label="Loading group..." /> : null}
-            {!loading && error ? <ErrorState error={error} onRetry={reload} /> : null}
+            {showColdLoading ? <LoadingState label="Loading group..." /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+            <SubjectLayoutHeader />
             
-            {!loading && !error && course ? (
+            {course && (!!group || accessDenied) ? (
               <>
                 {/* Navigation Bar */}
                 <View style={styles.navBar}>
                   <Pressable
                     onPress={() => {
                       triggerSelectionHaptic();
-                      router.push(`/subjects/${courseId}?tab=people`);
+                      goBackOrPush(router, `/subjects/${courseId}?tab=people&peopleView=groups`);
                     }}
                     style={styles.backButton}
                   >
@@ -123,7 +118,7 @@ export default function GroupDetailScreen() {
                           {group?.name ?? "Group"}
                         </Text>
                         <Text style={[styles.courseName, { color: colors.mutedForeground }]}>
-                          {formatSubjectName(course.name)}
+                          {course?.name ? formatSubjectName(course.name) : "Unknown course"}
                         </Text>
                       </View>
                     </View>
@@ -164,6 +159,11 @@ export default function GroupDetailScreen() {
                           You do not have permission to view this group. Canvas currently only allows this account to open groups you are authorized to access.
                         </Text>
                       </View>
+                    ) : members.length === 0 && showInlineRefresh ? (
+                      <>
+                        <PlaceholderBlock height={76} />
+                        <PlaceholderBlock height={76} />
+                      </>
                     ) : members.length === 0 ? (
                       <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
                         No members available for this group.
@@ -175,11 +175,16 @@ export default function GroupDetailScreen() {
                           onPress={() => router.push(`/subjects/${courseId}/people/${person.id}`)}
                           style={[styles.memberCard, { borderColor: colors.border, backgroundColor: colors.card }]}
                         >
-                          <View style={[styles.memberAvatar, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                            <Text style={[styles.memberAvatarText, { color: colors.foreground }]}>
-                              {getInitials(person.name)}
-                            </Text>
-                          </View>
+                          <UserAvatar
+                            backgroundColor={colors.muted}
+                            borderColor={colors.border}
+                            fallback={getInitials(person.name)}
+                            name={person.name}
+                            size={40}
+                            src={person.avatar_url}
+                            textColor={colors.foreground}
+                            textSize={14}
+                          />
                           <View style={styles.memberInfo}>
                             <Text style={[styles.memberName, { color: colors.foreground }]} numberOfLines={1}>
                               {person.name}
@@ -196,7 +201,7 @@ export default function GroupDetailScreen() {
               </>
             ) : null}
           </View>
-        </ScrollView>
+        </RestorableScrollView>
       </AppScreen>
     </RequireCanvasConfig>
   );
@@ -313,18 +318,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-  },
-  memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  memberAvatarText: {
-    fontSize: 14,
-    fontWeight: "600",
   },
   memberInfo: {
     flex: 1,

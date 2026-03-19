@@ -5,3 +5,4 @@ export * from "./calendar";
 export * from "./bookmarks";
 export * from "./preferences";
 export * from "./canvas-links";
+export * from "./due-activities";

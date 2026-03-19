@@ -1,19 +1,155 @@
-import { useCallback, useMemo } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Image, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, Download, FileImage, FileText, Presentation } from "lucide-react-native";
-import { getFileById, getSubjectShellData, formatSubjectName, getSubjectColorPalette } from "@canvas/shared";
+import { formatSubjectName, getFileContent, getSubjectColorPalette } from "@canvas/shared";
+import { WebView } from "react-native-webview";
 import {
   AppScreen,
   ErrorState,
+  PlaceholderBlock,
   LoadingState,
   RequireCanvasConfig,
-  SectionCard,
 } from "../../../../src/components/app-ui";
-import { useAsyncResource } from "../../../../src/hooks/use-async-resource";
+import { BookmarkButton } from "../../../../src/components/bookmark-button";
+import { useRefreshControl } from "../../../../src/hooks/use-refresh-control";
+import { RestorableScrollView } from "../../../../src/components/restorable-scroll-view";
+import { SubjectLayoutHeader } from "../../../../src/components/subject-layout";
+import { useFile, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
 import { formatDueDateShort } from "../../../../src/lib/format";
+import { goBackOrPush } from "../../../../src/lib/navigation";
 import { useAppPreferences } from "../../../../src/providers/app-preferences";
 import { useCanvasSession } from "../../../../src/providers/canvas-session";
+
+const BASE64_CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+function encodeBase64(bytes: Uint8Array) {
+  let output = "";
+
+  for (let index = 0; index < bytes.length; index += 3) {
+    const first = bytes[index] ?? 0;
+    const second = bytes[index + 1] ?? 0;
+    const third = bytes[index + 2] ?? 0;
+    const chunk = (first << 16) | (second << 8) | third;
+
+    output += BASE64_CHARSET[(chunk >> 18) & 63];
+    output += BASE64_CHARSET[(chunk >> 12) & 63];
+    output += index + 1 < bytes.length ? BASE64_CHARSET[(chunk >> 6) & 63] : "=";
+    output += index + 2 < bytes.length ? BASE64_CHARSET[chunk & 63] : "=";
+  }
+
+  return output;
+}
+
+function escapeForHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function buildPdfPreviewHtml({
+  backgroundColor,
+  borderColor,
+  fileName,
+  foregroundColor,
+  mutedColor,
+  pdfBase64,
+}: {
+  backgroundColor: string;
+  borderColor: string;
+  fileName: string;
+  foregroundColor: string;
+  mutedColor: string;
+  pdfBase64: string;
+}) {
+  const title = escapeForHtml(fileName);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>${title}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: ${backgroundColor};
+        color: ${foregroundColor};
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      #status {
+        padding: 18px 16px 8px;
+        color: ${mutedColor};
+        font-size: 13px;
+      }
+      #pages {
+        padding: 0 12px 12px;
+      }
+      .page {
+        margin-bottom: 12px;
+        border: 1px solid ${borderColor};
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fff;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">Loading preview…</div>
+    <div id="pages"></div>
+    <script type="module">
+      import * as pdfjsLib from "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.mjs";
+
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+
+      const status = document.getElementById("status");
+      const pages = document.getElementById("pages");
+      const binary = atob("${pdfBase64}");
+      const data = new Uint8Array(binary.length);
+
+      for (let index = 0; index < binary.length; index += 1) {
+        data[index] = binary.charCodeAt(index);
+      }
+
+      try {
+        const pdf = await pdfjsLib.getDocument({ data }).promise;
+        status.textContent = pdf.numPages === 1 ? "1 page" : pdf.numPages + " pages";
+        const targetWidth = Math.max(window.innerWidth - 24, 320);
+
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          const page = await pdf.getPage(pageNumber);
+          const initialViewport = page.getViewport({ scale: 1 });
+          const viewport = page.getViewport({ scale: targetWidth / initialViewport.width });
+          const canvas = document.createElement("canvas");
+          const context = canvas.getContext("2d");
+          const wrapper = document.createElement("div");
+
+          wrapper.className = "page";
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          wrapper.appendChild(canvas);
+          pages.appendChild(wrapper);
+
+          await page.render({ canvasContext: context, viewport }).promise;
+        }
+      } catch (error) {
+        status.textContent = "Could not load the PDF preview.";
+        console.error(error);
+      }
+    </script>
+  </body>
+</html>`;
+}
 
 function isPreviewableFile(contentType?: string, filename?: string) {
   const normalizedType = (contentType ?? "").toLowerCase();
@@ -51,6 +187,9 @@ export default function FileDetailScreen() {
   const fileId = Number(params.fileId);
   const { config } = useCanvasSession();
   const { resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
+  const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
 
   const colors = useMemo(() => {
     const isDark = resolvedTheme === "dark";
@@ -65,18 +204,12 @@ export default function FileDetailScreen() {
     };
   }, [resolvedTheme]);
 
-  const loadData = useCallback(async () => {
-    const [shell, file] = await Promise.all([
-      getSubjectShellData(courseId, config!),
-      getFileById(fileId, config!),
-    ]);
-    return { course: shell.course, file };
-  }, [config, courseId, fileId]);
+  const { data: shellData } = useCourseShell(courseId);
+  const { data: fileData, error, isLoading, isFetching, refetch } = useFile(courseId, fileId);
+  const { onRefresh, refreshing } = useRefreshControl(refetch);
 
-  const { data, error, loading, reload } = useAsyncResource(loadData, [config, courseId, fileId], config != null);
-
-  const course = data?.course;
-  const file = data?.file;
+  const course = shellData?.course;
+  const file = fileData?.file;
   const palette = useMemo(() => {
     if (!course) return { backgroundColor: "rgba(59, 130, 246, 0.16)", borderColor: "#3b82f6", color: "rgba(29, 78, 216, 0.95)" };
     return getSubjectColorPalette(course.name);
@@ -95,23 +228,93 @@ export default function FileDetailScreen() {
   const contentType = useMemo(() => (file?.["content-type"] ?? "").toLowerCase(), [file]);
   const isImage = contentType.startsWith("image/");
   const isPdf = contentType === "application/pdf" || (file?.filename ?? file?.display_name ?? "").toLowerCase().endsWith(".pdf");
+  const showColdLoading = isLoading && !course && !file && !error;
+  const showBlockingError = !!error && !course && !file;
+  const showInlineRefresh = !!course && !!file && (isFetching || isLoading);
+  const pdfPreviewHtml = useMemo(() => {
+    if (!pdfBase64 || !file) {
+      return null;
+    }
+
+    return buildPdfPreviewHtml({
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      fileName: file.display_name ?? file.filename ?? "PDF preview",
+      foregroundColor: colors.foreground,
+      mutedColor: colors.mutedForeground,
+      pdfBase64,
+    });
+  }, [colors.border, colors.card, colors.foreground, colors.mutedForeground, file, pdfBase64]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!config || !file?.id || !isPdf) {
+      setPdfBase64(null);
+      setPdfPreviewError(null);
+      setPdfPreviewLoading(false);
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setPdfPreviewLoading(true);
+    setPdfPreviewError(null);
+
+    void getFileContent(file.id, config)
+      .then(({ data }) => {
+        if (cancelled) {
+          return;
+        }
+
+        setPdfBase64(encodeBase64(new Uint8Array(data)));
+      })
+      .catch((previewError) => {
+        if (cancelled) {
+          return;
+        }
+
+        setPdfBase64(null);
+        setPdfPreviewError(previewError instanceof Error ? previewError.message : "Could not load the PDF preview.");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPdfPreviewLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [config, file?.id, isPdf]);
 
   return (
     <RequireCanvasConfig>
       <AppScreen scroll={false}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <RestorableScrollView 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.mutedForeground}
+            />
+          }
+        >
           <View style={styles.container}>
-            {loading ? <LoadingState label="Loading file..." /> : null}
-            {!loading && error ? <ErrorState error={error} onRetry={reload} /> : null}
+            {showColdLoading ? <LoadingState label="Loading file..." /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+            <SubjectLayoutHeader />
             
-            {!loading && !error && course && file ? (
+            {course && file ? (
               <>
                 {/* Navigation Bar */}
                 <View style={styles.navBar}>
                   <Pressable
                     onPress={() => {
                       triggerSelectionHaptic();
-                      router.push(`/subjects/${courseId}?tab=files`);
+                      goBackOrPush(router, `/subjects/${courseId}?tab=files`);
                     }}
                     style={styles.backButton}
                   >
@@ -119,6 +322,22 @@ export default function FileDetailScreen() {
                     <Text style={[styles.backText, { color: colors.foreground }]}>Back to files</Text>
                   </Pressable>
                   <View style={styles.actions}>
+                    {course && file ? (
+                      <BookmarkButton
+                        bookmark={{
+                          courseId,
+                          href: `/subjects/${courseId}/files/${fileId}`,
+                          id: `file-${courseId}-${fileId}`,
+                          kind: "file",
+                          subjectName: course.name,
+                          title: file.display_name ?? file.filename ?? "Untitled file",
+                        }}
+                        borderColor={colors.border}
+                        fillColor={colors.foreground}
+                        mutedColor={colors.mutedForeground}
+                        textColor={colors.foreground}
+                      />
+                    ) : null}
                     <Pressable
                       onPress={() => {
                         triggerSelectionHaptic();
@@ -142,7 +361,7 @@ export default function FileDetailScreen() {
                         <Text style={[styles.fileName, { color: colors.foreground }]} numberOfLines={2}>
                           {file.display_name ?? file.filename ?? "Untitled file"}
                         </Text>
-                        <Pressable onPress={() => router.push(`/subjects/${courseId}`)}>
+                        <Pressable onPress={() => goBackOrPush(router, `/subjects/${courseId}?tab=files`)}>
                           <Text style={[styles.courseLink, { color: colors.mutedForeground }]}>
                             {formatSubjectName(course.name)}
                           </Text>
@@ -182,13 +401,39 @@ export default function FileDetailScreen() {
                         style={styles.imagePreview}
                         resizeMode="contain"
                       />
+                    ) : isPdf ? (
+                      pdfPreviewHtml ? (
+                        <WebView
+                          originWhitelist={["*"]}
+                          source={{ html: pdfPreviewHtml }}
+                          style={styles.pdfPreview}
+                          nestedScrollEnabled
+                          showsVerticalScrollIndicator={false}
+                        />
+                      ) : pdfPreviewLoading ? (
+                        <View style={styles.previewLoadingState}>
+                          <ActivityIndicator size="small" color={colors.foreground} />
+                          <Text style={[styles.previewText, { color: colors.mutedForeground }]}>
+                            Loading PDF preview...
+                          </Text>
+                        </View>
+                      ) : pdfPreviewError ? (
+                        <Text style={[styles.previewText, { color: colors.mutedForeground }]}>
+                          {pdfPreviewError}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.previewText, { color: colors.mutedForeground }]}>
+                          PDF preview is not available right now.
+                        </Text>
+                      )
                     ) : (
-                      <Text style={[styles.previewText, { color: colors.mutedForeground }]}>
-                        {isPdf 
-                          ? "PDF preview is not available in the mobile app. Please download the file to view it."
-                          : "This file type can't be previewed here."
-                        }
-                      </Text>
+                      showInlineRefresh ? (
+                        <PlaceholderBlock height={140} />
+                      ) : (
+                        <Text style={[styles.previewText, { color: colors.mutedForeground }]}>
+                          This file type can't be previewed here.
+                        </Text>
+                      )
                     )}
                   </View>
                 </View>
@@ -220,7 +465,7 @@ export default function FileDetailScreen() {
               </>
             ) : null}
           </View>
-        </ScrollView>
+        </RestorableScrollView>
       </AppScreen>
     </RequireCanvasConfig>
   );
@@ -336,6 +581,16 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 300,
     borderRadius: 12,
+  },
+  pdfPreview: {
+    alignSelf: "stretch",
+    borderRadius: 12,
+    height: 560,
+    overflow: "hidden",
+  },
+  previewLoadingState: {
+    alignItems: "center",
+    gap: 10,
   },
   infoCard: {
     borderRadius: 16,

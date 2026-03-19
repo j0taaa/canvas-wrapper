@@ -1,32 +1,14 @@
-import { useCallback, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowRight,
-  BookOpen,
-  Briefcase,
-  Calculator,
   CircleDot,
-  Code2,
-  FlaskConical,
-  Globe,
-  Landmark,
   LockKeyhole,
-  PenSquare,
-  Sigma,
 } from "lucide-react-native";
 import {
   createCourseGroup,
   formatGroupJoinLevel,
-  formatSubjectName,
-  getCourseContent,
-  getCourseDiscussions,
-  getCourseFiles,
-  getCourseGradeData,
-  getCourseGroupCreateAccess,
-  getCourseGroups,
-  getCoursePeople,
-  getSubjectShellData,
   getSubjectColorPalette,
 } from "@canvas/shared";
 import {
@@ -34,40 +16,29 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  PlaceholderBlock,
   RequireCanvasConfig,
   SectionCard,
 } from "../../../src/components/app-ui";
-import { useAsyncResource } from "../../../src/hooks/use-async-resource";
+import { useRefreshControl } from "../../../src/hooks/use-refresh-control";
+import { RestorableScrollView } from "../../../src/components/restorable-scroll-view";
+import { SubjectLayoutHeader } from "../../../src/components/subject-layout";
+import { UserAvatar } from "../../../src/components/user-avatar";
+import { useSubject } from "../../../src/hooks/use-canvas-queries";
 import { useAppPreferences } from "../../../src/providers/app-preferences";
-import { useCanvasSession } from "../../../src/providers/canvas-session";
 import { openAppHref } from "../../../src/lib/navigation";
 import { formatDueDateShort } from "../../../src/lib/format";
 
-const SUBJECT_TABS = ["overview", "modules", "assignments", "grades", "people", "forums", "files"] as const;
+const SUBJECT_TABS = ["modules", "assignments", "grades", "people", "forums", "files"] as const;
 type SubjectTab = typeof SUBJECT_TABS[number];
 type PeopleSubtab = "people" | "groups";
 
 function normalizeTab(value?: string): SubjectTab {
-  return SUBJECT_TABS.includes(value as SubjectTab) ? (value as SubjectTab) : "overview";
+  return SUBJECT_TABS.includes(value as SubjectTab) ? (value as SubjectTab) : "modules";
 }
 
 function normalizePeopleSubtab(value?: string): PeopleSubtab {
   return value === "groups" ? "groups" : "people";
-}
-
-function getSubjectIcon(courseName?: string | null) {
-  const normalized = (courseName ?? "").toLowerCase();
-
-  if (normalized.includes("cálculo") || normalized.includes("calculo") || normalized.includes("mat")) return Calculator;
-  if (normalized.includes("física") || normalized.includes("fisica") || normalized.includes("química") || normalized.includes("quimica")) return FlaskConical;
-  if (normalized.includes("algorit") || normalized.includes("program") || normalized.includes("software") || normalized.includes("comput")) return Code2;
-  if (normalized.includes("hist") || normalized.includes("direito") || normalized.includes("pol") || normalized.includes("soc")) return Landmark;
-  if (normalized.includes("ingl") || normalized.includes("idioma") || normalized.includes("comun") || normalized.includes("texto")) return PenSquare;
-  if (normalized.includes("gest") || normalized.includes("adm") || normalized.includes("econom") || normalized.includes("negó") || normalized.includes("nego")) return Briefcase;
-  if (normalized.includes("estat") || normalized.includes("álgebra") || normalized.includes("algebra")) return Sigma;
-  if (normalized.includes("geog") || normalized.includes("global") || normalized.includes("internac")) return Globe;
-
-  return BookOpen;
 }
 
 function getModuleHref(courseId: number, item: {
@@ -134,7 +105,6 @@ export default function SubjectScreen() {
   const courseId = Number(params.courseId);
   const activeTab = normalizeTab(params.tab);
   const activePeopleView = normalizePeopleSubtab(params.peopleView);
-  const { config } = useCanvasSession();
   const { resolvedTheme, subjectPreferences } = useAppPreferences();
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
@@ -157,33 +127,8 @@ export default function SubjectScreen() {
     };
   }, [resolvedTheme]);
 
-  const loadSubject = useCallback(async () => {
-    const [shell, content, grades, people, discussions, groups, files] = await Promise.all([
-      getSubjectShellData(courseId, config!),
-      getCourseContent(courseId, config!),
-      getCourseGradeData(courseId, config!),
-      getCoursePeople(courseId, config!),
-      getCourseDiscussions(courseId, config!),
-      getCourseGroups(courseId, config!).catch(() => []),
-      getCourseFiles(courseId, config!).catch(() => []),
-    ]);
-
-    return {
-      content,
-      discussions,
-      files,
-      grades,
-      groups,
-      groupCreateAccess: await getCourseGroupCreateAccess(groups, config!).catch(() => ({
-        canCreate: false,
-        groupCategoryId: null,
-      })),
-      people,
-      shell,
-    };
-  }, [config, courseId]);
-
-  const { data, error, loading, reload } = useAsyncResource(loadSubject, [config, courseId], config != null && Number.isFinite(courseId));
+  const { data, error, isLoading, isFetching, refetch } = useSubject(courseId);
+  const { onRefresh, refreshing } = useRefreshControl(refetch);
 
   const course = data?.shell.course;
   const palette = useMemo(() => {
@@ -191,79 +136,37 @@ export default function SubjectScreen() {
     return getSubjectColorPalette(course.name, subjectPreferences.colors[course.id]);
   }, [course, subjectPreferences.colors]);
 
-  const SubjectIcon = useMemo(() => {
-    if (!course) return BookOpen;
-    return getSubjectIcon(course.name);
-  }, [course]);
-
   const gradeData = data?.grades;
-  const totalDistributedPoints = gradeData?.assignments.reduce((sum, a) => sum + (a.points_possible ?? 0), 0) ?? 0;
-  const absolutePoints = gradeData?.assignments.reduce((sum, a) => sum + (a.submission?.score ?? 0), 0) ?? 0;
+  const totalDistributedPoints = gradeData?.assignments.reduce((sum: number, a: {points_possible?: number}) => sum + (a.points_possible ?? 0), 0) ?? 0;
+  const absolutePoints = gradeData?.assignments.reduce((sum: number, a: {submission?: {score?: number}}) => sum + (a.submission?.score ?? 0), 0) ?? 0;
   const gradePercentage = gradeData?.enrollment?.grades?.current_score ?? (totalDistributedPoints > 0 ? (absolutePoints / totalDistributedPoints) * 100 : null);
   const gradeTrendPoints = getGradeTrendPoints(gradeData?.assignments ?? []);
   const gradeTrendPath = buildTrendPath(gradeTrendPoints);
+  const showColdLoading = isLoading && !course && !data && !error;
+  const showBlockingError = !!error && !course && !data;
+  const showInlineRefresh = !!course && !!data && (isFetching || isLoading);
 
   return (
     <RequireCanvasConfig>
       <AppScreen scroll={false}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {loading ? <LoadingState label="Loading subject..." /> : null}
-          {!loading && error ? <ErrorState error={error} onRetry={reload} /> : null}
+        <RestorableScrollView 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.mutedForeground}
+            />
+          }
+        >
+          {showColdLoading ? <LoadingState label="Loading subject..." /> : null}
+          {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+          <SubjectLayoutHeader />
           
-          {!loading && !error && course ? (
+          {course && data ? (
             <View style={styles.container}>
-              {/* Header Card */}
-              <View style={[styles.headerCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                <View style={[styles.headerTop, { borderBottomColor: colors.border }]}>
-                  <View style={styles.headerContent}>
-                    <View style={[styles.iconContainer, { borderColor: palette.borderColor, backgroundColor: palette.backgroundColor }]}>
-                      <SubjectIcon size={20} color={palette.color} />
-                    </View>
-                    <View style={styles.headerText}>
-                      <Text style={[styles.subjectName, { color: colors.foreground }]} numberOfLines={1}>
-                        {formatSubjectName(course.name)}
-                      </Text>
-                      <Text style={[styles.courseCode, { color: colors.mutedForeground }]}>
-                        {course.course_code ?? "Subject overview"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Tabs */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsContainer}>
-                <View style={styles.tabsRow}>
-                  {SUBJECT_TABS.map((tab) => (
-                    <Pressable
-                      key={tab}
-                      onPress={() => {
-                        router.replace({
-                          params: tab === "overview" ? { courseId: String(courseId) } : { courseId: String(courseId), tab },
-                          pathname: "/subjects/[courseId]",
-                        });
-                      }}
-                      style={[
-                        styles.tabButton,
-                        { borderColor: activeTab === tab ? colors.primary : colors.border },
-                        activeTab === tab && { backgroundColor: colors.primary },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.tabText,
-                          { color: activeTab === tab ? colors.primaryText : colors.mutedForeground },
-                        ]}
-                      >
-                        {tab === "overview" ? "Overview" : tab === "modules" ? "Modules" : tab === "assignments" ? "Assignments" : tab === "grades" ? "Grades" : tab === "people" ? "People" : tab === "forums" ? "Forums" : "Files"}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
-
-              {/* Overview/Modules/Assignments Tab */}
-              {(activeTab === "overview" || activeTab === "modules" || activeTab === "assignments") && data && (
+              {/* Modules/Assignments Tab */}
+              {(activeTab === "modules" || activeTab === "assignments") && (
                 <View style={styles.twoColumnGrid}>
                   {/* Modules Section */}
                   {(activeTab !== "assignments") && (
@@ -495,7 +398,12 @@ export default function SubjectScreen() {
 
                   <SectionCard title={activePeopleView === "groups" ? "Groups" : "People"} subtitle={activePeopleView === "groups" ? "All groups visible in this subject" : "Everyone currently visible in this subject"}>
                     {activePeopleView === "people" ? (
-                      data.people.length === 0 ? (
+                      data.people.length === 0 && showInlineRefresh ? (
+                        <>
+                          <PlaceholderBlock height={76} />
+                          <PlaceholderBlock height={76} />
+                        </>
+                      ) : data.people.length === 0 ? (
                         <EmptyState label="No people available for this subject." />
                       ) : (
                         data.people.map((person) => (
@@ -504,11 +412,16 @@ export default function SubjectScreen() {
                             onPress={() => router.push(`/subjects/${courseId}/people/${person.id}`)}
                             style={[styles.personCard, { borderColor: colors.border, backgroundColor: colors.card }]}
                           >
-                            <View style={[styles.personAvatar, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                              <Text style={[styles.personAvatarText, { color: colors.foreground }]}>
-                                {person.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()}
-                              </Text>
-                            </View>
+                            <UserAvatar
+                              backgroundColor={colors.muted}
+                              borderColor={colors.border}
+                              fallback={person.name.split(" ").map((name) => name[0]).slice(0, 2).join("").toUpperCase()}
+                              name={person.name}
+                              size={40}
+                              src={person.avatar_url}
+                              textColor={colors.foreground}
+                              textSize={14}
+                            />
                             <View style={styles.personInfo}>
                               <Text style={[styles.personName, { color: colors.foreground }]} numberOfLines={1}>{person.name}</Text>
                               <Text style={[styles.personRole, { color: colors.mutedForeground }]} numberOfLines={1}>
@@ -519,7 +432,12 @@ export default function SubjectScreen() {
                         ))
                       )
                     ) : (
-                      data.groups.length === 0 ? (
+                      data.groups.length === 0 && showInlineRefresh ? (
+                        <>
+                          <PlaceholderBlock height={88} />
+                          <PlaceholderBlock height={88} />
+                        </>
+                      ) : data.groups.length === 0 ? (
                         <EmptyState label="No groups available for this subject." />
                       ) : (
                         data.groups.map((group) => (
@@ -560,7 +478,12 @@ export default function SubjectScreen() {
               {/* Forums Tab */}
               {activeTab === "forums" && data && (
                 <SectionCard title="Forums" subtitle="Discussion topics for this subject">
-                  {data.discussions.length === 0 ? (
+                  {data.discussions.length === 0 && showInlineRefresh ? (
+                    <>
+                      <PlaceholderBlock height={100} />
+                      <PlaceholderBlock height={100} />
+                    </>
+                  ) : data.discussions.length === 0 ? (
                     <EmptyState label="No forums available for this subject." />
                   ) : (
                     data.discussions.map((discussion) => (
@@ -590,7 +513,12 @@ export default function SubjectScreen() {
               {/* Files Tab */}
               {activeTab === "files" && data && (
                 <SectionCard title="Files" subtitle="Course files and materials">
-                  {data.files.length === 0 ? (
+                  {data.files.length === 0 && showInlineRefresh ? (
+                    <>
+                      <PlaceholderBlock height={88} />
+                      <PlaceholderBlock height={88} />
+                    </>
+                  ) : data.files.length === 0 ? (
                     <EmptyState label="No files available for this subject." />
                   ) : (
                     data.files.map((file) => (
@@ -622,7 +550,7 @@ export default function SubjectScreen() {
               )}
             </View>
           ) : null}
-        </ScrollView>
+        </RestorableScrollView>
       </AppScreen>
     </RequireCanvasConfig>
   );
@@ -633,59 +561,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 12,
     gap: 12,
-  },
-  headerCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  headerTop: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  headerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerText: {
-    flex: 1,
-  },
-  subjectName: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  courseCode: {
-    fontSize: 14,
-  },
-  tabsContainer: {
-    marginHorizontal: -8,
-    paddingHorizontal: 8,
-  },
-  tabsRow: {
-    flexDirection: "row",
-    gap: 8,
-    paddingVertical: 4,
-  },
-  tabButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: "500",
   },
   twoColumnGrid: {
     gap: 16,
@@ -950,18 +825,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     marginBottom: 10,
-  },
-  personAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 999,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  personAvatarText: {
-    fontSize: 14,
-    fontWeight: "600",
   },
   personInfo: {
     flex: 1,

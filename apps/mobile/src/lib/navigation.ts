@@ -13,3 +13,12 @@ export async function openAppHref(router: Router, href?: string | null) {
 
   await Linking.openURL(href);
 }
+
+export function goBackOrPush(router: Router, fallbackHref: string) {
+  if (router.canGoBack()) {
+    router.back();
+    return;
+  }
+
+  router.push(fallbackHref);
+}

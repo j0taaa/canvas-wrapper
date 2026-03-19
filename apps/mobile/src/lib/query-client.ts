@@ -2,6 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { QueryClient } from "@tanstack/react-query";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 
+export const QUERY_CACHE_PERSIST_KEY = "canvasQueryCache:v2";
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -20,6 +22,6 @@ export const queryClient = new QueryClient({
 
 export const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
-  key: "canvasQueryCache",
+  key: QUERY_CACHE_PERSIST_KEY,
   throttleTime: 1000,
 });

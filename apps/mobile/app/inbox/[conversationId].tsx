@@ -1,10 +1,10 @@
-import { useCallback, useState } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import { useState } from "react";
+import { RefreshControl, StyleSheet, TextInput, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { addConversationMessage, getConversationData } from "@canvas/shared";
 import {
   AppScreen,
   ErrorState,
+  PlaceholderBlock,
   LoadingState,
   PrimaryButton,
   RequireCanvasConfig,
@@ -13,70 +13,104 @@ import {
   RowTitle,
   SectionCard,
 } from "../../src/components/app-ui";
-import { useAsyncResource } from "../../src/hooks/use-async-resource";
+import { useRefreshControl } from "../../src/hooks/use-refresh-control";
+import { RestorableScrollView } from "../../src/components/restorable-scroll-view";
+import { useConversation, useSendReply } from "../../src/hooks/use-canvas-queries";
 import { formatDateTime, stripHtml } from "../../src/lib/format";
-import { useCanvasSession } from "../../src/providers/canvas-session";
+
+function getAuthorName(
+  participants: Array<{ full_name?: string; id: number; name: string }> | undefined,
+  authorId?: number,
+) {
+  if (authorId == null) {
+    return "Canvas";
+  }
+
+  const participant = participants?.find((item) => item.id === authorId);
+  return participant?.name ?? participant?.full_name ?? `Author #${authorId}`;
+}
 
 export default function ConversationDetailScreen() {
   const params = useLocalSearchParams<{ conversationId: string }>();
   const conversationId = Number(params.conversationId);
-  const { config } = useCanvasSession();
   const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
-  const loadConversation = useCallback(() => getConversationData(conversationId, config!), [config, conversationId]);
-  const { data, error, loading, reload } = useAsyncResource(loadConversation, [config, conversationId], config != null);
+  const { data, error, isLoading, isFetching, refetch } = useConversation(conversationId);
+  const { onRefresh, refreshing } = useRefreshControl(refetch);
+  const sendReply = useSendReply();
+  const showColdLoading = isLoading && !data && !error;
+  const showBlockingError = !!error && !data;
+  const showInlineRefresh = !!data && (isFetching || isLoading);
+
+  const handleSendReply = () => {
+    if (!draft.trim()) return;
+    
+    sendReply.mutate(
+      { conversationId, body: draft },
+      {
+        onSuccess: () => {
+          setDraft("");
+        },
+      }
+    );
+  };
 
   return (
     <RequireCanvasConfig>
       <AppScreen title="Conversation" subtitle={data?.subject ?? `Conversation #${conversationId}`}>
-        {loading ? <LoadingState label="Loading conversation..." /> : null}
-        {!loading && error ? <ErrorState error={error} onRetry={reload} /> : null}
-        {!loading && !error && data ? (
-          <>
-            <SectionCard title={data.subject ?? "No subject"}>
-              <RowMeta>{data.context_name ?? "General"}</RowMeta>
-              <RowMeta>{data.participants?.map((participant) => participant.name).join(", ") || "No participants listed"}</RowMeta>
-            </SectionCard>
+        <RestorableScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+            />
+          }
+        >
+          {showColdLoading ? <LoadingState label="Loading conversation..." /> : null}
+          {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+          {data ? (
+            <>
+              <SectionCard title={data.subject ?? "No subject"}>
+                <RowMeta>{data.context_name ?? "General"}</RowMeta>
+                <RowMeta>{data.participants?.map((participant) => participant.name).join(", ") || "No participants listed"}</RowMeta>
+              </SectionCard>
 
-            <SectionCard title="Messages">
-              {(data.messages ?? []).map((message) => (
-                <Row key={message.id}>
-                  <RowTitle>{message.generated ? "System" : `Author #${message.author_id ?? "?"}`}</RowTitle>
-                  <RowMeta>{formatDateTime(message.created_at)}</RowMeta>
-                  <RowMeta>{stripHtml(message.body) || "No message body"}</RowMeta>
-                </Row>
-              ))}
-            </SectionCard>
+              <SectionCard title="Messages">
+                {(data.messages ?? []).length === 0 && showInlineRefresh ? (
+                  <>
+                    <PlaceholderBlock height={108} />
+                    <PlaceholderBlock height={108} />
+                  </>
+                ) : null}
+                {(data.messages ?? []).map((message) => (
+                  <Row key={message.id}>
+                    <RowTitle>
+                      {message.generated ? "System" : getAuthorName(data.participants, message.author_id)}
+                    </RowTitle>
+                    <RowMeta>{formatDateTime(message.created_at)}</RowMeta>
+                    <RowMeta>{stripHtml(message.body) || "No message body"}</RowMeta>
+                  </Row>
+                ))}
+              </SectionCard>
 
-            <SectionCard title="Reply">
-              <View style={styles.composer}>
-                <TextInput
-                  multiline
-                  onChangeText={setDraft}
-                  placeholder="Write your reply"
-                  style={styles.input}
-                  value={draft}
-                />
-                <PrimaryButton
-                  disabled={sending || draft.trim().length === 0}
-                  label={sending ? "Sending..." : "Send reply"}
-                  onPress={() => {
-                    setSending(true);
-
-                    void addConversationMessage(conversationId, draft, config!)
-                      .then(() => {
-                        setDraft("");
-                        return reload();
-                      })
-                      .finally(() => {
-                        setSending(false);
-                      });
-                  }}
-                />
-              </View>
-            </SectionCard>
-          </>
-        ) : null}
+              <SectionCard title="Reply">
+                <View style={styles.composer}>
+                  <TextInput
+                    multiline
+                    onChangeText={setDraft}
+                    placeholder="Write your reply"
+                    style={styles.input}
+                    value={draft}
+                  />
+                  <PrimaryButton
+                    disabled={sendReply.isPending || draft.trim().length === 0}
+                    label={sendReply.isPending ? "Sending..." : "Send reply"}
+                    onPress={handleSendReply}
+                  />
+                </View>
+              </SectionCard>
+            </>
+          ) : null}
+        </RestorableScrollView>
       </AppScreen>
     </RequireCanvasConfig>
   );

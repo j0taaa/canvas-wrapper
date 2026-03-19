@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getMonthLabel,
   normalizeMonth,
@@ -17,13 +19,30 @@ import {
   RequireCanvasConfig,
   SectionCard,
 } from "../../src/components/app-ui";
-import { useCalendar } from "../../src/hooks/use-canvas-queries";
+import { RestorableScrollView } from "../../src/components/restorable-scroll-view";
+import { primeCalendarQuery, useCalendar } from "../../src/hooks/use-canvas-queries";
+import { useRefreshControl } from "../../src/hooks/use-refresh-control";
 import { useAppPreferences } from "../../src/providers/app-preferences";
+import { useCanvasSession } from "../../src/providers/canvas-session";
 import { formatDateTime } from "../../src/lib/format";
 import { openAppHref } from "../../src/lib/navigation";
+import { syncDeviceIntegrations } from "../../src/lib/device-integration-sync";
 
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MOBILE_WEEK_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const ZONED_DAY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: DISPLAY_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  weekday: "short",
+});
+const DAY_LABEL_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: DISPLAY_TIME_ZONE,
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+});
 
 type CalendarEntry = {
   id: string;
@@ -38,14 +57,7 @@ type CalendarEntry = {
 };
 
 function getZonedDateParts(value: Date | string) {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: DISPLAY_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    weekday: "short",
-  });
-  const parts = formatter.formatToParts(typeof value === "string" ? new Date(value) : value);
+  const parts = ZONED_DAY_FORMATTER.formatToParts(typeof value === "string" ? new Date(value) : value);
   const year = Number(parts.find((part) => part.type === "year")?.value ?? "0");
   const month = Number(parts.find((part) => part.type === "month")?.value ?? "1");
   const day = Number(parts.find((part) => part.type === "day")?.value ?? "1");
@@ -55,7 +67,11 @@ function getZonedDateParts(value: Date | string) {
   return { year, month, day, weekdayIndex: Math.max(weekdayIndex, 0) };
 }
 
-function buildCalendarCells(entries: CalendarEntry[], month: number, year: number) {
+function buildCalendarCells(
+  entriesByDayKey: Map<string, CalendarEntry[]>,
+  month: number,
+  year: number,
+) {
   const today = getZonedDateParts(new Date());
   const firstOfMonth = getZonedDateParts(new Date(Date.UTC(year, month - 1, 1)));
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -68,10 +84,8 @@ function buildCalendarCells(entries: CalendarEntry[], month: number, year: numbe
       return null;
     }
 
-    const dayEntries = entries.filter((entry) => {
-      const parts = getZonedDateParts(entry.date);
-      return parts.year === year && parts.month === month && parts.day === dayNumber;
-    });
+    const dayKey = `${year}-${String(month).padStart(2, "0")}-${String(dayNumber).padStart(2, "0")}`;
+    const dayEntries = entriesByDayKey.get(dayKey) ?? [];
 
     return {
       dayNumber,
@@ -87,16 +101,14 @@ function getDayKey(value: string) {
 }
 
 function getDayLabel(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: DISPLAY_TIME_ZONE,
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }).format(new Date(value));
+  return DAY_LABEL_FORMATTER.format(new Date(value));
 }
 
 export default function CalendarTab() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
+  const { config } = useCanvasSession();
   const { resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getUTCMonth() + 1);
@@ -133,6 +145,32 @@ export default function CalendarTab() {
   );
 
   const { data, error, isLoading, isFetching, refetch } = useCalendar(year, month);
+  const { onRefresh, refreshing } = useRefreshControl(async () => {
+    await refetch();
+
+    if (config) {
+      await syncDeviceIntegrations({
+        config,
+        queryClient,
+        reason: "calendar-refresh",
+      });
+    }
+  });
+  const showColdLoading = isLoading && !data && !error;
+  const showBlockingError = !!error && !data;
+  const showInlineRefresh = !!data && (isFetching || isLoading);
+
+  useEffect(() => {
+    if (!config || !data) {
+      return;
+    }
+
+    const previous = normalizeMonth(year, month - 1);
+    const next = normalizeMonth(year, month + 1);
+
+    void primeCalendarQuery(queryClient, config, previous.year, previous.month);
+    void primeCalendarQuery(queryClient, config, next.year, next.month);
+  }, [config, data, month, queryClient, year]);
 
   const visibleEntries = useMemo(
     () =>
@@ -142,9 +180,29 @@ export default function CalendarTab() {
     [data?.entries, subjectPreferences.hiddenCourseIds],
   );
 
+  const entriesByDayKey = useMemo(() => {
+    const map = new Map<string, CalendarEntry[]>();
+
+    for (const entry of visibleEntries) {
+      const key = getDayKey(entry.date);
+      const existing = map.get(key);
+      if (existing) {
+        existing.push(entry);
+      } else {
+        map.set(key, [entry]);
+      }
+    }
+
+    for (const groupedEntries of map.values()) {
+      groupedEntries.sort((left, right) => left.date.localeCompare(right.date));
+    }
+
+    return map;
+  }, [visibleEntries]);
+
   const calendarCells = useMemo(
-    () => buildCalendarCells(visibleEntries, month, year),
-    [month, year, visibleEntries],
+    () => buildCalendarCells(entriesByDayKey, month, year),
+    [entriesByDayKey, month, year],
   );
 
   const todayParts = getZonedDateParts(new Date());
@@ -156,23 +214,14 @@ export default function CalendarTab() {
   );
 
   const groupedEntries = useMemo(() => {
-    const groups = new Map<string, CalendarEntry[]>();
-
-    for (const entry of visibleEntries) {
-      const key = getDayKey(entry.date);
-      const existing = groups.get(key) ?? [];
-      existing.push(entry);
-      groups.set(key, existing);
-    }
-
-    return Array.from(groups.entries())
+    return Array.from(entriesByDayKey.entries())
       .map(([key, dayEntries]) => ({
         key,
         label: getDayLabel(dayEntries[0]?.date ?? key),
-        entries: dayEntries.sort((left, right) => left.date.localeCompare(right.date)),
+        entries: dayEntries,
       }))
       .sort((left, right) => left.key.localeCompare(right.key));
-  }, [visibleEntries]);
+  }, [entriesByDayKey]);
 
   const selectedCell = calendarCells.find((cell) => cell?.dayNumber === selectedDay) ?? null;
 
@@ -367,77 +416,40 @@ export default function CalendarTab() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen title="Calendar" subtitle={getMonthLabel(year, month)} scroll={false}>
-        <ScrollView 
-          showsVerticalScrollIndicator={false} 
-          contentContainerStyle={styles.scrollContent}
+      <AppScreen title="Calendar" scroll={false}>
+        <RestorableScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 112 }]}
           refreshControl={
             <RefreshControl
-              refreshing={isFetching}
-              onRefresh={refetch}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
               tintColor={colors.mutedForeground}
             />
           }
         >
           <View style={styles.container}>
-            <SectionCard title="">
-              <View style={styles.cardHeader}>
-                <View style={styles.titleSection}>
-                  <Text style={[styles.monthLabel, { color: colors.foreground }]}>
-                    {getMonthLabel(year, month)}
-                  </Text>
-                  <Text style={[styles.scheduledItems, { color: colors.muted }]}>
-                    {visibleEntries.length} scheduled items
-                  </Text>
-                </View>
-                <View style={styles.controlsSection}>
-                  <View style={[styles.viewToggle, { backgroundColor: colors.buttonBg, borderColor: colors.buttonBorder }]}>
-                    <Pressable
-                      onPress={() => {
-                        triggerSelectionHaptic();
-                        setViewMode("calendar");
-                      }}
-                      style={[
-                        styles.toggleButton,
-                        viewMode === "calendar" && { backgroundColor: colors.primaryButton },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.toggleText,
-                          { color: viewMode === "calendar" ? colors.primaryButtonText : colors.muted },
-                        ]}
-                      >
-                        Calendar
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => {
-                        triggerSelectionHaptic();
-                        setViewMode("list");
-                      }}
-                      style={[
-                        styles.toggleButton,
-                        viewMode === "list" && { backgroundColor: colors.primaryButton },
-                      ]}
-                    >
-                      <Text
-                        style={[styles.toggleText, { color: viewMode === "list" ? colors.primaryButtonText : colors.muted }]}
-                      >
-                        List
-                      </Text>
-                    </Pressable>
+            <View style={[styles.calendarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.calendarCardHeader, { borderBottomColor: colors.border }]}>
+                <View style={styles.cardHeaderRow}>
+                  <View style={styles.titleSection}>
+                    <Text style={[styles.monthLabel, { color: colors.foreground }]}>
+                      {getMonthLabel(year, month)}
+                    </Text>
+                    <Text style={[styles.scheduledItems, { color: colors.muted }]}>
+                      {visibleEntries.length} scheduled items
+                    </Text>
                   </View>
                   <View style={styles.navButtons}>
                     <Pressable
                       onPress={() => navigateMonth(-1)}
-                      style={[styles.navButton, { backgroundColor: colors.buttonBg, borderColor: colors.buttonBorder }]}
+                      style={[styles.navButton, { backgroundColor: colors.card, borderColor: colors.buttonBorder }]}
                     >
                       <ChevronLeft size={18} color={colors.foreground} />
                     </Pressable>
                     <Pressable
                       onPress={() => navigateMonth(1)}
-                      style={[styles.navButton, { backgroundColor: colors.buttonBg, borderColor: colors.buttonBorder }]}
+                      style={[styles.navButton, { backgroundColor: colors.card, borderColor: colors.buttonBorder }]}
                     >
                       <ChevronRight size={18} color={colors.foreground} />
                     </Pressable>
@@ -445,19 +457,61 @@ export default function CalendarTab() {
                 </View>
               </View>
 
-              {isLoading && !data ? <LoadingState label="Loading calendar..." /> : null}
-              {!isLoading && error ? <ErrorState error={error.message} onRetry={refetch} /> : null}
-
-              {!isLoading && !error && data ? (
-                <View style={styles.viewContainer}>
-                  {viewMode === "calendar" ? renderCalendarView() : renderListView()}
+              <View style={styles.calendarCardContent}>
+                <View style={[styles.viewToggle, { backgroundColor: colors.buttonBg, borderColor: colors.buttonBorder }]}>
+                  <Pressable
+                    onPress={() => {
+                      triggerSelectionHaptic();
+                      setViewMode("calendar");
+                    }}
+                    style={[
+                      styles.toggleButton,
+                      styles.toggleButtonMobile,
+                      viewMode === "calendar" && { backgroundColor: colors.primaryButton },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.toggleText,
+                        { color: viewMode === "calendar" ? colors.primaryButtonText : colors.muted },
+                      ]}
+                    >
+                      Calendar
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      triggerSelectionHaptic();
+                      setViewMode("list");
+                    }}
+                    style={[
+                      styles.toggleButton,
+                      styles.toggleButtonMobile,
+                      viewMode === "list" && { backgroundColor: colors.primaryButton },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.toggleText, { color: viewMode === "list" ? colors.primaryButtonText : colors.muted }]}
+                    >
+                      List
+                    </Text>
+                  </Pressable>
                 </View>
-              ) : null}
-            </SectionCard>
 
-            {!isLoading && !error && data ? renderSidePanel() : null}
+                {showColdLoading ? <LoadingState label="Loading calendar..." /> : null}
+                {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+
+                {data ? (
+                  <View style={styles.viewContainer}>
+                    {viewMode === "calendar" ? renderCalendarView() : renderListView()}
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            {data ? renderSidePanel() : null}
           </View>
-        </ScrollView>
+        </RestorableScrollView>
       </AppScreen>
     </RequireCanvasConfig>
   );
@@ -469,27 +523,43 @@ const styles = StyleSheet.create({
   },
   container: {
     gap: 16,
-    paddingTop: 8,
+    paddingTop: 0,
   },
-  cardHeader: {
+  calendarCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  calendarCardContent: {
     gap: 16,
+    paddingBottom: 16,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+  },
+  calendarCardHeader: {
+    borderBottomWidth: 1,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  cardHeaderRow: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
   },
   titleSection: {
     gap: 4,
+    minWidth: 0,
   },
   monthLabel: {
-    fontSize: 20,
-    fontWeight: "700",
-    letterSpacing: -0.4,
+    fontSize: 18,
+    fontWeight: "600",
+    letterSpacing: -0.3,
   },
   scheduledItems: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "400",
-  },
-  controlsSection: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
   },
   viewToggle: {
     flexDirection: "row",
@@ -502,13 +572,18 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
   },
+  toggleButtonMobile: {
+    flex: 1,
+  },
   toggleText: {
     fontSize: 12,
     fontWeight: "500",
+    textAlign: "center",
   },
   navButtons: {
     flexDirection: "row",
     gap: 8,
+    flexShrink: 0,
   },
   navButton: {
     width: 36,

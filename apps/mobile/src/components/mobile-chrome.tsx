@@ -3,8 +3,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Bookmark, CalendarDays, House, Inbox, LibraryBig, UserRound } from "lucide-react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { formatSubjectName, getAppShellData, getSubjectColorPalette, orderSubjectsByPreference } from "@canvas/shared";
-import { useAsyncResource } from "../hooks/use-async-resource";
+import { formatSubjectName, getSubjectColorPalette, orderSubjectsByPreference } from "@canvas/shared";
+import { useAppShell } from "../hooks/use-canvas-queries";
 import { useAppPreferences } from "../providers/app-preferences";
 import { useCanvasSession } from "../providers/canvas-session";
 
@@ -61,15 +61,15 @@ export function MobileChrome() {
     const parsed = Number(match?.[1]);
     return Number.isFinite(parsed) ? parsed : null;
   }, [pathname]);
-  const shellState = useAsyncResource(() => getAppShellData(config!), [config], config != null);
+  const { data: shellData } = useAppShell();
 
   const visibleCourses = useMemo(() => {
-    const courses = shellState.data?.courses ?? [];
+    const courses = shellData?.courses ?? [];
     return orderSubjectsByPreference(
       courses.filter((course: { id: number }) => !subjectPreferences.hiddenCourseIds.includes(course.id)),
       subjectPreferences.orderedCourseIds,
     );
-  }, [shellState.data?.courses, subjectPreferences.hiddenCourseIds, subjectPreferences.orderedCourseIds]);
+  }, [shellData?.courses, subjectPreferences.hiddenCourseIds, subjectPreferences.orderedCourseIds]);
 
   const showSubjectBar = Boolean(
     config && subjectPreferences.showMobileSubjectBar && visibleCourses.length > 0,

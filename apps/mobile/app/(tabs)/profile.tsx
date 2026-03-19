@@ -1,22 +1,27 @@
-import { useCallback, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowDown,
   ArrowUp,
+  Bell,
+  CalendarDays,
   ChevronDown,
+  Clock3,
   EyeOff,
   Mail,
   MonitorCog,
   MoonStar,
   Palette,
+  RefreshCcw,
   Smartphone,
   SunMedium,
   UserRound,
 } from "lucide-react-native";
 import {
   formatSubjectName,
-  getAppShellData,
   getSubjectColorHex,
   getSubjectColorPalette,
   orderSubjectsByPreference,
@@ -28,9 +33,14 @@ import {
   LoadingState,
   RequireCanvasConfig,
 } from "../../src/components/app-ui";
-import { useAsyncResource } from "../../src/hooks/use-async-resource";
+import { useRefreshControl } from "../../src/hooks/use-refresh-control";
+import { RestorableScrollView } from "../../src/components/restorable-scroll-view";
+import { useAppShell } from "../../src/hooks/use-canvas-queries";
+import { syncDeviceIntegrations } from "../../src/lib/device-integration-sync";
+import { formatDateTime } from "../../src/lib/format";
 import { useAppPreferences } from "../../src/providers/app-preferences";
 import { useCanvasSession } from "../../src/providers/canvas-session";
+import { useDeviceIntegrations } from "../../src/providers/device-integrations";
 
 function getInitials(name: string) {
   return name
@@ -53,8 +63,11 @@ const themeOptions: Array<{
 
 export default function ProfileTab() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const { config } = useCanvasSession();
   const { resolvedTheme, subjectPreferences, themePreference, triggerSelectionHaptic } = useAppPreferences();
+  const deviceIntegrations = useDeviceIntegrations();
 
   const colors = useMemo(
     () => ({
@@ -71,14 +84,27 @@ export default function ProfileTab() {
     [resolvedTheme],
   );
 
-  const loadProfile = useCallback(() => getAppShellData(config!), [config]);
-  const { data, error, loading, reload } = useAsyncResource(loadProfile, [config], config != null);
+  const { data, error, isLoading, isFetching, refetch } = useAppShell();
+  const { onRefresh, refreshing } = useRefreshControl(async () => {
+    await refetch();
+
+    if (config) {
+      await syncDeviceIntegrations({
+        config,
+        queryClient,
+        reason: "profile-refresh",
+      });
+    }
+  });
+  const showColdLoading = isLoading && !data && !error;
+  const showBlockingError = !!error && !data;
+  const showInlineRefresh = !!data && (isFetching || isLoading);
 
   const orderedCourses = useMemo(
     () =>
       data
         ? orderSubjectsByPreference(
-            data.courses.filter((course) => course.name),
+            data.courses.filter((course: {name?: string}) => course.name),
             subjectPreferences.orderedCourseIds,
           )
         : [],
@@ -88,12 +114,22 @@ export default function ProfileTab() {
   return (
     <RequireCanvasConfig>
       <AppScreen title="Profile" scroll={false}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <RestorableScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 112 }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.mutedForeground}
+            />
+          }
+        >
           <View style={styles.container}>
-            {loading ? <LoadingState label="Loading profile..." /> : null}
-            {!loading && error ? <ErrorState error={error} onRetry={reload} /> : null}
+            {showColdLoading ? <LoadingState label="Loading profile..." /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
 
-            {!loading && !error && data ? (
+            {data ? (
               <View style={styles.cardsContainer}>
                 {/* Account Card */}
                 <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -172,6 +208,7 @@ export default function ProfileTab() {
                   <View style={styles.cardContent}>
                     {/* ProfilePreferences - space-y-6 */}
                     <ProfilePreferences
+                      deviceIntegrations={deviceIntegrations}
                       courses={orderedCourses}
                       colors={colors}
                       subjectPreferences={subjectPreferences}
@@ -182,18 +219,20 @@ export default function ProfileTab() {
               </View>
             ) : null}
           </View>
-        </ScrollView>
+        </RestorableScrollView>
       </AppScreen>
     </RequireCanvasConfig>
   );
 }
 
 function ProfilePreferences({
+  deviceIntegrations,
   courses,
   colors,
   subjectPreferences,
   themePreference,
 }: {
+  deviceIntegrations: ReturnType<typeof useDeviceIntegrations>;
   courses: Array<{ course_code?: string; id: number; name: string }>;
   colors: {
     background: string;
@@ -215,8 +254,24 @@ function ProfilePreferences({
   };
   themePreference: ThemePreference;
 }) {
-  const { hapticsEnabled, updateHapticsEnabled, updateSubjectPreferences, updateThemePreference, triggerSelectionHaptic } =
+  const {
+    deviceIntegrationPreferences,
+    hapticsEnabled,
+    updateHapticsEnabled,
+    updateSubjectPreferences,
+    updateThemePreference,
+    triggerSelectionHaptic,
+  } =
     useAppPreferences();
+
+  const toggleReminderOffset = (offset: "day-7am" | "3h" | "1h") => {
+    const nextOffsets = deviceIntegrationPreferences.activityReminderOffsets.includes(offset)
+      ? deviceIntegrationPreferences.activityReminderOffsets.filter((candidate) => candidate !== offset)
+      : [...deviceIntegrationPreferences.activityReminderOffsets, offset];
+
+    triggerSelectionHaptic();
+    void deviceIntegrations.setReminderOffsets(nextOffsets);
+  };
 
   return (
     <View style={styles.preferencesContainer}>
@@ -298,6 +353,197 @@ function ProfilePreferences({
         </View>
         <Text style={[styles.preferenceDescription, { color: colors.mutedForeground }]}>
           Optional tap feedback for supported phones and touch devices. It is queued asynchronously so it never waits on navigation.
+        </Text>
+      </View>
+
+      <View style={[styles.preferenceCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+        <View style={styles.preferenceTitleRow}>
+          <CalendarDays size={16} color={colors.mutedForeground} />
+          <Text style={[styles.preferenceLabelInline, { color: colors.foreground }]}>Phone calendar sync</Text>
+        </View>
+        <View style={styles.optionsRow}>
+          <Pressable
+            onPress={() => {
+              triggerSelectionHaptic();
+              void deviceIntegrations.setCalendarSyncEnabled(false);
+            }}
+            style={[
+              styles.optionButton,
+              {
+                backgroundColor: !deviceIntegrationPreferences.calendarSyncEnabled ? colors.primary : colors.card,
+                borderColor: !deviceIntegrationPreferences.calendarSyncEnabled ? colors.primary : colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.optionButtonText,
+                { color: !deviceIntegrationPreferences.calendarSyncEnabled ? colors.primaryText : colors.mutedForeground },
+              ]}
+            >
+              Off
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              triggerSelectionHaptic();
+              void deviceIntegrations.setCalendarSyncEnabled(true);
+            }}
+            style={[
+              styles.optionButton,
+              {
+                backgroundColor: deviceIntegrationPreferences.calendarSyncEnabled ? colors.primary : colors.card,
+                borderColor: deviceIntegrationPreferences.calendarSyncEnabled ? colors.primary : colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.optionButtonText,
+                { color: deviceIntegrationPreferences.calendarSyncEnabled ? colors.primaryText : colors.mutedForeground },
+              ]}
+            >
+              On
+            </Text>
+          </Pressable>
+        </View>
+        <Text style={[styles.preferenceDescription, { color: colors.mutedForeground }]}>
+          Sync upcoming assignments and quizzes into the phone calendar. The app updates due-date changes and removes managed items when they disappear or are completed.
+        </Text>
+        <View style={[styles.statusCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+          <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
+            Calendar permission: {deviceIntegrations.calendarPermissionStatus ?? "unknown"}
+          </Text>
+          <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
+            Last sync: {deviceIntegrations.lastSyncAt ? formatDateTime(deviceIntegrations.lastSyncAt) : "Never"}
+          </Text>
+          {deviceIntegrations.syncError ? (
+            <Text style={[styles.statusErrorText, { color: "#dc2626" }]}>{deviceIntegrations.syncError}</Text>
+          ) : null}
+          <Pressable
+            onPress={() => {
+              triggerSelectionHaptic();
+              void deviceIntegrations.syncNow();
+            }}
+            style={[
+              styles.syncNowButton,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                opacity: deviceIntegrations.syncing ? 0.6 : 1,
+              },
+            ]}
+            disabled={deviceIntegrations.syncing}
+          >
+            <RefreshCcw size={14} color={colors.mutedForeground} />
+            <Text style={[styles.syncNowButtonText, { color: colors.foreground }]}>
+              {deviceIntegrations.syncing ? "Syncing..." : "Sync now"}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={[styles.preferenceCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+        <View style={styles.preferenceTitleRow}>
+          <Bell size={16} color={colors.mutedForeground} />
+          <Text style={[styles.preferenceLabelInline, { color: colors.foreground }]}>Assignment and quiz reminders</Text>
+        </View>
+        <View style={styles.optionsRow}>
+          <Pressable
+            onPress={() => toggleReminderOffset("day-7am")}
+            style={[
+              styles.optionButton,
+              {
+                backgroundColor: deviceIntegrationPreferences.activityReminderOffsets.includes("day-7am")
+                  ? colors.primary
+                  : colors.card,
+                borderColor: deviceIntegrationPreferences.activityReminderOffsets.includes("day-7am")
+                  ? colors.primary
+                  : colors.border,
+              },
+            ]}
+          >
+            <Clock3
+              size={16}
+              color={
+                deviceIntegrationPreferences.activityReminderOffsets.includes("day-7am")
+                  ? colors.primaryText
+                  : colors.mutedForeground
+              }
+            />
+            <Text
+              style={[
+                styles.optionButtonText,
+                {
+                  color: deviceIntegrationPreferences.activityReminderOffsets.includes("day-7am")
+                    ? colors.primaryText
+                    : colors.mutedForeground,
+                },
+              ]}
+            >
+              7 AM due day
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => toggleReminderOffset("3h")}
+            style={[
+              styles.optionButton,
+              {
+                backgroundColor: deviceIntegrationPreferences.activityReminderOffsets.includes("3h")
+                  ? colors.primary
+                  : colors.card,
+                borderColor: deviceIntegrationPreferences.activityReminderOffsets.includes("3h")
+                  ? colors.primary
+                  : colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.optionButtonText,
+                {
+                  color: deviceIntegrationPreferences.activityReminderOffsets.includes("3h")
+                    ? colors.primaryText
+                    : colors.mutedForeground,
+                },
+              ]}
+            >
+              3 hours before
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => toggleReminderOffset("1h")}
+            style={[
+              styles.optionButton,
+              {
+                backgroundColor: deviceIntegrationPreferences.activityReminderOffsets.includes("1h")
+                  ? colors.primary
+                  : colors.card,
+                borderColor: deviceIntegrationPreferences.activityReminderOffsets.includes("1h")
+                  ? colors.primary
+                  : colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.optionButtonText,
+                {
+                  color: deviceIntegrationPreferences.activityReminderOffsets.includes("1h")
+                    ? colors.primaryText
+                    : colors.mutedForeground,
+                },
+              ]}
+            >
+              1 hour before
+            </Text>
+          </Pressable>
+        </View>
+        <Text style={[styles.preferenceDescription, { color: colors.mutedForeground }]}>
+          Pick any combination of local reminders. Notifications are only scheduled for upcoming activities that are still incomplete.
+        </Text>
+        <Text style={[styles.preferenceDescription, styles.tightDescription, { color: colors.mutedForeground }]}>
+          Notification permission: {deviceIntegrations.notificationPermissionStatus ?? "unknown"}
         </Text>
       </View>
 
@@ -426,7 +672,7 @@ function ProfilePreferences({
       />
 
       {/* Footer */}
-      <View style={[styles.descriptionCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+      <View style={[styles.descriptionCard, styles.footerCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
         <Text style={[styles.footerTitle, { color: colors.foreground }]}>Made by Gabriel Jota Lizardo</Text>
         <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
           Suggestions, fixes, or feedback: <Text style={[styles.footerLink, { color: colors.foreground }]}>gabrieljotalizardo@gmail.com</Text>
@@ -615,6 +861,9 @@ function SubjectPreferenceList({
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    flexGrow: 1,
+  },
   container: {
     paddingHorizontal: 12,
     paddingVertical: 12,
@@ -697,6 +946,7 @@ const styles = StyleSheet.create({
   },
   changeKeyText: {
     fontSize: 14,
+    marginBottom: 12,
     textDecorationLine: "underline",
     textDecorationStyle: "solid",
   },
@@ -712,6 +962,16 @@ const styles = StyleSheet.create({
   preferenceLabel: {
     fontSize: 14,
     fontWeight: "500",
+    marginBottom: 12,
+  },
+  preferenceLabelInline: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  preferenceTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     marginBottom: 12,
   },
   optionsRow: {
@@ -737,11 +997,48 @@ const styles = StyleSheet.create({
     marginTop: 12,
     lineHeight: 18,
   },
+  tightDescription: {
+    marginTop: 8,
+  },
+  statusCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  statusErrorText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  syncNowButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  syncNowButtonText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
   descriptionCard: {
     borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 14,
+  },
+  footerCard: {
+    marginBottom: 12,
   },
   descriptionText: {
     fontSize: 14,
