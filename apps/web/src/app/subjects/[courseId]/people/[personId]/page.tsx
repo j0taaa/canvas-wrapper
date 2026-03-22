@@ -2,12 +2,14 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Mail } from "lucide-react";
+import { t, type AppLocale } from "@canvas/shared";
 import { PersonAvatarViewer } from "@/app/subjects/[courseId]/people/[personId]/person-avatar-viewer";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCoursePerson, getSharedActiveCourses, getSubjectShellData } from "@/lib/canvas";
+import { getRequestLocale } from "@/lib/request-locale";
 import { formatDueDateShort, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
@@ -21,17 +23,17 @@ function getInitials(name: string) {
     .join("");
 }
 
-function formatEnrollmentType(value?: string) {
+function formatEnrollmentType(locale: AppLocale, value?: string) {
   if (!value) {
-    return "Course member";
+    return t(locale, "profile.courseMember");
   }
 
   return value.replace(/Enrollment$/, "").replace(/([a-z])([A-Z])/g, "$1 $2").trim();
 }
 
-function formatEnrollmentState(value?: string) {
+function formatEnrollmentState(locale: AppLocale, value?: string) {
   if (!value) {
-    return "Unknown";
+    return t(locale, "common.unknown");
   }
 
   return value.charAt(0).toUpperCase() + value.slice(1).replace(/[_-]+/g, " ");
@@ -77,6 +79,7 @@ export default async function SubjectPersonPage({
   const { courseId, personId } = await params;
   const parsedCourseId = Number(courseId);
   const parsedPersonId = Number(personId);
+  const { resolvedLocale } = await getRequestLocale();
 
   if (!Number.isFinite(parsedCourseId) || !Number.isFinite(parsedPersonId)) {
     notFound();
@@ -103,14 +106,19 @@ export default async function SubjectPersonPage({
   const sharedActiveCourses = await getSharedActiveCourses(courseShellData.courses, parsedPersonId, apiKey);
 
   return (
-    <DesktopAppShell profile={courseShellData.profile} courses={courseShellData.courses} currentCourseId={parsedCourseId}>
+    <DesktopAppShell
+      profile={courseShellData.profile}
+      courses={courseShellData.courses}
+      currentCourseId={parsedCourseId}
+      contentClassName="p-4 pb-32 md:p-5 md:pb-6"
+    >
       <div className="w-full">
         <div className="mb-4 flex items-center justify-between gap-3">
           <HistoryBackButton fallbackHref={`/subjects/${parsedCourseId}?tab=people`} />
         </div>
 
         <div className="mb-6 overflow-hidden rounded-2xl border border-black/15 bg-gradient-to-br from-white via-white to-black/[0.03]">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-5 py-5 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-5">
             <div className="min-w-0">
               <div className="mb-3 flex items-center gap-4">
                 <PersonAvatarViewer src={person.avatar_url} alt={person.name} fallback={getInitials(person.name)} />
@@ -126,18 +134,18 @@ export default async function SubjectPersonPage({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge
+                <Badge
                 variant="outline"
                 className={getRoleBadgeClass(primaryEnrollment?.type ?? primaryEnrollment?.role)}
               >
-                {formatEnrollmentType(primaryEnrollment?.type ?? primaryEnrollment?.role)}
+                {formatEnrollmentType(resolvedLocale, primaryEnrollment?.type ?? primaryEnrollment?.role)}
               </Badge>
               {primaryEnrollment?.enrollment_state && (
                 <Badge
                   variant="outline"
                   className={getStatusBadgeClass(primaryEnrollment.enrollment_state)}
                 >
-                  {formatEnrollmentState(primaryEnrollment.enrollment_state)}
+                  {formatEnrollmentState(resolvedLocale, primaryEnrollment.enrollment_state)}
                 </Badge>
               )}
             </div>
@@ -145,23 +153,23 @@ export default async function SubjectPersonPage({
         </div>
 
         <div className="grid gap-6">
-          <Card className="border-black/15 bg-white/90">
+          <Card size="sm" className="border-black/15 bg-white/90">
             <CardHeader className="border-b border-black/10">
-              <CardTitle>Profile</CardTitle>
-              <CardDescription>Information available from the Canvas course user record</CardDescription>
+              <CardTitle>{t(resolvedLocale, "common.profile")}</CardTitle>
+              <CardDescription>{t(resolvedLocale, "profile.informationFromCanvas")}</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-black/10 bg-white p-4">
-                <p className="text-xs uppercase tracking-wide text-black/45">Name</p>
+                <p className="text-xs uppercase tracking-wide text-black/45">{t(resolvedLocale, "common.name")}</p>
                 <p className="mt-2 text-sm font-medium">{person.name}</p>
               </div>
               <div className="rounded-xl border border-black/10 bg-white p-4">
-                <p className="text-xs uppercase tracking-wide text-black/45">Canvas user ID</p>
+                <p className="text-xs uppercase tracking-wide text-black/45">{t(resolvedLocale, "common.canvasUserId")}</p>
                 <p className="mt-2 text-sm font-medium">{person.id}</p>
               </div>
               {person.sis_user_id && (
                 <div className="rounded-xl border border-black/10 bg-white p-4 sm:col-span-2">
-                  <p className="text-xs uppercase tracking-wide text-black/45">Email</p>
+                  <p className="text-xs uppercase tracking-wide text-black/45">{t(resolvedLocale, "common.email")}</p>
                   <div className="mt-2 flex items-center gap-2 text-sm font-medium">
                     <Mail className="h-4 w-4" />
                     <span className="break-all">{person.sis_user_id}</span>
@@ -170,21 +178,21 @@ export default async function SubjectPersonPage({
               )}
               {person.created_at && (
                 <div className="rounded-xl border border-black/10 bg-white p-4 sm:col-span-2">
-                  <p className="text-xs uppercase tracking-wide text-black/45">Canvas account created</p>
-                  <p className="mt-2 text-sm font-medium">{formatDueDateShort(person.created_at)}</p>
+                  <p className="text-xs uppercase tracking-wide text-black/45">{t(resolvedLocale, "profile.canvasAccountCreated")}</p>
+                  <p className="mt-2 text-sm font-medium">{formatDueDateShort(resolvedLocale, person.created_at)}</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="border-black/15 bg-white/90">
+          <Card size="sm" className="border-black/15 bg-white/90">
             <CardHeader className="border-b border-black/10">
-              <CardTitle>Shared active subjects</CardTitle>
-              <CardDescription>Active subjects that both you and this person are currently taking</CardDescription>
+              <CardTitle>{t(resolvedLocale, "profile.sharedActiveSubjects")}</CardTitle>
+              <CardDescription>{t(resolvedLocale, "profile.sharedActiveSubjectsDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {sharedActiveCourses.length === 0 ? (
-                <p className="text-sm text-black/70">No shared active subjects were found.</p>
+                <p className="text-sm text-black/70">{t(resolvedLocale, "profile.noSharedActiveSubjects")}</p>
               ) : (
                 sharedActiveCourses.map((sharedCourse) => {
                   const subjectStyle = getSubjectColorStyle(sharedCourse.name);
@@ -197,7 +205,7 @@ export default async function SubjectPersonPage({
                       style={{ boxShadow: `inset 3px 0 0 ${subjectStyle.borderColor}` }}
                     >
                       <p className="truncate text-sm font-medium">{formatSubjectName(sharedCourse.name)}</p>
-                      <p className="mt-1 truncate text-xs text-black/55">{sharedCourse.course_code ?? "Active subject"}</p>
+                      <p className="mt-1 truncate text-xs text-black/55">{sharedCourse.course_code ?? t(resolvedLocale, "common.activeSubject")}</p>
                     </Link>
                   );
                 })

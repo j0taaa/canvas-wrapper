@@ -1,7 +1,6 @@
 import { CanvasCalendarData } from "./canvas";
+import { AppLocale, DISPLAY_TIME_ZONE, formatMonthLabel } from "./locale";
 import { formatSubjectName } from "./subject";
-
-export const DISPLAY_TIME_ZONE = "America/Sao_Paulo";
 
 export type CalendarEntry = {
   id: string;
@@ -34,12 +33,8 @@ export function getMonthRange(year: number, month: number) {
   };
 }
 
-export function getMonthLabel(year: number, month: number) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: DISPLAY_TIME_ZONE,
-    month: "long",
-    year: "numeric",
-  }).format(new Date(Date.UTC(year, month - 1, 1, 12)));
+export function getMonthLabel(year: number, month: number, locale: AppLocale = "en") {
+  return formatMonthLabel(locale, year, month);
 }
 
 export function buildCalendarEntries(calendarData: CanvasCalendarData): CalendarEntry[] {

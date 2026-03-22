@@ -10,6 +10,7 @@ import {
   uploadAssignmentSubmissionFiles,
   formatSubjectName,
   getSubjectColorPalette,
+  t,
 } from "@canvas/shared";
 import {
   AppScreen,
@@ -25,7 +26,7 @@ import { RestorableScrollView } from "../../../../src/components/restorable-scro
 import { SubjectLayoutHeader } from "../../../../src/components/subject-layout";
 import { useAssignment, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
 import { formatDueDateShort, formatDateTime } from "../../../../src/lib/format";
-import { goBackOrPush } from "../../../../src/lib/navigation";
+import { goBackOrPush, openCanvasUrl } from "../../../../src/lib/navigation";
 import { useAppPreferences } from "../../../../src/providers/app-preferences";
 import { useCanvasSession } from "../../../../src/providers/canvas-session";
 
@@ -35,9 +36,9 @@ function isCompletedAssignment(workflowState?: string, excused?: boolean) {
   return excused || ["submitted", "graded", "pending_review", "complete"].includes(workflowState ?? "");
 }
 
-function formatSubmissionStatus(workflowState?: string, excused?: boolean) {
-  if (excused) return "Excused";
-  if (!workflowState) return "Not submitted";
+function formatSubmissionStatus(locale: "en" | "pt-BR", workflowState?: string, excused?: boolean) {
+  if (excused) return t(locale, "subjects.excused");
+  if (!workflowState) return t(locale, "subjects.notSubmitted");
   return workflowState
     .replace(/[_-]+/g, " ")
     .split(" ")
@@ -46,21 +47,21 @@ function formatSubmissionStatus(workflowState?: string, excused?: boolean) {
     .join(" ");
 }
 
-function formatSubmissionTypes(submissionTypes: string[]) {
-  if (submissionTypes.length === 0) return "Not specified";
+function formatSubmissionTypes(locale: "en" | "pt-BR", submissionTypes: string[]) {
+  if (submissionTypes.length === 0) return t(locale, "subjects.notSpecified");
   
   const labels = submissionTypes.map((type) => {
     switch (type) {
-      case "online_upload": return "File upload";
-      case "online_text_entry": return "Text entry";
-      case "online_url": return "Website URL";
-      case "online_quiz": return "Quiz";
-      case "discussion_topic": return "Discussion";
-      case "media_recording": return "Media recording";
-      case "student_annotation": return "Student annotation";
-      case "external_tool": return "External tool";
-      case "none": return "No submission";
-      case "on_paper": return "On paper";
+      case "online_upload": return t(locale, "subjects.fileUpload");
+      case "online_text_entry": return t(locale, "subjects.textEntry");
+      case "online_url": return t(locale, "subjects.websiteUrl");
+      case "online_quiz": return t(locale, "bookmarks.quiz");
+      case "discussion_topic": return t(locale, "subjects.discussion");
+      case "media_recording": return t(locale, "subjects.mediaRecording");
+      case "student_annotation": return t(locale, "subjects.studentAnnotation");
+      case "external_tool": return t(locale, "subjects.externalTool");
+      case "none": return t(locale, "subjects.noSubmission");
+      case "on_paper": return t(locale, "subjects.onPaper");
       default: return type.replace(/[_-]+/g, " ").split(" ").filter(Boolean).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
     }
   });
@@ -73,7 +74,7 @@ export default function AssignmentDetailScreen() {
   const params = useLocalSearchParams<{ assignmentId: string; courseId: string }>();
   const assignmentId = Number(params.assignmentId);
   const courseId = Number(params.courseId);
-  const { resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
+  const { resolvedLocale, resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
   
   const [submissionType, setSubmissionType] = useState<SubmitMode>("online_text_entry");
   const [body, setBody] = useState("");
@@ -130,14 +131,14 @@ export default function AssignmentDetailScreen() {
 
   const effectiveSubmissionType = availableTypes.includes(submissionType) ? submissionType : availableTypes[0] ?? "online_text_entry";
   const isCompleted = useMemo(() => isCompletedAssignment(assignment?.submission?.workflow_state, assignment?.submission?.excused), [assignment]);
-  const submissionStatusText = useMemo(() => formatSubmissionStatus(assignment?.submission?.workflow_state, assignment?.submission?.excused), [assignment]);
+  const submissionStatusText = useMemo(() => formatSubmissionStatus(resolvedLocale, assignment?.submission?.workflow_state, assignment?.submission?.excused), [assignment, resolvedLocale]);
   const showColdLoading = isLoading && !course && !assignment && !error;
   const showBlockingError = !!error && !course && !assignment;
   const showInlineRefresh = !!course && !!assignment && (isFetching || isLoading);
 
   return (
     <RequireCanvasConfig>
-      <AppScreen scroll={false}>
+      <AppScreen contentStyle={styles.screenContent} scroll={false}>
         <RestorableScrollView 
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -149,23 +150,24 @@ export default function AssignmentDetailScreen() {
           }
         >
           <View style={styles.container}>
-            {showColdLoading ? <LoadingState label="Loading assignment..." /> : null}
-            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             <SubjectLayoutHeader />
+            {showColdLoading ? <LoadingState label={t(resolvedLocale, "subjects.loadingAssignment")} /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             
             {course && assignment ? (
               <>
                 {/* Navigation Bar */}
                 <View style={styles.navBar}>
                   <Pressable
+                    accessibilityLabel={t(resolvedLocale, "subjects.backToSubject")}
+                    accessibilityRole="button"
                     onPress={() => {
                       triggerSelectionHaptic();
                       goBackOrPush(router, `/subjects/${courseId}`);
                     }}
-                    style={styles.backButton}
+                    style={[styles.backButton, { borderColor: colors.border }]}
                   >
                     <ChevronLeft size={20} color={colors.foreground} />
-                    <Text style={[styles.backText, { color: colors.foreground }]}>Back to subject</Text>
                   </Pressable>
                   {course && assignment ? (
                     <BookmarkButton
@@ -175,7 +177,7 @@ export default function AssignmentDetailScreen() {
                         id: `assignment-${courseId}-${assignmentId}`,
                         kind: "assignment",
                         subjectName: course.name,
-                        title: assignment.name ?? "Untitled assignment",
+                        title: assignment.name ?? t(resolvedLocale, "subjects.assignments"),
                       }}
                       borderColor={colors.border}
                       fillColor={colors.foreground}
@@ -206,20 +208,20 @@ export default function AssignmentDetailScreen() {
                     <View style={styles.badges}>
                       {isCompleted && (
                         <View style={[styles.badge, { borderColor: colors.emerald.border, backgroundColor: colors.emerald.bg }]}>
-                          <Text style={[styles.badgeText, { color: colors.emerald.text }]}>Done</Text>
+                          <Text style={[styles.badgeText, { color: colors.emerald.text }]}>{t(resolvedLocale, "calendar.done")}</Text>
                         </View>
                       )}
                       {assignment.points_possible != null && (
                         <View style={[styles.badge, { borderColor: colors.border }]}>
                           <Text style={[styles.badgeText, { color: colors.mutedForeground }]}>
-                            {assignment.points_possible} points
+                            {t(resolvedLocale, "subjects.points", { count: assignment.points_possible })}
                           </Text>
                         </View>
                       )}
                       {assignment.due_at && (
                         <View style={[styles.badge, { borderColor: colors.border }]}>
                           <Text style={[styles.badgeText, { color: colors.mutedForeground }]}>
-                            Due {formatDueDateShort(assignment.due_at)}
+                            {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
                           </Text>
                         </View>
                       )}
@@ -230,7 +232,7 @@ export default function AssignmentDetailScreen() {
                 {/* Details Card */}
                 <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>Details</Text>
+                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.details")}</Text>
                   </View>
                   <View style={styles.cardContent}>
                     {assignment.description ? (
@@ -241,11 +243,11 @@ export default function AssignmentDetailScreen() {
                         <PlaceholderBlock height={144} />
                       </>
                     ) : (
-                      <RichText currentCourseId={courseId} html="<p>No assignment description available.</p>" providerUrl={config?.apiBase} />
+                      <RichText currentCourseId={courseId} html={`<p>${t(resolvedLocale, "subjects.noAssignmentDescription")}</p>`} providerUrl={config?.apiBase} />
                     )}
                     {assignment.html_url && (
-                      <Pressable onPress={() => Linking.openURL(assignment.html_url!)}>
-                        <Text style={[styles.linkText, { color: colors.mutedForeground }]}>Open in Canvas</Text>
+                      <Pressable onPress={() => void openCanvasUrl(assignment.html_url)}>
+                        <Text style={[styles.linkText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.openInCanvas")}</Text>
                       </Pressable>
                     )}
                   </View>
@@ -254,7 +256,7 @@ export default function AssignmentDetailScreen() {
                 {/* Submission Card */}
                 <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>Submission</Text>
+                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.submission")}</Text>
                   </View>
                   <View style={styles.cardContent}>
                     {/* Status Cards */}
@@ -265,8 +267,8 @@ export default function AssignmentDetailScreen() {
                             <Send size={16} color={colors.sky.text} />
                           </View>
                           <View>
-                            <Text style={[styles.statusLabel, { color: colors.sky.text }]}>SUBMITTING</Text>
-                            <Text style={[styles.statusValue, { color: colors.foreground }]}>{formatSubmissionTypes(submissionTypes)}</Text>
+                            <Text style={[styles.statusLabel, { color: colors.sky.text }]}>{t(resolvedLocale, "subjects.submitting").toUpperCase()}</Text>
+                            <Text style={[styles.statusValue, { color: colors.foreground }]}>{formatSubmissionTypes(resolvedLocale, submissionTypes)}</Text>
                           </View>
                         </View>
                       </View>
@@ -277,12 +279,14 @@ export default function AssignmentDetailScreen() {
                             <CalendarClock size={16} color={colors.amber.text} />
                           </View>
                           <View>
-                            <Text style={[styles.statusLabel, { color: colors.amber.text }]}>AVAILABLE</Text>
+                            <Text style={[styles.statusLabel, { color: colors.amber.text }]}>{t(resolvedLocale, "subjects.available").toUpperCase()}</Text>
                             <Text style={[styles.statusValue, { color: colors.foreground }]}>
-                              {assignment.unlock_at ? formatDueDateShort(assignment.unlock_at) : "Now"}
+                              {assignment.unlock_at ? formatDueDateShort(resolvedLocale, assignment.unlock_at) : t(resolvedLocale, "subjects.now")}
                             </Text>
                             <Text style={[styles.statusSubtext, { color: colors.mutedForeground }]}>
-                              until {assignment.lock_at ? formatDueDateShort(assignment.lock_at) : "No lock date"}
+                              {t(resolvedLocale, "subjects.until", {
+                                value: assignment.lock_at ? formatDueDateShort(resolvedLocale, assignment.lock_at) : t(resolvedLocale, "subjects.noLockDate"),
+                              })}
                             </Text>
                           </View>
                         </View>
@@ -294,9 +298,9 @@ export default function AssignmentDetailScreen() {
                             <Trophy size={16} color={colors.emerald.text} />
                           </View>
                           <View>
-                            <Text style={[styles.statusLabel, { color: colors.emerald.text }]}>STATUS</Text>
+                            <Text style={[styles.statusLabel, { color: colors.emerald.text }]}>{t(resolvedLocale, "subjects.status").toUpperCase()}</Text>
                             <Text style={[styles.statusValueLarge, { color: colors.foreground }]}>
-                              {isCompleted ? "Submitted" : submissionStatusText}
+                              {isCompleted ? t(resolvedLocale, "subjects.submitted") : submissionStatusText}
                             </Text>
                           </View>
                         </View>
@@ -305,9 +309,9 @@ export default function AssignmentDetailScreen() {
                       {assignment.submission?.submitted_at && (
                         <View style={[styles.statusCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
                           <View>
-                            <Text style={[styles.statusLabelMuted, { color: colors.mutedForeground }]}>SUBMITTED AT</Text>
+                            <Text style={[styles.statusLabelMuted, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.submittedAt").toUpperCase()}</Text>
                             <Text style={[styles.statusValue, { color: colors.foreground }]}>
-                              {formatDueDateShort(assignment.submission.submitted_at)}
+                              {formatDueDateShort(resolvedLocale, assignment.submission.submitted_at)}
                             </Text>
                           </View>
                         </View>
@@ -316,7 +320,7 @@ export default function AssignmentDetailScreen() {
                       {assignment.submission?.grade && (
                         <View style={[styles.statusCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
                           <View>
-                            <Text style={[styles.statusLabelMuted, { color: colors.mutedForeground }]}>GRADE</Text>
+                            <Text style={[styles.statusLabelMuted, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.grade").toUpperCase()}</Text>
                             <Text style={[styles.statusValue, { color: colors.foreground }]}>{assignment.submission.grade}</Text>
                           </View>
                         </View>
@@ -325,7 +329,7 @@ export default function AssignmentDetailScreen() {
                       {assignment.allowed_attempts != null && assignment.allowed_attempts > 0 && (
                         <View style={[styles.statusCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
                           <View>
-                            <Text style={[styles.statusLabelMuted, { color: colors.mutedForeground }]}>ATTEMPTS ALLOWED</Text>
+                            <Text style={[styles.statusLabelMuted, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.attemptsAllowed").toUpperCase()}</Text>
                             <Text style={[styles.statusValue, { color: colors.foreground }]}>{assignment.allowed_attempts}</Text>
                           </View>
                         </View>
@@ -334,15 +338,15 @@ export default function AssignmentDetailScreen() {
                       {assignment.locked_for_user && (
                         <View style={[styles.statusCard, { borderColor: colors.rose.border, backgroundColor: colors.rose.bg }]}>
                           <View style={styles.statusCardContent}>
-                            <View style={[styles.statusIcon, { backgroundColor: isDark(resolvedTheme) ? "rgba(244,63,94,0.2)" : "rgba(244,63,94,0.1)" }]}>
-                              <LockKeyhole size={16} color={colors.rose.text} />
-                            </View>
-                            <View>
-                              <Text style={[styles.statusLabel, { color: colors.rose.text }]}>ACCESS</Text>
-                              <Text style={[styles.statusValue, { color: colors.foreground }]}>Locked for you</Text>
-                            </View>
+                          <View style={[styles.statusIcon, { backgroundColor: isDark(resolvedTheme) ? "rgba(244,63,94,0.2)" : "rgba(244,63,94,0.1)" }]}>
+                            <LockKeyhole size={16} color={colors.rose.text} />
+                          </View>
+                          <View>
+                              <Text style={[styles.statusLabel, { color: colors.rose.text }]}>{t(resolvedLocale, "subjects.access").toUpperCase()}</Text>
+                              <Text style={[styles.statusValue, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.lockedForYou")}</Text>
                           </View>
                         </View>
+                      </View>
                       )}
                     </View>
 
@@ -370,7 +374,7 @@ export default function AssignmentDetailScreen() {
                                     { color: effectiveSubmissionType === type ? colors.primaryText : colors.mutedForeground },
                                   ]}
                                 >
-                                  {type === "online_text_entry" ? "Text entry" : type === "online_url" ? "Website URL" : "File upload"}
+                                  {type === "online_text_entry" ? t(resolvedLocale, "subjects.textEntry") : type === "online_url" ? t(resolvedLocale, "subjects.websiteUrl") : t(resolvedLocale, "subjects.fileUpload")}
                                 </Text>
                               </Pressable>
                             ))}
@@ -381,7 +385,7 @@ export default function AssignmentDetailScreen() {
                           <TextInput
                             multiline
                             onChangeText={setBody}
-                            placeholder="Write your submission here"
+                            placeholder={t(resolvedLocale, "subjects.writeSubmissionHere")}
                             style={[styles.textInput, { borderColor: colors.border, color: colors.foreground }]}
                             value={body}
                           />
@@ -415,7 +419,7 @@ export default function AssignmentDetailScreen() {
                               style={[styles.uploadButton, { borderColor: colors.border }]}
                             >
                               <Text style={[styles.uploadButtonText, { color: colors.foreground }]}>
-                                {selectedFiles.length > 0 ? `${selectedFiles.length} files selected` : "Choose files"}
+                                {selectedFiles.length > 0 ? t(resolvedLocale, "subjects.filesSelected", { count: selectedFiles.length }) : t(resolvedLocale, "subjects.chooseFiles")}
                               </Text>
                             </Pressable>
                             {selectedFiles.map((file) => (
@@ -429,14 +433,14 @@ export default function AssignmentDetailScreen() {
                         <TextInput
                           multiline
                           onChangeText={setSubmissionComment}
-                          placeholder="Optional submission comment"
+                          placeholder={t(resolvedLocale, "subjects.optionalSubmissionComment")}
                           style={[styles.textInput, { borderColor: colors.border, color: colors.foreground }]}
                           value={submissionComment}
                         />
 
                         {assignment.submission?.attachments?.length ? (
                           <View style={styles.attachmentSection}>
-                            <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Submitted files</Text>
+                            <Text style={[styles.sectionLabel, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.submittedFiles")}</Text>
                             {assignment.submission.attachments.map((attachment, index) =>
                               attachment.url ? (
                                 <Pressable
@@ -445,7 +449,7 @@ export default function AssignmentDetailScreen() {
                                   style={[styles.attachmentButton, { borderColor: colors.emerald.border, backgroundColor: colors.emerald.bg }]}
                                 >
                                   <Text style={[styles.attachmentButtonText, { color: colors.emerald.text }]} numberOfLines={1}>
-                                    {attachment.display_name ?? attachment.filename ?? "Download file"}
+                                    {attachment.display_name ?? attachment.filename ?? t(resolvedLocale, "subjects.downloadSubmittedFile")}
                                   </Text>
                                 </Pressable>
                               ) : null
@@ -501,12 +505,12 @@ export default function AssignmentDetailScreen() {
                               setUrl("");
                               setSubmissionComment("");
                               setSelectedFiles([]);
-                              setSubmissionStatus("Submitted successfully");
+                              setSubmissionStatus(t(resolvedLocale, "subjects.submittedSuccessfully"));
                               await refetch();
                             };
 
                             void run()
-                              .catch((err) => setSubmissionStatus(err instanceof Error ? err.message : "Could not submit assignment"))
+                              .catch((err) => setSubmissionStatus(err instanceof Error ? err.message : t(resolvedLocale, "subjects.couldNotSubmitAssignment")))
                               .finally(() => setSubmitting(false));
                           }}
                           style={[
@@ -516,17 +520,17 @@ export default function AssignmentDetailScreen() {
                           ]}
                         >
                           <Text style={[styles.submitButtonText, { color: colors.primaryText }]}>
-                            {submitting ? "Submitting..." : "Submit assignment"}
+                            {submitting ? t(resolvedLocale, "subjects.submittingAssignmentAction") : t(resolvedLocale, "subjects.submitAssignmentAction")}
                           </Text>
                         </Pressable>
                       </View>
                     ) : submissionTypes.includes("online_quiz") ? (
                       <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
-                        This assignment is a quiz. Quiz content can be opened from module quiz items.
+                        {t(resolvedLocale, "subjects.assignmentIsQuiz")}
                       </Text>
                     ) : (
                       <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
-                        This assignment type can't be submitted directly here yet.
+                        {t(resolvedLocale, "subjects.assignmentUnsupportedSubmission")}
                       </Text>
                     )}
                   </View>
@@ -536,14 +540,14 @@ export default function AssignmentDetailScreen() {
                 {(assignment.submission?.submission_comments?.length ?? 0) > 0 && (
                   <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
                     <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                      <Text style={[styles.cardTitle, { color: colors.foreground }]}>Comments</Text>
+                      <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.comments")}</Text>
                     </View>
                     <View style={styles.cardContent}>
                       {assignment.submission?.submission_comments?.map((comment, index) => (
                         <View key={comment.id ?? index} style={[styles.commentCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                          <Text style={[styles.commentAuthor, { color: colors.foreground }]}>{comment.author_name ?? "Unknown author"}</Text>
-                          <Text style={[styles.commentDate, { color: colors.mutedForeground }]}>{formatDateTime(comment.created_at)}</Text>
-                          <Text style={[styles.commentText, { color: colors.foreground }]}>{comment.comment ?? "No comment body"}</Text>
+                          <Text style={[styles.commentAuthor, { color: colors.foreground }]}>{comment.author_name ?? t(resolvedLocale, "common.unknown")}</Text>
+                          <Text style={[styles.commentDate, { color: colors.mutedForeground }]}>{formatDateTime(resolvedLocale, comment.created_at)}</Text>
+                          <Text style={[styles.commentText, { color: colors.foreground }]}>{comment.comment ?? t(resolvedLocale, "inbox.noMessageBody")}</Text>
                         </View>
                       ))}
 
@@ -551,7 +555,7 @@ export default function AssignmentDetailScreen() {
                         <TextInput
                           multiline
                           onChangeText={setCommentDraft}
-                          placeholder="Add a comment"
+                          placeholder={t(resolvedLocale, "subjects.addComment")}
                           style={[styles.textInput, { borderColor: colors.border, color: colors.foreground }]}
                           value={commentDraft}
                         />
@@ -563,10 +567,10 @@ export default function AssignmentDetailScreen() {
                             void addAssignmentComment(courseId, assignmentId, commentDraft, config!)
                               .then(() => {
                                 setCommentDraft("");
-                                setCommentStatus("Comment sent successfully");
+                                setCommentStatus(t(resolvedLocale, "subjects.commentSentSuccessfully"));
                                 return refetch();
                               })
-                              .catch((err) => setCommentStatus(err instanceof Error ? err.message : "Could not send comment"))
+                              .catch((err) => setCommentStatus(err instanceof Error ? err.message : t(resolvedLocale, "subjects.couldNotSubmitComment")))
                               .finally(() => setSubmitting(false));
                           }}
                           style={[
@@ -576,7 +580,7 @@ export default function AssignmentDetailScreen() {
                           ]}
                         >
                           <Text style={[styles.submitButtonText, { color: colors.primaryText }]}>
-                            {submitting ? "Sending..." : "Send comment"}
+                            {submitting ? t(resolvedLocale, "subjects.sendingComment") : t(resolvedLocale, "subjects.sendComment")}
                           </Text>
                         </Pressable>
                         {commentStatus && <Text style={[styles.statusMessage, { color: colors.mutedForeground }]}>{commentStatus}</Text>}
@@ -598,9 +602,12 @@ function isDark(resolvedTheme: string) {
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    padding: 0,
+  },
   container: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     gap: 12,
   },
   navBar: {
@@ -610,13 +617,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   backButton: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 8,
-  },
-  backText: {
-    fontSize: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
   },
   headerCard: {
     borderRadius: 16,
@@ -624,8 +630,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   headerTop: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     borderBottomWidth: 1,
   },
   headerContent: {
@@ -678,7 +684,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cardHeader: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
@@ -687,8 +693,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   cardContent: {
-    padding: 16,
-    gap: 16,
+    padding: 14,
+    gap: 12,
   },
   linkText: {
     fontSize: 14,

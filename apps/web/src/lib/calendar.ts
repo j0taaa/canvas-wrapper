@@ -1,7 +1,6 @@
+import { buildCalendarEntries as buildSharedCalendarEntries, DISPLAY_TIME_ZONE, formatMonthLabel, type AppLocale } from "@canvas/shared";
 import { CanvasCalendarData } from "@/lib/canvas";
 import { formatSubjectName } from "@/lib/utils";
-
-export const DISPLAY_TIME_ZONE = "America/Sao_Paulo";
 
 export type CalendarEntry = {
   id: string;
@@ -34,12 +33,8 @@ export function getMonthRange(year: number, month: number) {
   };
 }
 
-export function getMonthLabel(year: number, month: number) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: DISPLAY_TIME_ZONE,
-    month: "long",
-    year: "numeric",
-  }).format(new Date(Date.UTC(year, month - 1, 1, 12)));
+export function getMonthLabel(year: number, month: number, locale: AppLocale = "en") {
+  return formatMonthLabel(locale, year, month);
 }
 
 export function getZonedDateParts(value: Date | string) {
@@ -61,46 +56,8 @@ export function getZonedDateParts(value: Date | string) {
 }
 
 export function buildCalendarEntries(calendarData: CanvasCalendarData): CalendarEntry[] {
-  return [
-    ...calendarData.assignments
-      .filter((assignment) => assignment.start_at)
-      .map((assignment) => {
-        const assignmentId =
-          assignment.assignment_id ?? String(assignment.id ?? "").match(/(\d+)$/)?.[1] ?? assignment.id;
-
-        return {
-          id: `assignment-${assignmentId}`,
-          title: assignment.title,
-          date: assignment.start_at as string,
-          kind: "assignment" as const,
-          courseId: (() => {
-            const courseId = Number(assignment.context_code?.replace("course_", ""));
-            return Number.isFinite(courseId) ? courseId : undefined;
-          })(),
-          href: (() => {
-            const courseId = Number(assignment.context_code?.replace("course_", ""));
-            return Number.isFinite(courseId)
-              ? `/subjects/${courseId}/assignments/${assignmentId}`
-              : assignment.html_url;
-          })(),
-          contextName: formatSubjectName(assignment.context_name ?? "Unknown course"),
-          completed: assignment.workflow_state === "completed",
-        };
-      }),
-    ...calendarData.events
-      .filter((event) => event.start_at)
-      .map((event) => ({
-        id: `event-${event.id}`,
-        title: event.title,
-        date: event.start_at as string,
-        kind: "event" as const,
-        href: event.html_url,
-        contextName: formatSubjectName(event.context_name ?? "General"),
-        courseId: (() => {
-          const courseId = Number(event.context_code?.replace("course_", ""));
-          return Number.isFinite(courseId) ? courseId : undefined;
-        })(),
-        locationName: event.location_name,
-      })),
-  ].sort((left, right) => left.date.localeCompare(right.date));
+  return buildSharedCalendarEntries(calendarData).map((entry) => ({
+    ...entry,
+    contextName: formatSubjectName(entry.contextName),
+  }));
 }

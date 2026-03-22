@@ -6,10 +6,12 @@ import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getMonthLabel,
+  getWeekdayLabels,
   normalizeMonth,
   getSubjectColorPalette,
   formatSubjectName,
   DISPLAY_TIME_ZONE,
+  t,
 } from "@canvas/shared";
 import {
   AppScreen,
@@ -28,8 +30,6 @@ import { formatDateTime } from "../../src/lib/format";
 import { openAppHref } from "../../src/lib/navigation";
 import { syncDeviceIntegrations } from "../../src/lib/device-integration-sync";
 
-const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MOBILE_WEEK_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const ZONED_DAY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
   timeZone: DISPLAY_TIME_ZONE,
   year: "numeric",
@@ -37,13 +37,6 @@ const ZONED_DAY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
   weekday: "short",
 });
-const DAY_LABEL_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  timeZone: DISPLAY_TIME_ZONE,
-  weekday: "long",
-  month: "long",
-  day: "numeric",
-});
-
 type CalendarEntry = {
   id: string;
   title: string;
@@ -100,8 +93,13 @@ function getDayKey(value: string) {
   return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
 
-function getDayLabel(value: string) {
-  return DAY_LABEL_FORMATTER.format(new Date(value));
+function getDayLabel(value: string, locale = "en-US") {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: DISPLAY_TIME_ZONE,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(value));
 }
 
 export default function CalendarTab() {
@@ -109,12 +107,14 @@ export default function CalendarTab() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const { config } = useCanvasSession();
-  const { resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
+  const { resolvedLocale, resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getUTCMonth() + 1);
   const [currentYear, setCurrentYear] = useState(today.getUTCFullYear());
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const weekdayLabels = useMemo(() => getWeekdayLabels(resolvedLocale, "short"), [resolvedLocale]);
+  const mobileWeekdayLabels = useMemo(() => getWeekdayLabels(resolvedLocale, "narrow"), [resolvedLocale]);
 
   const { month, year } = useMemo(
     () => normalizeMonth(currentYear, currentMonth),
@@ -217,11 +217,11 @@ export default function CalendarTab() {
     return Array.from(entriesByDayKey.entries())
       .map(([key, dayEntries]) => ({
         key,
-        label: getDayLabel(dayEntries[0]?.date ?? key),
+        label: getDayLabel(dayEntries[0]?.date ?? key, resolvedLocale),
         entries: dayEntries,
       }))
       .sort((left, right) => left.key.localeCompare(right.key));
-  }, [entriesByDayKey]);
+  }, [entriesByDayKey, resolvedLocale]);
 
   const selectedCell = calendarCells.find((cell) => cell?.dayNumber === selectedDay) ?? null;
 
@@ -241,9 +241,9 @@ export default function CalendarTab() {
   const renderCalendarView = () => (
     <View style={styles.calendarWrapper}>
       <View style={styles.calendarGrid}>
-        {WEEK_DAYS.map((weekDay, index) => (
+        {weekdayLabels.map((weekDay, index) => (
           <Text key={weekDay} style={[styles.weekDayHeader, { color: colors.mutedForeground }]}>
-            {MOBILE_WEEK_DAYS[index]}
+            {mobileWeekdayLabels[index]}
           </Text>
         ))}
 
@@ -288,7 +288,7 @@ export default function CalendarTab() {
     if (groupedEntries.length === 0) {
       return (
         <View style={styles.emptyListContainer}>
-          <Text style={[styles.emptyText, { color: colors.muted }]}>No scheduled items found.</Text>
+          <Text style={[styles.emptyText, { color: colors.muted }]}>{t(resolvedLocale, "calendar.noScheduledItemsFound")}</Text>
         </View>
       );
     }
@@ -330,7 +330,7 @@ export default function CalendarTab() {
                       </Text>
                       {entry.completed && (
                         <View style={[styles.doneBadge, { borderColor: colors.border }]}>
-                          <Text style={[styles.doneBadgeText, { color: colors.foreground }]}>Done</Text>
+                          <Text style={[styles.doneBadgeText, { color: colors.foreground }]}>{t(resolvedLocale, "calendar.done")}</Text>
                         </View>
                       )}
                     </View>
@@ -340,7 +340,7 @@ export default function CalendarTab() {
                         {formatSubjectName(entry.contextName)}
                       </Text>
                     </View>
-                    <Text style={[styles.entryDate, { color: colors.muted }]}>{formatDateTime(entry.date)}</Text>
+                    <Text style={[styles.entryDate, { color: colors.muted }]}>{formatDateTime(resolvedLocale, entry.date)}</Text>
                   </View>
                 </Pressable>
               );
@@ -353,14 +353,14 @@ export default function CalendarTab() {
 
   const renderSidePanel = () => {
     const entriesToShow = selectedCell ? selectedCell.entries : visibleUpcomingEntries;
-    const title = selectedCell ? `Day ${selectedCell.dayNumber}` : "Upcoming";
-    const subtitle = selectedCell ? "Activities due on the selected day" : "Next assignments and events";
+    const title = selectedCell ? t(resolvedLocale, "calendar.dayTitle", { day: selectedCell.dayNumber }) : t(resolvedLocale, "calendar.upcoming");
+    const subtitle = selectedCell ? t(resolvedLocale, "calendar.selectedDayDescription") : t(resolvedLocale, "calendar.upcomingDescription");
 
     return (
       <SectionCard title={title}>
         <Text style={[styles.panelSubtitle, { color: colors.muted }]}>{subtitle}</Text>
         {entriesToShow.length === 0 ? (
-          <EmptyState label={selectedCell ? "No activities scheduled for this day." : "No upcoming items found."} />
+          <EmptyState label={selectedCell ? t(resolvedLocale, "calendar.noActivitiesForDay") : t(resolvedLocale, "calendar.noUpcomingItemsFound")} />
         ) : (
           entriesToShow.map((entry) => {
             const palette = getSubjectColorPalette(
@@ -394,7 +394,7 @@ export default function CalendarTab() {
                     </Text>
                     {entry.completed && (
                       <View style={[styles.doneBadge, { borderColor: colors.border }]}>
-                        <Text style={[styles.doneBadgeText, { color: colors.foreground }]}>Done</Text>
+                        <Text style={[styles.doneBadgeText, { color: colors.foreground }]}>{t(resolvedLocale, "calendar.done")}</Text>
                       </View>
                     )}
                   </View>
@@ -404,7 +404,7 @@ export default function CalendarTab() {
                       {formatSubjectName(entry.contextName)}
                     </Text>
                   </View>
-                  <Text style={[styles.entryDate, { color: colors.muted }]}>{formatDateTime(entry.date)}</Text>
+                  <Text style={[styles.entryDate, { color: colors.muted }]}>{formatDateTime(resolvedLocale, entry.date)}</Text>
                 </View>
               </Pressable>
             );
@@ -416,7 +416,7 @@ export default function CalendarTab() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen title="Calendar" scroll={false}>
+      <AppScreen title={t(resolvedLocale, "calendar.title")} scroll={false}>
         <RestorableScrollView 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 112 }]}
@@ -434,10 +434,10 @@ export default function CalendarTab() {
                 <View style={styles.cardHeaderRow}>
                   <View style={styles.titleSection}>
                     <Text style={[styles.monthLabel, { color: colors.foreground }]}>
-                      {getMonthLabel(year, month)}
+                      {getMonthLabel(year, month, resolvedLocale)}
                     </Text>
                     <Text style={[styles.scheduledItems, { color: colors.muted }]}>
-                      {visibleEntries.length} scheduled items
+                      {t(resolvedLocale, "calendar.scheduledItems", { count: visibleEntries.length })}
                     </Text>
                   </View>
                   <View style={styles.navButtons}>
@@ -476,7 +476,7 @@ export default function CalendarTab() {
                         { color: viewMode === "calendar" ? colors.primaryButtonText : colors.muted },
                       ]}
                     >
-                      Calendar
+                      {t(resolvedLocale, "calendar.viewCalendar")}
                     </Text>
                   </Pressable>
                   <Pressable
@@ -493,12 +493,12 @@ export default function CalendarTab() {
                     <Text
                       style={[styles.toggleText, { color: viewMode === "list" ? colors.primaryButtonText : colors.muted }]}
                     >
-                      List
+                      {t(resolvedLocale, "calendar.viewList")}
                     </Text>
                   </Pressable>
                 </View>
 
-                {showColdLoading ? <LoadingState label="Loading calendar..." /> : null}
+                {showColdLoading ? <LoadingState label={t(resolvedLocale, "common.loading")} /> : null}
                 {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
 
                 {data ? (

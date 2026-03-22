@@ -2,9 +2,6 @@ import type {
   CanvasAssignment,
   CanvasCourseContent,
   CanvasCourseGradeData,
-  CanvasCourseFile,
-  CanvasCourseUser,
-  CanvasDiscussionTopic,
   CanvasInboxData,
 } from "@/lib/canvas";
 import type { CalendarEntry } from "@/lib/calendar";
@@ -21,10 +18,7 @@ export type CanvasBootstrapData = {
   };
   courses: Record<string, {
     content: CanvasCourseContent;
-    files: CanvasCourseFile[];
-    forums: CanvasDiscussionTopic[];
     grades: CanvasCourseGradeData;
-    people: CanvasCourseUser[];
   }>;
   generatedAt: string;
   inbox: CanvasInboxData;

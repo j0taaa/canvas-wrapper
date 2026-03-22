@@ -4,6 +4,7 @@ import { DesktopSidebar, MobileBottomNav, SidebarActiveItem } from "./desktop-si
 type DesktopAppShellProps = {
   active?: SidebarActiveItem;
   children: ReactNode;
+  contentClassName?: string;
   profile?: {
     name: string;
     primary_email?: string;
@@ -16,12 +17,12 @@ type DesktopAppShellProps = {
   currentCourseId?: number;
 };
 
-export function DesktopAppShell({ active, children, profile, courses, currentCourseId }: DesktopAppShellProps) {
+export function DesktopAppShell({ active, children, contentClassName, profile, courses, currentCourseId }: DesktopAppShellProps) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="grid min-h-screen w-full md:grid-cols-[200px_minmax(0,1fr)]">
         <DesktopSidebar active={active} profile={profile} courses={courses} currentCourseId={currentCourseId} />
-        <main className="min-w-0 p-6 pb-32 md:pb-6">{children}</main>
+        <main className={contentClassName ? `min-w-0 ${contentClassName}` : "min-w-0 p-6 pb-32 md:pb-6"}>{children}</main>
       </div>
       <MobileBottomNav active={active} courses={courses} currentCourseId={currentCourseId} />
     </div>

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
+import { formatSubjectName, getSubjectColorPalette, t } from "@canvas/shared";
 import {
   AppScreen,
   EmptyState,
@@ -11,13 +12,28 @@ import {
 } from "../../src/components/app-ui";
 import { useRefreshControl } from "../../src/hooks/use-refresh-control";
 import { RestorableScrollView } from "../../src/components/restorable-scroll-view";
-import { useInbox } from "../../src/hooks/use-canvas-queries";
+import { useAppShell, useInbox } from "../../src/hooks/use-canvas-queries";
 import { formatDateTime } from "../../src/lib/format";
 import { useAppPreferences } from "../../src/providers/app-preferences";
 
+function resolveConversationPalette(
+  contextName: string | undefined,
+  courses: Array<{ id: number; name: string }> | undefined,
+  preferredColors: Record<number, string>,
+) {
+  const formattedContext = formatSubjectName(contextName ?? "").toLowerCase();
+  const matchedCourse = courses?.find((course) => {
+    const formattedCourseName = formatSubjectName(course.name).toLowerCase();
+    return formattedCourseName === formattedContext || course.name.toLowerCase() === (contextName ?? "").toLowerCase();
+  });
+
+  return getSubjectColorPalette(contextName ?? matchedCourse?.name, matchedCourse ? preferredColors[matchedCourse.id] : undefined);
+}
+
 export default function InboxTab() {
   const router = useRouter();
-  const { resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
+  const { resolvedLocale, resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
+  const { data: shellData } = useAppShell();
   const { data, error, isLoading, isFetching, refetch } = useInbox();
   const { onRefresh, refreshing } = useRefreshControl(refetch);
   const showColdLoading = isLoading && !data && !error;
@@ -56,75 +72,90 @@ export default function InboxTab() {
             {/* Header */}
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
               <View>
-                <Text style={[styles.title, { color: colors.foreground }]}>Inbox</Text>
+                <Text style={[styles.title, { color: colors.foreground }]}>{t(resolvedLocale, "inbox.title")}</Text>
               </View>
               {data ? (
                 <Text style={[styles.count, { color: colors.mutedForeground }]}>
-                  {data.conversations.length} conversations
+                  {t(resolvedLocale, "inbox.messageCount", { count: data.conversations.length })}
                 </Text>
               ) : null}
             </View>
 
-            {showColdLoading ? <LoadingState label="Loading inbox..." /> : null}
+            {showColdLoading ? <LoadingState label={`${t(resolvedLocale, "common.loading")} ${t(resolvedLocale, "inbox.title").toLowerCase()}...`} /> : null}
             {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             
             {data ? (
-              <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                {/* Card Header */}
-                <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>Messages</Text>
-                  <Text style={[styles.cardSubtitle, { color: colors.mutedForeground }]}>Most recent conversations first</Text>
-                </View>
+              <View style={styles.list}>
+                {data.conversations.length === 0 ? (
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                    {t(resolvedLocale, "inbox.empty")}
+                  </Text>
+                ) : (
+                  data.conversations.map((conversation) => (
+                    (() => {
+                      const palette = resolveConversationPalette(
+                        conversation.context_name,
+                        shellData?.courses,
+                        subjectPreferences.colors,
+                      );
 
-                {/* Card Content */}
-                <View style={styles.cardContent}>
-                  {data.conversations.length === 0 ? (
-                    <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                      No recent conversations found.
-                    </Text>
-                  ) : (
-                    data.conversations.map((conversation) => (
-                      <Pressable
-                        key={conversation.id}
-                        onPress={() => {
-                          triggerSelectionHaptic();
-                          router.push(`/inbox/${conversation.id}`);
-                        }}
-                        style={({ pressed }) => [
-                          styles.conversationItem,
-                          { borderColor: colors.border, backgroundColor: pressed ? colors.muted : colors.card },
-                        ]}
-                      >
-                        <View style={styles.conversationHeader}>
-                          <View style={styles.conversationInfo}>
-                            <Text style={[styles.conversationSubject, { color: colors.foreground }]} numberOfLines={1}>
-                              {conversation.subject || "No subject"}
-                            </Text>
-                            <Text style={[styles.conversationContext, { color: colors.mutedForeground }]}>
-                              {conversation.context_name ?? "Canvas"}
-                            </Text>
-                            <Text style={[styles.conversationPreview, { color: colors.foreground }]} numberOfLines={2}>
-                              {conversation.last_message ?? "No preview available."}
-                            </Text>
-                          </View>
-                          {conversation.workflow_state === "unread" && (
-                            <View style={[styles.unreadBadge, { borderColor: colors.border, backgroundColor: colors.unreadBadge }]}>
-                              <Text style={[styles.unreadText, { color: colors.foreground }]}>Unread</Text>
+                      return (
+                        <Pressable
+                          key={conversation.id}
+                          onPress={() => {
+                            triggerSelectionHaptic();
+                            router.push(`/inbox/${conversation.id}`);
+                          }}
+                          style={({ pressed }) => [
+                            styles.conversationItem,
+                            { borderColor: colors.border, backgroundColor: pressed ? colors.muted : colors.card },
+                          ]}
+                        >
+                          <View style={styles.conversationShell}>
+                            <View style={[styles.conversationAccent, { backgroundColor: palette.borderColor }]} />
+                            <View style={styles.conversationContent}>
+                              <View style={styles.conversationHeader}>
+                                <View style={styles.conversationInfo}>
+                                  <Text style={[styles.conversationSubject, { color: colors.foreground }]} numberOfLines={1}>
+                                    {conversation.subject || t(resolvedLocale, "inbox.noSubject")}
+                                  </Text>
+                                  <View style={styles.conversationContextRow}>
+                                    <View
+                                      style={[
+                                        styles.contextBadge,
+                                        { borderColor: palette.borderColor, backgroundColor: palette.backgroundColor },
+                                      ]}
+                                    >
+                                      <Text style={[styles.contextBadgeText, { color: palette.color }]} numberOfLines={1}>
+                                        {formatSubjectName(conversation.context_name ?? t(resolvedLocale, "common.canvas"))}
+                                      </Text>
+                                    </View>
+                                    {conversation.workflow_state === "unread" ? (
+                                      <View style={[styles.unreadBadge, { borderColor: colors.border, backgroundColor: colors.unreadBadge }]}>
+                                        <Text style={[styles.unreadText, { color: colors.foreground }]}>{t(resolvedLocale, "inbox.unread")}</Text>
+                                      </View>
+                                    ) : null}
+                                  </View>
+                                  <Text style={[styles.conversationPreview, { color: colors.foreground }]} numberOfLines={2}>
+                                    {conversation.last_message ?? t(resolvedLocale, "inbox.noPreview")}
+                                  </Text>
+                                </View>
+                              </View>
+                              <View style={styles.conversationMeta}>
+                                <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                                  {t(resolvedLocale, "inbox.messageCount", { count: conversation.message_count ?? 0 })}
+                                </Text>
+                                <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                                  {formatDateTime(resolvedLocale, conversation.last_message_at)}
+                                </Text>
+                              </View>
                             </View>
-                          )}
-                        </View>
-                        <View style={styles.conversationMeta}>
-                          <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-                            {conversation.message_count ?? 0} messages
-                          </Text>
-                          <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-                            {formatDateTime(conversation.last_message_at)}
-                          </Text>
-                        </View>
-                      </Pressable>
-                    ))
-                  )}
-                </View>
+                          </View>
+                        </Pressable>
+                      );
+                    })()
+                  ))
+                )}
               </View>
             ) : null}
           </View>
@@ -173,25 +204,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  cardHeader: {
-    padding: 16,
-    borderBottomWidth: 1,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 13,
-  },
-  cardContent: {
-    padding: 16,
+  list: {
     gap: 12,
   },
   emptyText: {
@@ -200,32 +213,57 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   conversationItem: {
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 16,
+    padding: 14,
+  },
+  conversationShell: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  conversationAccent: {
+    alignSelf: "stretch",
+    borderRadius: 999,
+    width: 4,
+  },
+  conversationContent: {
+    flex: 1,
     gap: 12,
   },
   conversationHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 12,
   },
   conversationInfo: {
     flex: 1,
-    gap: 4,
+    gap: 6,
+  },
+  conversationContextRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   conversationSubject: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 15,
+    fontWeight: "600",
   },
-  conversationContext: {
-    fontSize: 12,
+  contextBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    maxWidth: "100%",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  contextBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
   conversationPreview: {
     fontSize: 13,
-    marginTop: 4,
-    opacity: 0.8,
+    lineHeight: 18,
+    opacity: 0.82,
   },
   unreadBadge: {
     borderRadius: 999,

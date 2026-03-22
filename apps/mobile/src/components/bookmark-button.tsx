@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bookmark } from "lucide-react-native";
 import type { BookmarkItem } from "@canvas/shared";
@@ -35,6 +35,8 @@ export function BookmarkButton({
 
   return (
     <Pressable
+      accessibilityLabel={saved ? `Remove bookmark: ${bookmark.title}` : `Bookmark: ${bookmark.title}`}
+      accessibilityRole="button"
       onPress={() => {
         triggerSelectionHaptic();
         void toggleBookmark(bookmark).finally(() => {
@@ -52,9 +54,6 @@ export function BookmarkButton({
         fill={saved ? fillColor : "transparent"}
         size={18}
       />
-      <Text style={[styles.label, { color: saved ? textColor : mutedColor }]}>
-        {saved ? "Bookmarked" : "Bookmark"}
-      </Text>
     </Pressable>
   );
 }
@@ -64,15 +63,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 10,
     borderWidth: 1,
-    flexDirection: "row",
-    gap: 6,
+    height: 36,
     justifyContent: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: "500",
+    width: 36,
   },
   pressed: {
     opacity: 0.84,

@@ -5,6 +5,7 @@ import { BookOpenText, ChevronLeft } from "lucide-react-native";
 import {
   formatSubjectName,
   getSubjectColorPalette,
+  t,
 } from "@canvas/shared";
 import {
   AppScreen,
@@ -30,7 +31,7 @@ export default function PageDetailScreen() {
   const courseId = Number(params.courseId);
   const pageId = String(params.pageId);
   const { config } = useCanvasSession();
-  const { resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
+  const { resolvedLocale, resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
 
   const colors = useMemo(() => {
     const isDark = resolvedTheme === "dark";
@@ -61,7 +62,7 @@ export default function PageDetailScreen() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen scroll={false}>
+      <AppScreen contentStyle={styles.screenContent} scroll={false}>
         <RestorableScrollView 
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -73,23 +74,24 @@ export default function PageDetailScreen() {
           }
         >
           <View style={styles.container}>
-            {showColdLoading ? <LoadingState label="Loading page..." /> : null}
-            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             <SubjectLayoutHeader />
+            {showColdLoading ? <LoadingState label={t(resolvedLocale, "subjects.loadingPage")} /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             
             {course && page ? (
               <>
                 {/* Navigation Bar */}
                 <View style={styles.navBar}>
                   <Pressable
+                    accessibilityLabel={t(resolvedLocale, "subjects.backToSubject")}
+                    accessibilityRole="button"
                     onPress={() => {
                       triggerSelectionHaptic();
                       goBackOrPush(router, `/subjects/${courseId}`);
                     }}
-                    style={styles.backButton}
+                    style={[styles.backButton, { borderColor: colors.border }]}
                   >
                     <ChevronLeft size={20} color={colors.foreground} />
-                    <Text style={[styles.backText, { color: colors.foreground }]}>Back to subject</Text>
                   </Pressable>
                   {course && page ? (
                     <BookmarkButton
@@ -99,7 +101,7 @@ export default function PageDetailScreen() {
                         id: `page-${courseId}-${pageId}`,
                         kind: "page",
                         subjectName: course.name,
-                        title: page.title ?? "Untitled page",
+                        title: page.title ?? t(resolvedLocale, "subjects.untitledPage"),
                       }}
                       borderColor={colors.border}
                       fillColor={colors.foreground}
@@ -118,7 +120,7 @@ export default function PageDetailScreen() {
                       </View>
                       <View style={styles.headerText}>
                         <Text style={[styles.pageTitle, { color: colors.foreground }]} numberOfLines={2}>
-                          {page.title ?? "Untitled page"}
+                          {page.title ?? t(resolvedLocale, "subjects.untitledPage")}
                         </Text>
                         <Pressable onPress={() => goBackOrPush(router, `/subjects/${courseId}`)}>
                           <Text style={[styles.courseLink, { color: colors.mutedForeground }]}>
@@ -130,13 +132,13 @@ export default function PageDetailScreen() {
                     <View style={styles.badges}>
                       {page.front_page && (
                         <View style={[styles.badge, { borderColor: colors.border }]}>
-                          <Text style={[styles.badgeText, { color: colors.foreground }]}>Front page</Text>
+                          <Text style={[styles.badgeText, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.frontPage")}</Text>
                         </View>
                       )}
                       {page.updated_at && (
                         <View style={[styles.badge, { borderColor: colors.border }]}>
                           <Text style={[styles.badgeText, { color: colors.mutedForeground }]}>
-                            Updated {formatDueDateShort(page.updated_at)}
+                            {t(resolvedLocale, "common.updated")} {formatDueDateShort(resolvedLocale, page.updated_at)}
                           </Text>
                         </View>
                       )}
@@ -147,7 +149,7 @@ export default function PageDetailScreen() {
                 {/* Page Content Card */}
                 <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>Page content</Text>
+                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.pageContent")}</Text>
                   </View>
                   <View style={styles.cardContent}>
                     {page.body ? (
@@ -158,7 +160,7 @@ export default function PageDetailScreen() {
                         <PlaceholderBlock height={144} />
                       </>
                     ) : (
-                      <RichText currentCourseId={courseId} html="<p>No content available for this page.</p>" providerUrl={config?.apiBase} />
+                      <RichText currentCourseId={courseId} html={`<p>${t(resolvedLocale, "subjects.noPageContent")}</p>`} providerUrl={config?.apiBase} />
                     )}
                   </View>
                 </View>
@@ -172,9 +174,12 @@ export default function PageDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    padding: 0,
+  },
   container: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     gap: 12,
   },
   navBar: {
@@ -184,13 +189,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   backButton: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 8,
-  },
-  backText: {
-    fontSize: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
   },
   headerCard: {
     borderRadius: 16,
@@ -198,8 +202,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   headerTop: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     borderBottomWidth: 1,
   },
   headerContent: {
@@ -248,7 +252,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cardHeader: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
@@ -257,6 +261,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   cardContent: {
-    padding: 16,
+    padding: 14,
   },
 });

@@ -6,6 +6,7 @@ import {
   getSharedActiveCourses,
   formatSubjectName,
   getSubjectColorPalette,
+  t,
 } from "@canvas/shared";
 import {
   AppScreen,
@@ -33,13 +34,13 @@ function getInitials(name: string) {
     .join("");
 }
 
-function formatEnrollmentType(value?: string) {
-  if (!value) return "Course member";
+function formatEnrollmentType(locale: "en" | "pt-BR", value?: string) {
+  if (!value) return t(locale, "profile.courseMember");
   return value.replace(/Enrollment$/, "").replace(/([a-z])([A-Z])/g, "$1 $2").trim();
 }
 
-function formatEnrollmentState(value?: string) {
-  if (!value) return "Unknown";
+function formatEnrollmentState(locale: "en" | "pt-BR", value?: string) {
+  if (!value) return t(locale, "common.unknown");
   return value.charAt(0).toUpperCase() + value.slice(1).replace(/[_-]+/g, " ");
 }
 
@@ -49,7 +50,7 @@ export default function PersonDetailScreen() {
   const courseId = Number(params.courseId);
   const personId = Number(params.personId);
   const { config } = useCanvasSession();
-  const { resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
+  const { resolvedLocale, resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
 
   const colors = useMemo(() => {
     const isDark = resolvedTheme === "dark";
@@ -79,7 +80,7 @@ export default function PersonDetailScreen() {
   }, [course]);
 
   const primaryEnrollment = person?.enrollments?.[0];
-  const enrollmentType = formatEnrollmentType(primaryEnrollment?.type ?? primaryEnrollment?.role);
+  const enrollmentType = formatEnrollmentType(resolvedLocale, primaryEnrollment?.type ?? primaryEnrollment?.role);
   const enrollmentState = primaryEnrollment?.enrollment_state;
 
   const getRoleBadgeColors = (value?: string) => {
@@ -105,7 +106,7 @@ export default function PersonDetailScreen() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen scroll={false}>
+      <AppScreen contentStyle={styles.screenContent} scroll={false}>
         <RestorableScrollView 
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -117,23 +118,24 @@ export default function PersonDetailScreen() {
           }
         >
           <View style={styles.container}>
-            {showColdLoading ? <LoadingState label="Loading person..." /> : null}
-            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             <SubjectLayoutHeader />
+            {showColdLoading ? <LoadingState label={t(resolvedLocale, "profile.loadingPerson")} /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             
             {course && person ? (
               <>
                 {/* Navigation Bar */}
                 <View style={styles.navBar}>
                   <Pressable
+                    accessibilityLabel={t(resolvedLocale, "subjects.backToPeople")}
+                    accessibilityRole="button"
                     onPress={() => {
                       triggerSelectionHaptic();
                       goBackOrPush(router, `/subjects/${courseId}?tab=people`);
                     }}
-                    style={styles.backButton}
+                    style={[styles.backButton, { borderColor: colors.border }]}
                   >
                     <ChevronLeft size={20} color={colors.foreground} />
-                    <Text style={[styles.backText, { color: colors.foreground }]}>Back to people</Text>
                   </Pressable>
                 </View>
 
@@ -169,7 +171,7 @@ export default function PersonDetailScreen() {
                       {enrollmentState && (
                         <View style={[styles.badge, { borderColor: statusColors.border, backgroundColor: statusColors.bg }]}>
                           <Text style={[styles.badgeText, { color: statusColors.text }]}>
-                            {formatEnrollmentState(enrollmentState)}
+                            {formatEnrollmentState(resolvedLocale, enrollmentState)}
                           </Text>
                         </View>
                       )}
@@ -180,23 +182,23 @@ export default function PersonDetailScreen() {
                 {/* Profile Card */}
                 <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>Profile</Text>
+                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t(resolvedLocale, "common.profile")}</Text>
                     <Text style={[styles.cardSubtitle, { color: colors.mutedForeground }]}>
-                      Information available from the Canvas course user record
+                      {t(resolvedLocale, "profile.informationFromCanvas")}
                     </Text>
                   </View>
                   <View style={styles.cardContent}>
                     <View style={[styles.infoItem, { borderColor: colors.border }]}>
-                      <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>Name</Text>
+                      <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.name")}</Text>
                       <Text style={[styles.infoValue, { color: colors.foreground }]}>{person.name}</Text>
                     </View>
                     <View style={[styles.infoItem, { borderColor: colors.border }]}>
-                      <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>Canvas user ID</Text>
+                      <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.canvasUserId")}</Text>
                       <Text style={[styles.infoValue, { color: colors.foreground }]}>{person.id}</Text>
                     </View>
                     {person.sis_user_id && (
                       <View style={[styles.infoItem, { borderColor: colors.border }]}>
-                        <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>Email</Text>
+                        <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.email")}</Text>
                         <View style={styles.emailRow}>
                           <Mail size={16} color={colors.foreground} />
                           <Text style={[styles.infoValue, { color: colors.foreground }]} numberOfLines={1}>
@@ -207,9 +209,9 @@ export default function PersonDetailScreen() {
                     )}
                     {person.created_at && (
                       <View style={[styles.infoItem, { borderColor: colors.border }]}>
-                        <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>Canvas account created</Text>
+                        <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "profile.canvasAccountCreated")}</Text>
                         <Text style={[styles.infoValue, { color: colors.foreground }]}>
-                          {formatDueDateShort(person.created_at)}
+                          {formatDueDateShort(resolvedLocale, person.created_at)}
                         </Text>
                       </View>
                     )}
@@ -219,9 +221,9 @@ export default function PersonDetailScreen() {
                 {/* Shared Subjects Card */}
                 <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>Shared active subjects</Text>
+                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t(resolvedLocale, "profile.sharedActiveSubjects")}</Text>
                     <Text style={[styles.cardSubtitle, { color: colors.mutedForeground }]}>
-                      Active subjects that both you and this person are currently taking
+                      {t(resolvedLocale, "profile.sharedActiveSubjectsDescription")}
                     </Text>
                   </View>
                   <View style={styles.cardContent}>
@@ -229,6 +231,7 @@ export default function PersonDetailScreen() {
                       courseId={courseId} 
                       personId={personId} 
                       colors={colors} 
+                      locale={resolvedLocale}
                       router={router}
                     />
                   </View>
@@ -246,11 +249,13 @@ function SharedCoursesList({
   courseId, 
   personId, 
   colors, 
+  locale,
   router 
 }: { 
   courseId: number; 
   personId: number; 
   colors: any;
+  locale: "en" | "pt-BR";
   router: any;
 }) {
   const { data: shellData } = useCourseShell(courseId);
@@ -278,7 +283,7 @@ function SharedCoursesList({
   if (sharedCourses.length === 0) {
     return (
       <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-        No shared active subjects were found.
+        {t(locale, "profile.noSharedActiveSubjects")}
       </Text>
     );
   }
@@ -297,7 +302,7 @@ function SharedCoursesList({
               {formatSubjectName(sharedCourse.name)}
             </Text>
             <Text style={[styles.sharedCourseCode, { color: colors.mutedForeground }]} numberOfLines={1}>
-              {sharedCourse.course_code ?? "Active subject"}
+              {sharedCourse.course_code ?? t(locale, "common.activeSubject")}
             </Text>
           </Pressable>
         );
@@ -307,9 +312,12 @@ function SharedCoursesList({
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    padding: 0,
+  },
   container: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     gap: 12,
   },
   navBar: {
@@ -318,13 +326,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   backButton: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 8,
-  },
-  backText: {
-    fontSize: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
   },
   headerCard: {
     borderRadius: 16,
@@ -332,8 +339,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   headerTop: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     borderBottomWidth: 1,
   },
   headerContent: {
@@ -375,7 +382,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cardHeader: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
@@ -388,7 +395,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   cardContent: {
-    padding: 16,
+    padding: 14,
     gap: 10,
   },
   infoItem: {

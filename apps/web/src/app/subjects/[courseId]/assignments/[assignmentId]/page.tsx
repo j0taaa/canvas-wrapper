@@ -2,12 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { CalendarClock, ClipboardCheck, LockKeyhole, Send, Trophy } from "lucide-react";
+import { t, type AppLocale } from "@canvas/shared";
 import { BookmarkButton } from "@/components/bookmark-button";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAssignmentDetails, getSubjectShellData } from "@/lib/canvas";
+import { getRequestLocale } from "@/lib/request-locale";
 import { formatDueDateShort, formatSubjectName, getSubjectColorStyle, rewriteCanvasHtmlLinks } from "@/lib/utils";
 import { AssignmentSubmissionForm } from "./submission-form";
 
@@ -17,13 +19,13 @@ function isCompletedAssignment(workflowState?: string, excused?: boolean) {
   return excused || ["submitted", "graded", "pending_review", "complete"].includes(workflowState ?? "");
 }
 
-function formatSubmissionStatus(workflowState?: string, excused?: boolean) {
+function formatSubmissionStatus(locale: AppLocale, workflowState?: string, excused?: boolean) {
   if (excused) {
-    return "Excused";
+    return t(locale, "subjects.excused");
   }
 
   if (!workflowState) {
-    return "Not submitted";
+    return t(locale, "subjects.notSubmitted");
   }
 
   return workflowState
@@ -34,33 +36,33 @@ function formatSubmissionStatus(workflowState?: string, excused?: boolean) {
     .join(" ");
 }
 
-function formatSubmissionTypes(submissionTypes: string[]) {
+function formatSubmissionTypes(locale: AppLocale, submissionTypes: string[]) {
   if (submissionTypes.length === 0) {
-    return "Not specified";
+    return t(locale, "subjects.notSpecified");
   }
 
   const labels = submissionTypes.map((submissionType) => {
     switch (submissionType) {
       case "online_upload":
-        return "File upload";
+        return t(locale, "subjects.fileUpload");
       case "online_text_entry":
-        return "Text entry";
+        return t(locale, "subjects.textEntry");
       case "online_url":
-        return "Website URL";
+        return t(locale, "subjects.websiteUrl");
       case "online_quiz":
-        return "Quiz";
+        return t(locale, "bookmarks.quiz");
       case "discussion_topic":
-        return "Discussion";
+        return t(locale, "subjects.discussion");
       case "media_recording":
-        return "Media recording";
+        return t(locale, "subjects.mediaRecording");
       case "student_annotation":
-        return "Student annotation";
+        return t(locale, "subjects.studentAnnotation");
       case "external_tool":
-        return "External tool";
+        return t(locale, "subjects.externalTool");
       case "none":
-        return "No submission";
+        return t(locale, "subjects.noSubmission");
       case "on_paper":
-        return "On paper";
+        return t(locale, "subjects.onPaper");
       default:
         return submissionType
           .replace(/[_-]+/g, " ")
@@ -82,6 +84,7 @@ export default async function AssignmentPage({
   const { courseId, assignmentId } = await params;
   const parsedCourseId = Number(courseId);
   const parsedAssignmentId = Number(assignmentId);
+  const { resolvedLocale } = await getRequestLocale();
 
   if (!Number.isFinite(parsedCourseId) || !Number.isFinite(parsedAssignmentId)) {
     notFound();
@@ -111,15 +114,20 @@ export default async function AssignmentPage({
     submissionTypes.includes("online_url") ||
     submissionTypes.includes("online_upload");
   const isCompleted = isCompletedAssignment(assignment.submission?.workflow_state, assignment.submission?.excused);
-  const submissionStatus = formatSubmissionStatus(assignment.submission?.workflow_state, assignment.submission?.excused);
+  const submissionStatus = formatSubmissionStatus(resolvedLocale, assignment.submission?.workflow_state, assignment.submission?.excused);
   const renderedDescription = rewriteCanvasHtmlLinks(
-    assignment.description || "<p>No assignment description available.</p>",
+    assignment.description || `<p>${t(resolvedLocale, "subjects.noAssignmentDescription")}</p>`,
     courseShellData.apiBase,
     parsedCourseId,
   );
 
   return (
-    <DesktopAppShell profile={courseShellData.profile} courses={courseShellData.courses} currentCourseId={parsedCourseId}>
+    <DesktopAppShell
+      profile={courseShellData.profile}
+      courses={courseShellData.courses}
+      currentCourseId={parsedCourseId}
+      contentClassName="p-4 pb-32 md:p-5 md:pb-6"
+    >
       <div className="w-full">
         <div className="mb-4 flex items-center justify-between gap-3">
           <HistoryBackButton fallbackHref={`/subjects/${parsedCourseId}`} />
@@ -136,7 +144,7 @@ export default async function AssignmentPage({
         </div>
 
         <div className="mb-6 overflow-hidden rounded-2xl border border-black/15 bg-gradient-to-br from-white via-white to-black/[0.03]">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-5 py-5 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-5">
             <div className="min-w-0">
               <div className="mb-3 flex items-center gap-3">
                 <span
@@ -161,17 +169,17 @@ export default async function AssignmentPage({
             <div className="flex flex-wrap items-center gap-2">
               {isCompleted && (
                 <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">
-                  Done
+                  {t(resolvedLocale, "calendar.done")}
                 </Badge>
               )}
               {assignment.points_possible != null && (
                 <Badge variant="outline" className="border-black/25 bg-white/80 text-black/70">
-                  {assignment.points_possible} points
+                  {t(resolvedLocale, "subjects.points", { count: assignment.points_possible })}
                 </Badge>
               )}
               {assignment.due_at && (
                 <Badge variant="outline" className="border-black/25 bg-white/80 text-black/70">
-                  Due {formatDueDateShort(assignment.due_at)}
+                  {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
                 </Badge>
               )}
             </div>
@@ -179,9 +187,9 @@ export default async function AssignmentPage({
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <Card className="border-black/15 bg-white/90">
+          <Card size="sm" className="border-black/15 bg-white/90">
             <CardHeader className="border-b border-black/10">
-              <CardTitle>Details</CardTitle>
+              <CardTitle>{t(resolvedLocale, "subjects.details")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div
@@ -190,15 +198,15 @@ export default async function AssignmentPage({
               />
               {assignment.html_url && (
                 <Link href={assignment.html_url} target="_blank" className="inline-flex text-sm text-black/60 underline-offset-4 hover:underline">
-                  Open in Canvas
+                  {t(resolvedLocale, "subjects.openInCanvas")}
                 </Link>
               )}
             </CardContent>
           </Card>
 
-          <Card className="border-black/15 bg-white/90">
+          <Card size="sm" className="border-black/15 bg-white/90">
             <CardHeader className="border-b border-black/10">
-              <CardTitle>Submission</CardTitle>
+              <CardTitle>{t(resolvedLocale, "subjects.submission")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-xl border border-black/10 bg-black/[0.015] p-4">
@@ -209,8 +217,8 @@ export default async function AssignmentPage({
                         <Send className="h-4 w-4" />
                       </span>
                       <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-sky-700/75">Submitting</p>
-                        <p className="mt-1 font-medium text-sky-950">{formatSubmissionTypes(submissionTypes)}</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-sky-700/75">{t(resolvedLocale, "subjects.submitting")}</p>
+                        <p className="mt-1 font-medium text-sky-950">{formatSubmissionTypes(resolvedLocale, submissionTypes)}</p>
                       </div>
                     </div>
                   </div>
@@ -220,12 +228,14 @@ export default async function AssignmentPage({
                         <CalendarClock className="h-4 w-4" />
                       </span>
                       <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-amber-700/75">Available</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-amber-700/75">{t(resolvedLocale, "subjects.available")}</p>
                         <p className="mt-1 font-medium text-amber-950">
-                          {assignment.unlock_at ? formatDueDateShort(assignment.unlock_at) : "Now"}
+                          {assignment.unlock_at ? formatDueDateShort(resolvedLocale, assignment.unlock_at) : t(resolvedLocale, "subjects.now")}
                         </p>
                         <p className="mt-1 text-xs text-amber-900/65">
-                          until {assignment.lock_at ? formatDueDateShort(assignment.lock_at) : "No lock date"}
+                          {t(resolvedLocale, "subjects.until", {
+                            value: assignment.lock_at ? formatDueDateShort(resolvedLocale, assignment.lock_at) : t(resolvedLocale, "subjects.noLockDate"),
+                          })}
                         </p>
                       </div>
                     </div>
@@ -236,26 +246,26 @@ export default async function AssignmentPage({
                         <Trophy className="h-4 w-4" />
                       </span>
                       <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700/75">Status</p>
-                        <p className="mt-1 text-xl font-semibold text-emerald-950">{isCompleted ? "Submitted" : submissionStatus}</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700/75">{t(resolvedLocale, "subjects.status")}</p>
+                        <p className="mt-1 text-xl font-semibold text-emerald-950">{isCompleted ? t(resolvedLocale, "subjects.submitted") : submissionStatus}</p>
                       </div>
                     </div>
                   </div>
                   <div className="rounded-xl border border-black/10 bg-white/80 p-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-black/45">Submitted at</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-black/45">{t(resolvedLocale, "subjects.submittedAt")}</p>
                     <p className="mt-1 font-medium text-black/85">
-                      {assignment.submission?.submitted_at ? formatDueDateShort(assignment.submission.submitted_at) : "Not submitted yet"}
+                      {assignment.submission?.submitted_at ? formatDueDateShort(resolvedLocale, assignment.submission.submitted_at) : t(resolvedLocale, "subjects.notSubmittedYet")}
                     </p>
                   </div>
                   {assignment.submission?.grade && (
                     <div className="rounded-xl border border-black/10 bg-white/80 p-3">
-                      <p className="text-xs font-medium uppercase tracking-wide text-black/45">Grade</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-black/45">{t(resolvedLocale, "subjects.grade")}</p>
                       <p className="mt-1 font-medium text-black/85">{assignment.submission.grade}</p>
                     </div>
                   )}
                   {assignment.allowed_attempts != null && assignment.allowed_attempts > 0 && (
                     <div className="rounded-xl border border-black/10 bg-white/80 p-3">
-                      <p className="text-xs font-medium uppercase tracking-wide text-black/45">Attempts allowed</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-black/45">{t(resolvedLocale, "subjects.attemptsAllowed")}</p>
                       <p className="mt-1 font-medium text-black/85">{assignment.allowed_attempts}</p>
                     </div>
                   )}
@@ -266,8 +276,8 @@ export default async function AssignmentPage({
                           <LockKeyhole className="h-4 w-4" />
                         </span>
                         <div>
-                          <p className="text-xs font-medium uppercase tracking-wide text-rose-700/75">Access</p>
-                          <p className="mt-1 font-medium text-rose-950">Locked for you</p>
+                          <p className="text-xs font-medium uppercase tracking-wide text-rose-700/75">{t(resolvedLocale, "subjects.access")}</p>
+                          <p className="mt-1 font-medium text-rose-950">{t(resolvedLocale, "subjects.lockedForYou")}</p>
                         </div>
                       </div>
                     </div>
@@ -286,9 +296,9 @@ export default async function AssignmentPage({
                   submissionTypes={submissionTypes}
                 />
               ) : submissionTypes.includes("online_quiz") ? (
-                <p className="text-sm text-black/70">This assignment is a quiz. Quiz content can be opened from module quiz items.</p>
+                <p className="text-sm text-black/70">{t(resolvedLocale, "subjects.assignmentIsQuiz")}</p>
               ) : (
-                <p className="text-sm text-black/70">This assignment type can’t be submitted directly here yet.</p>
+                <p className="text-sm text-black/70">{t(resolvedLocale, "subjects.assignmentUnsupportedSubmission")}</p>
               )}
             </CardContent>
           </Card>

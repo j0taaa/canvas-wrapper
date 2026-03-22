@@ -3,7 +3,9 @@
 import { useMemo } from "react";
 import { useParams } from "next/navigation";
 import { CalendarClock, ClipboardCheck, LockKeyhole, Send, Trophy } from "lucide-react";
+import { t } from "@canvas/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLocale } from "@/components/locale-provider";
 import {
   HeaderBadge,
   LoadingInfoCard,
@@ -13,6 +15,7 @@ import {
 import { formatDueDateShort } from "@/lib/utils";
 
 export default function AssignmentLoading() {
+  const { resolvedLocale } = useLocale();
   const params = useParams<{ courseId: string; assignmentId: string }>();
   const courseId = Number(params.courseId);
   const assignmentId = Number(params.assignmentId);
@@ -29,24 +32,24 @@ export default function AssignmentLoading() {
     <SubjectLoadingShell
       courseId={courseId}
       backHref={`/subjects/${courseId}`}
-      title={assignment?.name ?? "Loading assignment"}
+      title={assignment?.name ?? t(resolvedLocale, "subjects.loadingAssignment")}
       icon={ClipboardCheck}
       badges={
         <>
-          {assignment?.points_possible != null && <HeaderBadge>{assignment.points_possible} points</HeaderBadge>}
-          {assignment?.due_at && <HeaderBadge>Due {formatDueDateShort(assignment.due_at)}</HeaderBadge>}
+          {assignment?.points_possible != null && <HeaderBadge>{t(resolvedLocale, "subjects.points", { count: assignment.points_possible })}</HeaderBadge>}
+          {assignment?.due_at && <HeaderBadge>{t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}</HeaderBadge>}
         </>
       }
     >
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <Card className="border-black/15 bg-white/90 dark:border-white/12 dark:bg-card/90">
           <CardHeader className="border-b border-black/10 dark:border-white/10">
-            <CardTitle>Details</CardTitle>
+            <CardTitle>{t(resolvedLocale, "subjects.details")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <LoadingInfoCard
-              title="Using prefetched subject data"
-              description="The subject shell is already restored. The full assignment body and latest submission state are being refreshed now."
+              title={t(resolvedLocale, "subjects.loadingAssignment")}
+              description={t(resolvedLocale, "subjects.details")}
             />
             <div className="h-24 rounded-xl border border-black/10 bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03]" />
             <div className="h-24 rounded-xl border border-black/10 bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03]" />
@@ -55,7 +58,7 @@ export default function AssignmentLoading() {
 
         <Card className="border-black/15 bg-white/90 dark:border-white/12 dark:bg-card/90">
           <CardHeader className="border-b border-black/10 dark:border-white/10">
-            <CardTitle>Submission</CardTitle>
+            <CardTitle>{t(resolvedLocale, "subjects.submission")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-xl border border-black/10 bg-black/[0.015] p-4 dark:border-white/10 dark:bg-white/[0.03]">
@@ -66,9 +69,9 @@ export default function AssignmentLoading() {
                       <Send className="h-4 w-4" />
                     </span>
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-sky-700/75 dark:text-sky-300/80">Submitting</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-sky-700/75 dark:text-sky-300/80">{t(resolvedLocale, "subjects.submitting")}</p>
                       <p className="mt-1 font-medium text-sky-950 dark:text-sky-100">
-                        {assignment?.submission_types?.length ? assignment.submission_types.join(", ") : "Loading method"}
+                        {assignment?.submission_types?.length ? assignment.submission_types.join(", ") : t(resolvedLocale, "subjects.loadingAssignment")}
                       </p>
                     </div>
                   </div>
@@ -79,8 +82,8 @@ export default function AssignmentLoading() {
                       <CalendarClock className="h-4 w-4" />
                     </span>
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-amber-700/75 dark:text-amber-300/80">Available</p>
-                      <p className="mt-1 font-medium text-amber-950 dark:text-amber-100">Refreshing</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-amber-700/75 dark:text-amber-300/80">{t(resolvedLocale, "subjects.available")}</p>
+                      <p className="mt-1 font-medium text-amber-950 dark:text-amber-100">{t(resolvedLocale, "common.loading")}</p>
                     </div>
                   </div>
                 </div>
@@ -90,8 +93,8 @@ export default function AssignmentLoading() {
                       <Trophy className="h-4 w-4" />
                     </span>
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-emerald-700/75 dark:text-emerald-300/80">Status</p>
-                      <p className="mt-1 font-medium text-emerald-950 dark:text-emerald-100">Loading submission</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-emerald-700/75 dark:text-emerald-300/80">{t(resolvedLocale, "subjects.status")}</p>
+                      <p className="mt-1 font-medium text-emerald-950 dark:text-emerald-100">{t(resolvedLocale, "subjects.loadingAssignment")}</p>
                     </div>
                   </div>
                 </div>
@@ -101,8 +104,8 @@ export default function AssignmentLoading() {
                       <LockKeyhole className="h-4 w-4" />
                     </span>
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-rose-700/75 dark:text-rose-300/80">Access</p>
-                      <p className="mt-1 font-medium text-rose-950 dark:text-rose-100">Checking</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-rose-700/75 dark:text-rose-300/80">{t(resolvedLocale, "subjects.access")}</p>
+                      <p className="mt-1 font-medium text-rose-950 dark:text-rose-100">{t(resolvedLocale, "common.loading")}</p>
                     </div>
                   </div>
                 </div>

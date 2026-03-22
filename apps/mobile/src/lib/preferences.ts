@@ -1,16 +1,20 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  DEFAULT_LANGUAGE_PREFERENCE,
   DEFAULT_DEVICE_INTEGRATION_PREFERENCES,
   DEFAULT_SUBJECT_PREFERENCES,
   DEFAULT_THEME_PREFERENCE,
   DEVICE_INTEGRATION_PREFERENCES_STORAGE_KEY,
   HAPTICS_PREFERENCE_STORAGE_KEY,
+  LANGUAGE_PREFERENCE_STORAGE_KEY,
   SUBJECT_PREFERENCES_STORAGE_KEY,
   THEME_PREFERENCE_STORAGE_KEY,
   parseDeviceIntegrationPreferences,
   parseHapticsEnabled,
+  parseLanguagePreference,
   parseSubjectPreferences,
   parseThemePreference,
+  type LanguagePreference,
   type DeviceIntegrationPreferences,
   type SubjectPreferences,
   type ThemePreference,
@@ -18,6 +22,14 @@ import {
 
 export async function readThemePreference() {
   return parseThemePreference(await AsyncStorage.getItem(THEME_PREFERENCE_STORAGE_KEY));
+}
+
+export async function readLanguagePreference() {
+  return parseLanguagePreference(await AsyncStorage.getItem(LANGUAGE_PREFERENCE_STORAGE_KEY));
+}
+
+export async function writeLanguagePreference(preference: LanguagePreference) {
+  await AsyncStorage.setItem(LANGUAGE_PREFERENCE_STORAGE_KEY, preference);
 }
 
 export async function writeThemePreference(preference: ThemePreference) {
@@ -49,8 +61,9 @@ export async function writeDeviceIntegrationPreferences(preferences: DeviceInteg
 }
 
 export async function readAllPreferences() {
-  const [themePreference, hapticsEnabled, subjectPreferences, deviceIntegrationPreferences] = await Promise.all([
+  const [themePreference, languagePreference, hapticsEnabled, subjectPreferences, deviceIntegrationPreferences] = await Promise.all([
     readThemePreference(),
+    readLanguagePreference(),
     readHapticsPreference(),
     readSubjectPreferences(),
     readDeviceIntegrationPreferences(),
@@ -59,11 +72,13 @@ export async function readAllPreferences() {
   return {
     deviceIntegrationPreferences,
     hapticsEnabled,
+    languagePreference,
     subjectPreferences,
     themePreference,
   };
 }
 
 export const MOBILE_DEFAULT_THEME_PREFERENCE = DEFAULT_THEME_PREFERENCE;
+export const MOBILE_DEFAULT_LANGUAGE_PREFERENCE = DEFAULT_LANGUAGE_PREFERENCE;
 export const MOBILE_DEFAULT_SUBJECT_PREFERENCES = DEFAULT_SUBJECT_PREFERENCES;
 export const MOBILE_DEFAULT_DEVICE_INTEGRATION_PREFERENCES = DEFAULT_DEVICE_INTEGRATION_PREFERENCES;

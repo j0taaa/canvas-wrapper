@@ -21,10 +21,13 @@ import {
   UserRound,
 } from "lucide-react-native";
 import {
+  getLocaleDisplayName,
+  t,
   formatSubjectName,
   getSubjectColorHex,
   getSubjectColorPalette,
   orderSubjectsByPreference,
+  type LanguagePreference,
   type ThemePreference,
 } from "@canvas/shared";
 import {
@@ -40,7 +43,7 @@ import { syncDeviceIntegrations } from "../../src/lib/device-integration-sync";
 import { formatDateTime } from "../../src/lib/format";
 import { useAppPreferences } from "../../src/providers/app-preferences";
 import { useCanvasSession } from "../../src/providers/canvas-session";
-import { useDeviceIntegrations } from "../../src/providers/device-integrations";
+import { DeviceIntegrationProvider, useDeviceIntegrations } from "../../src/providers/device-integrations";
 
 function getInitials(name: string) {
   return name
@@ -56,17 +59,35 @@ const themeOptions: Array<{
   label: string;
   value: ThemePreference;
 }> = [
-  { icon: MonitorCog, label: "System", value: "system" },
-  { icon: SunMedium, label: "Light", value: "light" },
-  { icon: MoonStar, label: "Dark", value: "dark" },
+  { icon: MonitorCog, label: "settings.systemTheme", value: "system" },
+  { icon: SunMedium, label: "settings.light", value: "light" },
+  { icon: MoonStar, label: "settings.dark", value: "dark" },
 ];
 
+const languageOptions: LanguagePreference[] = ["system", "en", "pt-BR"];
+
 export default function ProfileTab() {
+  return (
+    <DeviceIntegrationProvider>
+      <ProfileTabContent />
+    </DeviceIntegrationProvider>
+  );
+}
+
+function ProfileTabContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const { config } = useCanvasSession();
-  const { resolvedTheme, subjectPreferences, themePreference, triggerSelectionHaptic } = useAppPreferences();
+  const {
+    languagePreference,
+    resolvedLocale,
+    resolvedTheme,
+    subjectPreferences,
+    themePreference,
+    triggerSelectionHaptic,
+    updateLanguagePreference,
+  } = useAppPreferences();
   const deviceIntegrations = useDeviceIntegrations();
 
   const colors = useMemo(
@@ -113,10 +134,10 @@ export default function ProfileTab() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen title="Profile" scroll={false}>
+      <AppScreen title={t(resolvedLocale, "common.profile")} scroll={false}>
         <RestorableScrollView 
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 112 }]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 72 }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -126,7 +147,7 @@ export default function ProfileTab() {
           }
         >
           <View style={styles.container}>
-            {showColdLoading ? <LoadingState label="Loading profile..." /> : null}
+            {showColdLoading ? <LoadingState label={t(resolvedLocale, "profile.loadingProfile")} /> : null}
             {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
 
             {data ? (
@@ -134,8 +155,8 @@ export default function ProfileTab() {
                 {/* Account Card */}
                 <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   {/* CardHeader border-b border-border/70 */}
-                  <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>Account</Text>
+                    <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
+                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t(resolvedLocale, "common.account")}</Text>
                   </View>
                   
                   {/* CardContent pt-6 space-y-5 */}
@@ -168,7 +189,7 @@ export default function ProfileTab() {
                         {/* mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground */}
                         <View style={styles.infoCardHeader}>
                           <UserRound size={16} color={colors.mutedForeground} />
-                          <Text style={[styles.infoCardLabel, { color: colors.mutedForeground }]}>Name</Text>
+                          <Text style={[styles.infoCardLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.name")}</Text>
                         </View>
                         {/* text-sm text-foreground */}
                         <Text style={[styles.infoCardValue, { color: colors.foreground }]} numberOfLines={1}>
@@ -179,10 +200,10 @@ export default function ProfileTab() {
                       <View style={[styles.infoCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
                         <View style={styles.infoCardHeader}>
                           <Mail size={16} color={colors.mutedForeground} />
-                          <Text style={[styles.infoCardLabel, { color: colors.mutedForeground }]}>Email</Text>
+                          <Text style={[styles.infoCardLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.email")}</Text>
                         </View>
                         <Text style={[styles.infoCardValue, { color: colors.foreground }]} numberOfLines={1}>
-                          {data.profile.primary_email ?? "No email available"}
+                          {data.profile.primary_email ?? t(resolvedLocale, "common.noEmailAvailable")}
                         </Text>
                       </View>
                     </View>
@@ -194,28 +215,21 @@ export default function ProfileTab() {
                         router.push("/settings");
                       }}
                     >
-                      <Text style={[styles.changeKeyText, { color: colors.mutedForeground }]}>Change API key</Text>
+                      <Text style={[styles.changeKeyText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.changeApiKey")}</Text>
                     </Pressable>
                   </View>
                 </View>
 
-                {/* Configurations Card */}
-                <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>Configurations</Text>
-                  </View>
-                  
-                  <View style={styles.cardContent}>
-                    {/* ProfilePreferences - space-y-6 */}
-                    <ProfilePreferences
-                      deviceIntegrations={deviceIntegrations}
-                      courses={orderedCourses}
-                      colors={colors}
-                      subjectPreferences={subjectPreferences}
-                      themePreference={themePreference}
-                    />
-                  </View>
-                </View>
+                <ProfilePreferences
+                  deviceIntegrations={deviceIntegrations}
+                  courses={orderedCourses}
+                  colors={colors}
+                  languagePreference={languagePreference}
+                  resolvedLocale={resolvedLocale}
+                  subjectPreferences={subjectPreferences}
+                  themePreference={themePreference}
+                  updateLanguagePreference={updateLanguagePreference}
+                />
               </View>
             ) : null}
           </View>
@@ -229,8 +243,11 @@ function ProfilePreferences({
   deviceIntegrations,
   courses,
   colors,
+  languagePreference,
+  resolvedLocale,
   subjectPreferences,
   themePreference,
+  updateLanguagePreference,
 }: {
   deviceIntegrations: ReturnType<typeof useDeviceIntegrations>;
   courses: Array<{ course_code?: string; id: number; name: string }>;
@@ -245,6 +262,8 @@ function ProfilePreferences({
     primaryText: string;
     cardMuted: string;
   };
+  languagePreference: LanguagePreference;
+  resolvedLocale: "en" | "pt-BR";
   subjectPreferences: {
     hiddenCourseIds: number[];
     orderedCourseIds: number[];
@@ -253,6 +272,7 @@ function ProfilePreferences({
     compactMobileDashboardSubjects: boolean;
   };
   themePreference: ThemePreference;
+  updateLanguagePreference: (preference: LanguagePreference) => Promise<void>;
 }) {
   const {
     deviceIntegrationPreferences,
@@ -275,9 +295,50 @@ function ProfilePreferences({
 
   return (
     <View style={styles.preferencesContainer}>
+      <View style={[styles.preferenceCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+        <Text style={[styles.preferenceLabel, { color: colors.foreground }]}>{t(resolvedLocale, "settings.appLanguageTitle")}</Text>
+        <View style={styles.optionsRow}>
+          {languageOptions.map((option) => {
+            const isActive = languagePreference === option;
+            const label = option === "system" ? t(resolvedLocale, "common.system") : getLocaleDisplayName(option, resolvedLocale);
+
+            return (
+              <Pressable
+                key={option}
+                onPress={() => {
+                  triggerSelectionHaptic();
+                  void updateLanguagePreference(option);
+                }}
+                style={[
+                  styles.optionButton,
+                  {
+                    backgroundColor: isActive ? colors.primary : colors.card,
+                    borderColor: isActive ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.optionButtonText, { color: isActive ? colors.primaryText : colors.mutedForeground }]}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={[styles.preferenceDescription, { color: colors.mutedForeground }]}>
+          {t(resolvedLocale, "settings.languageDescription")}
+        </Text>
+        {languagePreference === "system" ? (
+          <Text style={[styles.preferenceDescription, styles.tightDescription, { color: colors.mutedForeground }]}>
+            {t(resolvedLocale, "settings.languageSystemDescription", {
+              language: getLocaleDisplayName(resolvedLocale, resolvedLocale),
+            })}
+          </Text>
+        ) : null}
+      </View>
+
       {/* ThemePreferenceSelector */}
       <View style={[styles.preferenceCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-        <Text style={[styles.preferenceLabel, { color: colors.foreground }]}>Appearance</Text>
+        <Text style={[styles.preferenceLabel, { color: colors.foreground }]}>{t(resolvedLocale, "common.appearance")}</Text>
         <View style={styles.optionsRow}>
           {themeOptions.map((option) => {
             const Icon = option.icon;
@@ -296,23 +357,23 @@ function ProfilePreferences({
                     borderColor: isActive ? colors.primary : colors.border,
                   },
                 ]}
-              >
-                <Icon size={16} color={isActive ? colors.primaryText : colors.mutedForeground} />
-                <Text style={[styles.optionButtonText, { color: isActive ? colors.primaryText : colors.mutedForeground }]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+                >
+                  <Icon size={16} color={isActive ? colors.primaryText : colors.mutedForeground} />
+                  <Text style={[styles.optionButtonText, { color: isActive ? colors.primaryText : colors.mutedForeground }]}>
+                    {t(resolvedLocale, option.label as "settings.systemTheme" | "settings.light" | "settings.dark")}
+                  </Text>
+                </Pressable>
+              );
+            })}
         </View>
         <Text style={[styles.preferenceDescription, { color: colors.mutedForeground }]}>
-          Use the system theme by default, or force light or dark mode for the whole app.
+          {t(resolvedLocale, "settings.themeDescription")}
         </Text>
       </View>
 
       {/* HapticsPreferenceSelector */}
       <View style={[styles.preferenceCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-        <Text style={[styles.preferenceLabel, { color: colors.foreground }]}>Haptic feedback</Text>
+        <Text style={[styles.preferenceLabel, { color: colors.foreground }]}>{t(resolvedLocale, "settings.haptics")}</Text>
         <View style={styles.optionsRow}>
           <Pressable
             onPress={() => {
@@ -329,7 +390,7 @@ function ProfilePreferences({
           >
             <Smartphone size={16} color={!hapticsEnabled ? colors.primaryText : colors.mutedForeground} />
             <Text style={[styles.optionButtonText, { color: !hapticsEnabled ? colors.primaryText : colors.mutedForeground }]}>
-              Off
+              {t(resolvedLocale, "common.off")}
             </Text>
           </Pressable>
           <Pressable
@@ -347,19 +408,19 @@ function ProfilePreferences({
           >
             <Smartphone size={16} color={hapticsEnabled ? colors.primaryText : colors.mutedForeground} />
             <Text style={[styles.optionButtonText, { color: hapticsEnabled ? colors.primaryText : colors.mutedForeground }]}>
-              On
+              {t(resolvedLocale, "common.on")}
             </Text>
           </Pressable>
         </View>
         <Text style={[styles.preferenceDescription, { color: colors.mutedForeground }]}>
-          Optional tap feedback for supported phones and touch devices. It is queued asynchronously so it never waits on navigation.
+          {t(resolvedLocale, "settings.hapticsDescription")}
         </Text>
       </View>
 
       <View style={[styles.preferenceCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
         <View style={styles.preferenceTitleRow}>
           <CalendarDays size={16} color={colors.mutedForeground} />
-          <Text style={[styles.preferenceLabelInline, { color: colors.foreground }]}>Phone calendar sync</Text>
+          <Text style={[styles.preferenceLabelInline, { color: colors.foreground }]}>{t(resolvedLocale, "settings.phoneCalendarSync")}</Text>
         </View>
         <View style={styles.optionsRow}>
           <Pressable
@@ -381,7 +442,7 @@ function ProfilePreferences({
                 { color: !deviceIntegrationPreferences.calendarSyncEnabled ? colors.primaryText : colors.mutedForeground },
               ]}
             >
-              Off
+              {t(resolvedLocale, "common.off")}
             </Text>
           </Pressable>
           <Pressable
@@ -403,19 +464,25 @@ function ProfilePreferences({
                 { color: deviceIntegrationPreferences.calendarSyncEnabled ? colors.primaryText : colors.mutedForeground },
               ]}
             >
-              On
+              {t(resolvedLocale, "common.on")}
             </Text>
           </Pressable>
         </View>
         <Text style={[styles.preferenceDescription, { color: colors.mutedForeground }]}>
-          Sync upcoming assignments and quizzes into the phone calendar. The app updates due-date changes and removes managed items when they disappear or are completed.
+          {t(resolvedLocale, "settings.phoneCalendarSyncDescription")}
         </Text>
         <View style={[styles.statusCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
           <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
-            Calendar permission: {deviceIntegrations.calendarPermissionStatus ?? "unknown"}
+            {t(resolvedLocale, "common.calendarPermission", {
+              value: deviceIntegrations.calendarPermissionStatus ?? t(resolvedLocale, "common.unknown"),
+            })}
           </Text>
           <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
-            Last sync: {deviceIntegrations.lastSyncAt ? formatDateTime(deviceIntegrations.lastSyncAt) : "Never"}
+            {t(resolvedLocale, "common.lastSync", {
+              value: deviceIntegrations.lastSyncAt
+                ? formatDateTime(resolvedLocale, deviceIntegrations.lastSyncAt)
+                : t(resolvedLocale, "common.never"),
+            })}
           </Text>
           {deviceIntegrations.syncError ? (
             <Text style={[styles.statusErrorText, { color: "#dc2626" }]}>{deviceIntegrations.syncError}</Text>
@@ -437,7 +504,7 @@ function ProfilePreferences({
           >
             <RefreshCcw size={14} color={colors.mutedForeground} />
             <Text style={[styles.syncNowButtonText, { color: colors.foreground }]}>
-              {deviceIntegrations.syncing ? "Syncing..." : "Sync now"}
+              {deviceIntegrations.syncing ? t(resolvedLocale, "settings.syncing") : t(resolvedLocale, "settings.syncNow")}
             </Text>
           </Pressable>
         </View>
@@ -446,7 +513,7 @@ function ProfilePreferences({
       <View style={[styles.preferenceCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
         <View style={styles.preferenceTitleRow}>
           <Bell size={16} color={colors.mutedForeground} />
-          <Text style={[styles.preferenceLabelInline, { color: colors.foreground }]}>Assignment and quiz reminders</Text>
+          <Text style={[styles.preferenceLabelInline, { color: colors.foreground }]}>{t(resolvedLocale, "settings.reminders")}</Text>
         </View>
         <View style={styles.optionsRow}>
           <Pressable
@@ -481,7 +548,7 @@ function ProfilePreferences({
                 },
               ]}
             >
-              7 AM due day
+              {t(resolvedLocale, "settings.reminderSevenAm")}
             </Text>
           </Pressable>
           <Pressable
@@ -508,7 +575,7 @@ function ProfilePreferences({
                 },
               ]}
             >
-              3 hours before
+              {t(resolvedLocale, "settings.reminderThreeHours")}
             </Text>
           </Pressable>
           <Pressable
@@ -535,21 +602,23 @@ function ProfilePreferences({
                 },
               ]}
             >
-              1 hour before
+              {t(resolvedLocale, "settings.reminderOneHour")}
             </Text>
           </Pressable>
         </View>
         <Text style={[styles.preferenceDescription, { color: colors.mutedForeground }]}>
-          Pick any combination of local reminders. Notifications are only scheduled for upcoming activities that are still incomplete.
+          {t(resolvedLocale, "settings.remindersDescription")}
         </Text>
         <Text style={[styles.preferenceDescription, styles.tightDescription, { color: colors.mutedForeground }]}>
-          Notification permission: {deviceIntegrations.notificationPermissionStatus ?? "unknown"}
+          {t(resolvedLocale, "common.notificationPermission", {
+            value: deviceIntegrations.notificationPermissionStatus ?? t(resolvedLocale, "common.unknown"),
+          })}
         </Text>
       </View>
 
       {/* MobileSubjectBarSelector */}
       <View style={[styles.preferenceCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-        <Text style={[styles.preferenceLabel, { color: colors.foreground }]}>Mobile subject bar</Text>
+        <Text style={[styles.preferenceLabel, { color: colors.foreground }]}>{t(resolvedLocale, "settings.mobileSubjectBar")}</Text>
         <View style={styles.optionsRow}>
           <Pressable
             onPress={() => {
@@ -570,7 +639,7 @@ function ProfilePreferences({
                 { color: subjectPreferences.showMobileSubjectBar ? colors.primaryText : colors.mutedForeground },
               ]}
             >
-              Show
+              {t(resolvedLocale, "common.show")}
             </Text>
           </Pressable>
           <Pressable
@@ -592,18 +661,18 @@ function ProfilePreferences({
                 { color: !subjectPreferences.showMobileSubjectBar ? colors.primaryText : colors.mutedForeground },
               ]}
             >
-              Hide
+              {t(resolvedLocale, "common.hide")}
             </Text>
           </Pressable>
         </View>
         <Text style={[styles.preferenceDescription, { color: colors.mutedForeground }]}>
-          Show or hide the horizontal subject shortcuts above the mobile bottom navigation.
+          {t(resolvedLocale, "settings.mobileSubjectBarDescription")}
         </Text>
       </View>
 
       {/* MobileDashboardSubjectSizeSelector */}
       <View style={[styles.preferenceCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-        <Text style={[styles.preferenceLabel, { color: colors.foreground }]}>Mobile dashboard subjects</Text>
+        <Text style={[styles.preferenceLabel, { color: colors.foreground }]}>{t(resolvedLocale, "settings.mobileDashboardSubjects")}</Text>
         <View style={styles.optionsRow}>
           <Pressable
             onPress={() => {
@@ -624,7 +693,7 @@ function ProfilePreferences({
                 { color: !subjectPreferences.compactMobileDashboardSubjects ? colors.primaryText : colors.mutedForeground },
               ]}
             >
-              Default
+              {t(resolvedLocale, "common.default")}
             </Text>
           </Pressable>
           <Pressable
@@ -646,19 +715,19 @@ function ProfilePreferences({
                 { color: subjectPreferences.compactMobileDashboardSubjects ? colors.primaryText : colors.mutedForeground },
               ]}
             >
-              Compact
+              {t(resolvedLocale, "common.compact")}
             </Text>
           </Pressable>
         </View>
         <Text style={[styles.preferenceDescription, { color: colors.mutedForeground }]}>
-          Make dashboard subject cards smaller on mobile so two subjects fit per row.
+          {t(resolvedLocale, "settings.mobileDashboardSubjectsDescription")}
         </Text>
       </View>
 
       {/* Description div */}
       <View style={[styles.descriptionCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
         <Text style={[styles.descriptionText, { color: colors.mutedForeground }]}>
-          Hide subjects from the dashboard and navigation, choose your own subject colors, or enable optional haptic feedback.
+          {t(resolvedLocale, "settings.overviewDescription")}
         </Text>
       </View>
 
@@ -673,12 +742,12 @@ function ProfilePreferences({
 
       {/* Footer */}
       <View style={[styles.descriptionCard, styles.footerCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-        <Text style={[styles.footerTitle, { color: colors.foreground }]}>Made by Gabriel Jota Lizardo</Text>
+        <Text style={[styles.footerTitle, { color: colors.foreground }]}>{t(resolvedLocale, "common.madeBy")}</Text>
         <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-          Suggestions, fixes, or feedback: <Text style={[styles.footerLink, { color: colors.foreground }]}>gabrieljotalizardo@gmail.com</Text>
+          {t(resolvedLocale, "settings.suggestions")} <Text style={[styles.footerLink, { color: colors.foreground }]}>gabrieljotalizardo@gmail.com</Text>
         </Text>
         <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-          LinkedIn: <Text style={[styles.footerLink, { color: colors.foreground }]}>Gabriel Jota Lizardo</Text>
+          {t(resolvedLocale, "settings.linkedIn")} <Text style={[styles.footerLink, { color: colors.foreground }]}>Gabriel Jota Lizardo</Text>
         </Text>
       </View>
     </View>
@@ -714,6 +783,7 @@ function SubjectPreferenceList({
     cardMuted: string;
   };
 }) {
+  const { resolvedLocale } = useAppPreferences();
   const [isExpanded, setIsExpanded] = useState(false);
 
   const moveCourse = (courseId: number, direction: -1 | 1) => {
@@ -748,9 +818,9 @@ function SubjectPreferenceList({
         style={[styles.subjectsButton, { borderColor: colors.border, backgroundColor: colors.muted }]}
       >
         <View>
-          <Text style={[styles.subjectsButtonTitle, { color: colors.foreground }]}>Subjects</Text>
+          <Text style={[styles.subjectsButtonTitle, { color: colors.foreground }]}>{t(resolvedLocale, "common.subjects")}</Text>
           <Text style={[styles.subjectsButtonSubtitle, { color: colors.mutedForeground }]}>
-            Hide subjects, change their colors, and reorder them.
+            {t(resolvedLocale, "settings.subjectsDescription")}
           </Text>
         </View>
         <ChevronDown
@@ -764,7 +834,7 @@ function SubjectPreferenceList({
         <View style={styles.expandedContent}>
           <View style={[styles.infoBar, { borderColor: colors.border, backgroundColor: colors.muted }]}>
             <Text style={[styles.infoBarText, { color: colors.mutedForeground }]}>
-              Use the arrows to reorder how active subjects appear in the dashboard and navigation.
+              {t(resolvedLocale, "settings.subjectsOrderDescription")}
             </Text>
             {subjectPreferences.orderedCourseIds.length > 0 && (
               <Pressable
@@ -773,7 +843,7 @@ function SubjectPreferenceList({
                   void onUpdatePreferences({ ...subjectPreferences, orderedCourseIds: [] });
                 }}
               >
-                <Text style={[styles.resetOrderText, { color: colors.foreground }]}>Reset order</Text>
+                <Text style={[styles.resetOrderText, { color: colors.foreground }]}>{t(resolvedLocale, "common.resetOrder")}</Text>
               </Pressable>
             )}
           </View>
@@ -797,8 +867,8 @@ function SubjectPreferenceList({
                         {formatSubjectName(course.name)}
                       </Text>
                     </View>
-                    <Text style={[styles.subjectCode, { color: colors.mutedForeground }]}>
-                      {course.course_code ?? "Subject"}
+                      <Text style={[styles.subjectCode, { color: colors.mutedForeground }]}>
+                      {course.course_code ?? t(resolvedLocale, "common.subject")}
                     </Text>
                   </View>
                   <View style={styles.subjectControls}>
@@ -819,7 +889,7 @@ function SubjectPreferenceList({
                       </Pressable>
                     </View>
                     <View style={styles.visibilityControl}>
-                      <Text style={[styles.visibilityText, { color: colors.mutedForeground }]}>Visible</Text>
+                      <Text style={[styles.visibilityText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.visible")}</Text>
                     </View>
                   </View>
                 </View>
@@ -827,7 +897,7 @@ function SubjectPreferenceList({
                 <View style={styles.colorSection}>
                   <View style={styles.colorPickerRow}>
                     <Palette size={16} color={colors.mutedForeground} />
-                    <Text style={[styles.colorLabel, { color: colors.mutedForeground }]}>Color</Text>
+                    <Text style={[styles.colorLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.color")}</Text>
                     <View style={[styles.colorInputContainer, { borderColor: colors.border }]}>
                       <View style={[styles.colorPreview, { backgroundColor: inputColor }]} />
                     </View>
@@ -841,13 +911,13 @@ function SubjectPreferenceList({
                         void onUpdatePreferences({ ...subjectPreferences, colors: nextColors });
                       }}
                     >
-                      <Text style={[styles.resetColorText, { color: colors.mutedForeground }]}>Reset color</Text>
+                      <Text style={[styles.resetColorText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.resetColor")}</Text>
                     </Pressable>
                   )}
                   {isHidden && (
                     <View style={[styles.hiddenBadge, { borderColor: colors.border, backgroundColor: colors.muted }]}>
                       <EyeOff size={12} color={colors.mutedForeground} />
-                      <Text style={[styles.hiddenBadgeText, { color: colors.mutedForeground }]}>Hidden</Text>
+                      <Text style={[styles.hiddenBadgeText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.hidden")}</Text>
                     </View>
                   )}
                 </View>

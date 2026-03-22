@@ -29,11 +29,12 @@ export function BookmarkButton({ bookmark }: BookmarkButtonProps) {
       type="button"
       variant="outline"
       size="sm"
+      aria-label={saved ? `Remove bookmark for ${bookmark.title}` : `Bookmark ${bookmark.title}`}
+      title={saved ? `Remove bookmark for ${bookmark.title}` : `Bookmark ${bookmark.title}`}
       onClick={() => setSaved(toggleBookmark(bookmark))}
-      className="border-border/80 bg-card/85 text-muted-foreground hover:border-foreground/15 hover:bg-muted/85 hover:text-foreground"
+      className="size-9 border-border/80 bg-card/85 p-0 text-muted-foreground hover:border-foreground/15 hover:bg-muted/85 hover:text-foreground"
     >
       <Bookmark className={saved ? "fill-current" : ""} />
-      {saved ? "Bookmarked" : "Bookmark"}
     </Button>
   );
 }

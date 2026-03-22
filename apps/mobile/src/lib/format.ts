@@ -1,52 +1,35 @@
-import { DISPLAY_TIME_ZONE } from "@canvas/shared";
+import {
+  formatDate as formatLocalizedDate,
+  formatDateTime as formatLocalizedDateTime,
+  formatDueDateShort as formatLocalizedDueDateShort,
+  formatGrade as formatLocalizedGrade,
+  formatRelativeBucket as formatLocalizedRelativeBucket,
+  type AppLocale,
+} from "@canvas/shared";
 
-export function formatDateTime(value?: string | null) {
-  if (!value) {
-    return "No date";
-  }
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: DISPLAY_TIME_ZONE,
-  }).format(new Date(value));
+function isLocale(value?: string | null): value is AppLocale {
+  return value === "en" || value === "pt-BR";
 }
 
-export function formatDate(value?: string | null) {
-  if (!value) {
-    return "No date";
-  }
+export function formatDateTime(localeOrValue?: AppLocale | string | null, maybeValue?: string | null) {
+  const locale = isLocale(localeOrValue) ? localeOrValue : "en";
+  const value = isLocale(localeOrValue) ? maybeValue : localeOrValue;
 
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "medium",
-    timeZone: DISPLAY_TIME_ZONE,
-  }).format(new Date(value));
+  return formatLocalizedDateTime(locale, value);
 }
 
-export function formatRelativeBucket(value?: string | null) {
-  if (!value) {
-    return "Later";
-  }
+export function formatDate(localeOrValue?: AppLocale | string | null, maybeValue?: string | null) {
+  const locale = isLocale(localeOrValue) ? localeOrValue : "en";
+  const value = isLocale(localeOrValue) ? maybeValue : localeOrValue;
 
-  const now = new Date();
-  const dueDate = new Date(value);
-  const startOfToday = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const startOfDue = Date.UTC(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-  const diffDays = Math.floor((startOfDue - startOfToday) / 86_400_000);
+  return formatLocalizedDate(locale, value);
+}
 
-  if (diffDays < 0) {
-    return "Overdue";
-  }
+export function formatRelativeBucket(localeOrValue?: AppLocale | string | null, maybeValue?: string | null) {
+  const locale = isLocale(localeOrValue) ? localeOrValue : "en";
+  const value = isLocale(localeOrValue) ? maybeValue : localeOrValue;
 
-  if (diffDays === 0) {
-    return "Due today";
-  }
-
-  if (diffDays <= 6) {
-    return "This week";
-  }
-
-  return "Later";
+  return formatLocalizedRelativeBucket(locale, value);
 }
 
 export function stripHtml(value?: string | null) {
@@ -68,42 +51,16 @@ export function stripHtml(value?: string | null) {
     .trim();
 }
 
-export function formatGrade(value?: number | null) {
-  if (value == null || !Number.isFinite(value)) {
-    return "No grade";
-  }
+export function formatGrade(localeOrValue?: AppLocale | number | null, maybeValue?: number | null) {
+  const locale = typeof localeOrValue === "string" && isLocale(localeOrValue) ? localeOrValue : "en";
+  const value = typeof localeOrValue === "string" && isLocale(localeOrValue) ? maybeValue : localeOrValue;
 
-  return `${new Intl.NumberFormat("pt-BR", {
-    maximumFractionDigits: value % 1 === 0 ? 0 : 1,
-  }).format(value)}%`;
+  return formatLocalizedGrade(locale, value as number | null | undefined);
 }
 
-export function formatDueDateShort(value?: string | null) {
-  if (!value) {
-    return "No date";
-  }
+export function formatDueDateShort(localeOrValue?: AppLocale | string | null, maybeValue?: string | null) {
+  const locale = isLocale(localeOrValue) ? localeOrValue : "en";
+  const value = isLocale(localeOrValue) ? maybeValue : localeOrValue;
 
-  const date = new Date(value);
-  const now = new Date();
-  const diffTime = date.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return "Today";
-  }
-  if (diffDays === 1) {
-    return "Tomorrow";
-  }
-  if (diffDays === -1) {
-    return "Yesterday";
-  }
-  if (diffDays > 0 && diffDays <= 7) {
-    return date.toLocaleDateString("en-US", { weekday: "long" });
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: DISPLAY_TIME_ZONE,
-  }).format(date);
+  return formatLocalizedDueDateShort(locale, value);
 }

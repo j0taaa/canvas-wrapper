@@ -1,13 +1,24 @@
-import { PropsWithChildren, useMemo, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { PropsWithChildren, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
-import { normalizeCanvasProviderUrl } from "@canvas/shared";
+import {
+  APP_WELCOME_STORAGE_KEY,
+  normalizeCanvasProviderUrl,
+  t,
+} from "@canvas/shared";
+import { BookOpen, CalendarDays, Inbox, Sparkles } from "lucide-react-native";
 import { useAppPreferences } from "../providers/app-preferences";
 import { useCanvasSession } from "../providers/canvas-session";
 import { RestorableScrollView } from "./restorable-scroll-view";
@@ -60,13 +71,14 @@ function useAppColors() {
 
 export function AppScreen({
   children,
+  contentStyle,
   scroll = true,
   subtitle,
   title,
-}: PropsWithChildren<{ scroll?: boolean; subtitle?: string; title?: string }>) {
+}: PropsWithChildren<{ contentStyle?: StyleProp<ViewStyle>; scroll?: boolean; subtitle?: string; title?: string }>) {
   const colors = useAppColors();
   const content = (
-    <View style={styles.content}>
+    <View style={[styles.content, contentStyle]}>
       {title ? (
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
@@ -92,12 +104,19 @@ export function AppScreen({
 
 export function SectionCard({
   children,
+  density = "default",
   title,
   subtitle,
-}: PropsWithChildren<{ title: string; subtitle?: string }>) {
+}: PropsWithChildren<{ density?: "default" | "compact"; title: string; subtitle?: string }>) {
   const colors = useAppColors();
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View
+      style={[
+        styles.card,
+        density === "compact" ? styles.cardCompact : null,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
       <View>
         <Text style={[styles.cardTitle, { color: colors.foreground }]}>{title}</Text>
         {subtitle ? <Text style={[styles.cardSubtitle, { color: colors.subtitle }]}>{subtitle}</Text> : null}
@@ -109,10 +128,13 @@ export function SectionCard({
 
 export function LoadingState({ label = "Loading..." }: { label?: string }) {
   const colors = useAppColors();
+  const { resolvedLocale } = useAppPreferences();
   return (
     <View style={styles.centerState}>
       <ActivityIndicator size="large" color={colors.foreground} />
-      <Text style={[styles.stateText, { color: colors.subtitle }]}>{label}</Text>
+      <Text style={[styles.stateText, { color: colors.subtitle }]}>
+        {label === "Loading..." ? t(resolvedLocale, "common.loading") : label}
+      </Text>
     </View>
   );
 }
@@ -155,9 +177,10 @@ export function PlaceholderBlock({
 
 export function EmptyState({ label }: { label: string }) {
   const colors = useAppColors();
+  const { resolvedLocale } = useAppPreferences();
   return (
     <View style={styles.centerState}>
-      <Text style={[styles.stateTitle, { color: colors.foreground }]}>Nothing here yet</Text>
+      <Text style={[styles.stateTitle, { color: colors.foreground }]}>{t(resolvedLocale, "common.noneYet")}</Text>
       <Text style={[styles.stateText, { color: colors.subtitle }]}>{label}</Text>
     </View>
   );
@@ -171,12 +194,13 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   const colors = useAppColors();
+  const { resolvedLocale } = useAppPreferences();
   return (
     <View style={styles.centerState}>
-      <Text style={[styles.errorTitle, { color: colors.foreground }]}>Something went wrong</Text>
+      <Text style={[styles.errorTitle, { color: colors.foreground }]}>{t(resolvedLocale, "common.errorTitle")}</Text>
       <Text style={[styles.stateText, { color: colors.subtitle }]}>{error}</Text>
       {onRetry ? (
-        <PrimaryButton label="Retry" onPress={onRetry} />
+        <PrimaryButton label={t(resolvedLocale, "common.retry")} onPress={onRetry} />
       ) : null}
     </View>
   );
@@ -290,20 +314,285 @@ export function SecondaryButton({
   );
 }
 
+function WelcomeSplash({ onContinue }: { onContinue: () => void }) {
+  const colors = useAppColors();
+  const { resolvedLocale, resolvedTheme } = useAppPreferences();
+  const floatPrimary = useRef(new Animated.Value(0)).current;
+  const floatSecondary = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0)).current;
+  const isDark = resolvedTheme === "dark";
+  const highlights = [
+    {
+      title: t(resolvedLocale, "welcome.highlightOneTitle"),
+      description: t(resolvedLocale, "welcome.highlightOneBody"),
+    },
+    {
+      title: t(resolvedLocale, "welcome.highlightTwoTitle"),
+      description: t(resolvedLocale, "welcome.highlightTwoBody"),
+    },
+    {
+      title: t(resolvedLocale, "welcome.highlightThreeTitle"),
+      description: t(resolvedLocale, "welcome.highlightThreeBody"),
+    },
+  ];
+
+  useEffect(() => {
+    const primaryLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatPrimary, {
+          toValue: 1,
+          duration: 2800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatPrimary, {
+          toValue: 0,
+          duration: 2800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    const secondaryLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatSecondary, {
+          toValue: 1,
+          duration: 3400,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatSecondary, {
+          toValue: 0,
+          duration: 3400,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 2200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 2200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    primaryLoop.start();
+    secondaryLoop.start();
+    pulseLoop.start();
+
+    return () => {
+      primaryLoop.stop();
+      secondaryLoop.stop();
+      pulseLoop.stop();
+    };
+  }, [floatPrimary, floatSecondary, pulse]);
+
+  return (
+    <View style={styles.welcomeScreen}>
+      <View style={styles.welcomeHero}>
+        <Animated.View
+          style={[
+            styles.welcomeGlow,
+            styles.welcomeGlowLarge,
+            {
+              backgroundColor: isDark ? "rgba(251,191,36,0.18)" : "rgba(251,191,36,0.22)",
+              opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.72, 1] }),
+              transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.04] }) }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.welcomeGlow,
+            styles.welcomeGlowSmall,
+            {
+              backgroundColor: isDark ? "rgba(34,197,94,0.12)" : "rgba(45,212,191,0.18)",
+              transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1.04, 0.94] }) }],
+            },
+          ]}
+        />
+
+        <Animated.View
+          style={[
+            styles.welcomeBadge,
+            styles.welcomeBadgeTop,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              transform: [
+                { translateY: floatPrimary.interpolate({ inputRange: [0, 1], outputRange: [0, -12] }) },
+                { rotate: floatPrimary.interpolate({ inputRange: [0, 1], outputRange: ["-4deg", "4deg"] }) },
+              ],
+            },
+          ]}
+        >
+          <CalendarDays color="#f59e0b" size={18} />
+          <View style={styles.welcomeBadgeTextWrap}>
+            <Text style={[styles.welcomeBadgeLabel, { color: colors.foreground }]}>
+              {t(resolvedLocale, "welcome.deadlinesTitle")}
+            </Text>
+            <Text style={[styles.welcomeBadgeMeta, { color: colors.helper }]}>
+              {t(resolvedLocale, "welcome.deadlinesBody")}
+            </Text>
+          </View>
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            styles.welcomeBadge,
+            styles.welcomeBadgeBottom,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              transform: [
+                { translateY: floatSecondary.interpolate({ inputRange: [0, 1], outputRange: [0, 10] }) },
+                { rotate: floatSecondary.interpolate({ inputRange: [0, 1], outputRange: ["3deg", "-3deg"] }) },
+              ],
+            },
+          ]}
+        >
+          <Inbox color="#14b8a6" size={18} />
+          <View style={styles.welcomeBadgeTextWrap}>
+            <Text style={[styles.welcomeBadgeLabel, { color: colors.foreground }]}>
+              {t(resolvedLocale, "welcome.messagesTitle")}
+            </Text>
+            <Text style={[styles.welcomeBadgeMeta, { color: colors.helper }]}>
+              {t(resolvedLocale, "welcome.messagesBody")}
+            </Text>
+          </View>
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            styles.welcomeCenterCard,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              transform: [{ translateY: floatPrimary.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) }],
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.welcomeCenterIcon,
+              { backgroundColor: isDark ? "rgba(248,250,252,0.08)" : "rgba(15,23,42,0.06)" },
+            ]}
+          >
+            <Sparkles color={colors.foreground} size={24} />
+          </View>
+          <Text style={[styles.welcomeCenterTitle, { color: colors.foreground }]}>Janvas</Text>
+          <Text style={[styles.welcomeCenterSubtitle, { color: colors.helper }]}>
+            {t(resolvedLocale, "welcome.appTagline")}
+          </Text>
+          <View style={styles.welcomeCenterPills}>
+            <View style={[styles.welcomeMiniPill, { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#fff7ed" }]}>
+              <BookOpen color={isDark ? "#fde68a" : "#c2410c"} size={14} />
+              <Text style={[styles.welcomeMiniPillText, { color: colors.foreground }]}>
+                {t(resolvedLocale, "welcome.subjectsPill")}
+              </Text>
+            </View>
+            <View style={[styles.welcomeMiniPill, { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#ecfeff" }]}>
+              <CalendarDays color={isDark ? "#99f6e4" : "#0f766e"} size={14} />
+              <Text style={[styles.welcomeMiniPillText, { color: colors.foreground }]}>
+                {t(resolvedLocale, "welcome.calendarPill")}
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+      </View>
+
+      <View style={styles.welcomeBody}>
+        <Text style={[styles.welcomeTitle, { color: colors.foreground }]}>{t(resolvedLocale, "welcome.title")}</Text>
+        <Text style={[styles.welcomeSubtitle, { color: colors.subtitle }]}>{t(resolvedLocale, "welcome.subtitle")}</Text>
+
+        <View style={styles.welcomeHighlights}>
+          {highlights.map((highlight) => (
+            <View
+              key={highlight.title}
+              style={[styles.welcomeHighlight, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}
+            >
+              <Text style={[styles.welcomeHighlightTitle, { color: colors.foreground }]}>{highlight.title}</Text>
+              <Text style={[styles.welcomeHighlightDescription, { color: colors.helper }]}>
+                {highlight.description}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <PrimaryButton label={t(resolvedLocale, "welcome.cta")} onPress={onContinue} />
+      </View>
+    </View>
+  );
+}
+
 export function RequireCanvasConfig({ children }: PropsWithChildren) {
   const { configured, ready } = useCanvasSession();
+  const [hasSeenWelcome, setHasSeenWelcome] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!ready || configured) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void AsyncStorage.getItem(APP_WELCOME_STORAGE_KEY)
+      .then((value) => {
+        if (!cancelled) {
+          setHasSeenWelcome(value === "true");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHasSeenWelcome(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, ready]);
 
   if (!ready) {
     return <LoadingState label="Loading your Canvas configuration..." />;
   }
 
+  if (!configured && hasSeenWelcome == null) {
+    return <LoadingState label="Preparing your first launch..." />;
+  }
+
+  if (!configured && !hasSeenWelcome) {
+    return (
+      <AppScreen contentStyle={styles.welcomeScreenContent}>
+        <WelcomeSplash
+          onContinue={() => {
+            void AsyncStorage.setItem(APP_WELCOME_STORAGE_KEY, "true").finally(() => {
+              setHasSeenWelcome(true);
+            });
+          }}
+        />
+      </AppScreen>
+    );
+  }
+
   if (!configured) {
     return (
       <AppScreen
-        title="Connect Canvas"
-        subtitle="The native app talks directly to Canvas now, so it needs your provider URL and API key on-device."
+        contentStyle={styles.connectScreenContent}
       >
-        <CanvasConfigForm />
+        <CanvasConfigForm mode="connect" />
       </AppScreen>
     );
   }
@@ -311,34 +600,91 @@ export function RequireCanvasConfig({ children }: PropsWithChildren) {
   return children;
 }
 
-export function CanvasConfigForm({ showClear = false }: { showClear?: boolean }) {
+export function CanvasConfigForm({
+  mode = "settings",
+  showClear = false,
+}: {
+  mode?: "connect" | "settings";
+  showClear?: boolean;
+}) {
   const colors = useAppColors();
+  const { resolvedLocale } = useAppPreferences();
   const { clearConfig, config, saveConfig } = useCanvasSession();
   const [apiBase, setApiBase] = useState(() => config?.apiBase ?? normalizeCanvasProviderUrl(undefined));
   const [apiKey, setApiKey] = useState(() => config?.apiKey ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const normalizedApiBase = useMemo(() => normalizeCanvasProviderUrl(apiBase), [apiBase]);
+  const isConnectMode = mode === "connect";
+  const connectButtonLabel = saving ? t(resolvedLocale, "connect.connecting") : t(resolvedLocale, "connect.saveAndConnect");
+  const settingsButtonLabel = saving ? t(resolvedLocale, "connect.savingConfig") : t(resolvedLocale, "connect.saveConfig");
+  const apiKeySteps = [
+    t(resolvedLocale, "connect.keyStep1"),
+    t(resolvedLocale, "connect.keyStep2"),
+    t(resolvedLocale, "connect.keyStep3"),
+    t(resolvedLocale, "connect.keyStep4"),
+    t(resolvedLocale, "connect.keyStep5"),
+  ];
+  const urlSteps = [
+    t(resolvedLocale, "connect.urlStep1"),
+    t(resolvedLocale, "connect.urlStep2"),
+    t(resolvedLocale, "connect.urlStep3"),
+    t(resolvedLocale, "connect.urlStep4"),
+  ];
 
   return (
-    <SectionCard title="Credentials">
-      <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Canvas provider URL</Text>
+    <SectionCard
+      title={isConnectMode ? t(resolvedLocale, "connect.accountTitle") : t(resolvedLocale, "connect.credentialsTitle")}
+      subtitle={isConnectMode ? t(resolvedLocale, "connect.accountSubtitle") : undefined}
+    >
+      {isConnectMode ? (
+        <View style={[styles.instructionsCard, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}>
+          <View style={styles.instructionsSection}>
+            <Text style={[styles.instructionsTitle, { color: colors.foreground }]}>{t(resolvedLocale, "connect.howToGetKeyTitle")}</Text>
+            {apiKeySteps.map((step) => (
+              <Text key={step} style={[styles.instructionsStep, { color: colors.helper }]}>
+                {step}
+              </Text>
+            ))}
+          </View>
+
+          <View style={styles.instructionsSection}>
+            <Text style={[styles.instructionsTitle, { color: colors.foreground }]}>{t(resolvedLocale, "connect.whatUrlTitle")}</Text>
+            {urlSteps.map((step) => (
+              <Text key={step} style={[styles.instructionsStep, { color: colors.helper }]}>
+                {step}
+              </Text>
+            ))}
+          </View>
+
+          <Pressable
+            onPress={() => {
+              void Linking.openURL("https://developerdocs.instructure.com/services/canvas/oauth2/file.oauth");
+            }}
+            style={({ pressed }) => [styles.instructionsLinkButton, pressed && styles.rowPressed]}
+          >
+            <Text style={[styles.instructionsLink, { color: colors.foreground }]}>{t(resolvedLocale, "connect.docsLink")}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      <Text style={[styles.fieldLabel, { color: colors.foreground }]}>{t(resolvedLocale, "connect.urlLabel")}</Text>
       <TextInput
         autoCapitalize="none"
         autoCorrect={false}
         onChangeText={setApiBase}
-        placeholder="https://your-school.instructure.com"
+        placeholder={t(resolvedLocale, "connect.urlPlaceholder")}
         placeholderTextColor={colors.helper}
         style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
         value={apiBase}
       />
 
-      <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Canvas API key</Text>
+      <Text style={[styles.fieldLabel, { color: colors.foreground }]}>{t(resolvedLocale, "connect.apiKeyLabel")}</Text>
       <TextInput
         autoCapitalize="none"
         autoCorrect={false}
         onChangeText={setApiKey}
-        placeholder="Paste your Canvas API key"
+        placeholder={t(resolvedLocale, "connect.apiKeyPlaceholder")}
         placeholderTextColor={colors.helper}
         secureTextEntry
         style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
@@ -350,14 +696,14 @@ export function CanvasConfigForm({ showClear = false }: { showClear?: boolean })
 
       <PrimaryButton
         disabled={saving || apiKey.trim().length === 0}
-        label={saving ? "Saving..." : "Save configuration"}
+        label={isConnectMode ? connectButtonLabel : settingsButtonLabel}
         onPress={() => {
           setSaving(true);
           setError(null);
 
           void saveConfig({ apiBase, apiKey })
             .catch((nextError) => {
-              setError(nextError instanceof Error ? nextError.message : "Could not save the configuration");
+              setError(nextError instanceof Error ? nextError.message : t(resolvedLocale, "connect.saveError"));
             })
             .finally(() => {
               setSaving(false);
@@ -365,7 +711,7 @@ export function CanvasConfigForm({ showClear = false }: { showClear?: boolean })
         }}
       />
 
-      {showClear ? <SecondaryButton label="Clear saved credentials" onPress={() => void clearConfig()} /> : null}
+      {showClear ? <SecondaryButton label={t(resolvedLocale, "connect.clearCredentials")} onPress={() => void clearConfig()} /> : null}
     </SectionCard>
   );
 }
@@ -376,6 +722,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 14,
     padding: 18,
+  },
+  cardCompact: {
+    borderRadius: 22,
+    gap: 12,
+    padding: 14,
   },
   cardBody: {
     gap: 12,
@@ -400,6 +751,11 @@ const styles = StyleSheet.create({
   content: {
     gap: 18,
     padding: 16,
+  },
+  connectScreenContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingBottom: 12,
   },
   errorText: {
     color: "#b91c1c",
@@ -434,6 +790,31 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   inlineNoticeTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  instructionsCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 14,
+    padding: 16,
+  },
+  instructionsLink: {
+    fontSize: 13,
+    fontWeight: "600",
+    textDecorationLine: "underline",
+  },
+  instructionsLinkButton: {
+    alignSelf: "flex-start",
+  },
+  instructionsSection: {
+    gap: 6,
+  },
+  instructionsStep: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  instructionsTitle: {
     fontSize: 14,
     fontWeight: "700",
   },
@@ -535,5 +916,147 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "700",
     letterSpacing: -0.6,
+  },
+  welcomeBadge: {
+    borderRadius: 22,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    position: "absolute",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+  },
+  welcomeBadgeBottom: {
+    bottom: 14,
+    right: 10,
+    width: 188,
+  },
+  welcomeBadgeLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  welcomeBadgeMeta: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  welcomeBadgeTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  welcomeBadgeTop: {
+    left: 8,
+    top: 16,
+    width: 176,
+  },
+  welcomeBody: {
+    gap: 14,
+  },
+  welcomeCenterCard: {
+    alignItems: "center",
+    borderRadius: 30,
+    borderWidth: 1,
+    gap: 10,
+    marginHorizontal: 32,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+  },
+  welcomeCenterIcon: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 52,
+    justifyContent: "center",
+    width: 52,
+  },
+  welcomeCenterPills: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
+  welcomeCenterSubtitle: {
+    fontSize: 13,
+    textAlign: "center",
+  },
+  welcomeCenterTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    letterSpacing: -0.8,
+  },
+  welcomeGlow: {
+    borderRadius: 999,
+    position: "absolute",
+  },
+  welcomeGlowLarge: {
+    height: 220,
+    left: 22,
+    top: 18,
+    width: 220,
+  },
+  welcomeGlowSmall: {
+    height: 156,
+    right: 20,
+    top: 82,
+    width: 156,
+  },
+  welcomeHero: {
+    justifyContent: "center",
+    minHeight: 320,
+    position: "relative",
+  },
+  welcomeHighlight: {
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  welcomeHighlightDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  welcomeHighlightTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  welcomeHighlights: {
+    gap: 10,
+  },
+  welcomeMiniPill: {
+    alignItems: "center",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  welcomeMiniPillText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  welcomeScreen: {
+    gap: 18,
+    justifyContent: "center",
+    paddingVertical: 6,
+  },
+  welcomeScreenContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  welcomeSubtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  welcomeTitle: {
+    fontSize: 30,
+    fontWeight: "800",
+    letterSpacing: -1.1,
+    lineHeight: 34,
   },
 });

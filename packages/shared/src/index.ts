@@ -6,3 +6,5 @@ export * from "./bookmarks";
 export * from "./preferences";
 export * from "./canvas-links";
 export * from "./due-activities";
+export * from "./locale";
+export * from "./onboarding";

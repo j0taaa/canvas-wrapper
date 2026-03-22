@@ -2,17 +2,12 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { MessageSquarePlus, Plus } from "lucide-react";
+import { formatSubjectName, getSubjectColorPalette, t } from "@canvas/shared";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { getAppShellData, getInboxData } from "@/lib/canvas";
+import { getRequestLocale } from "@/lib/request-locale";
 import { formatDueDate } from "@/lib/utils";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
@@ -30,6 +25,19 @@ function getInitials(name: string) {
     .join("");
 }
 
+function resolveConversationPalette(
+  contextName: string | undefined,
+  courses: Array<{ id: number; name: string }>,
+) {
+  const formattedContext = formatSubjectName(contextName ?? "").toLowerCase();
+  const matchedCourse = courses.find((course) => {
+    const formattedCourseName = formatSubjectName(course.name).toLowerCase();
+    return formattedCourseName === formattedContext || course.name.toLowerCase() === (contextName ?? "").toLowerCase();
+  });
+
+  return getSubjectColorPalette(contextName ?? matchedCourse?.name);
+}
+
 export default async function InboxPage({
   searchParams,
 }: {
@@ -37,6 +45,7 @@ export default async function InboxPage({
 }) {
   const { mode, sent } = await searchParams;
   const cookieStore = await cookies();
+  const { resolvedLocale } = await getRequestLocale();
   const apiKey = cookieStore.get(CANVAS_API_KEY_COOKIE)?.value;
 
   if (!apiKey) {
@@ -53,14 +62,14 @@ export default async function InboxPage({
       <div className="w-full">
         <div className="mb-6 flex items-end justify-between gap-4 border-b border-border/80 pb-4">
           <div>
-            <h1 className="text-2xl font-bold">Inbox</h1>
-            <p className="text-sm text-muted-foreground">Recent Canvas conversations and course-wide messages.</p>
+            <h1 className="text-2xl font-bold">{t(resolvedLocale, "inbox.title")}</h1>
+            <p className="text-sm text-muted-foreground">{t(resolvedLocale, "inbox.subtitle")}</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-muted-foreground">{inboxData.conversations.length}</span>
             <Link href="/inbox/new" className={primaryLinkButtonClassName}>
               <MessageSquarePlus className="h-4 w-4" />
-              <span>New message</span>
+              <span>{t(resolvedLocale, "inbox.newMessage")}</span>
             </Link>
           </div>
         </div>
@@ -68,59 +77,64 @@ export default async function InboxPage({
         {sent === "1" && (
           <div className="mb-4 rounded-3xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
             {mode === "queued"
-              ? "Message queued. Canvas is sending the individual copies in the background."
-              : "Message sent."}
+              ? t(resolvedLocale, "inbox.queued")
+              : t(resolvedLocale, "inbox.sent")}
           </div>
         )}
 
-        <Card className="border-border/80 bg-card/95">
-          <CardHeader>
-            <CardTitle>Messages</CardTitle>
-            <CardDescription>Most recent conversations first</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {inboxData.conversations.length === 0 && (
-              <p className="text-sm text-muted-foreground">No recent conversations found.</p>
-            )}
-            {inboxData.conversations.map((conversation) => {
-              const participant = conversation.participants?.find((item) => item.name);
-              return (
-                <Link
-                  key={conversation.id}
-                  href={`/inbox/${conversation.id}`}
-                  className="block rounded-md border border-border/70 p-3 transition hover:border-foreground/15 hover:bg-muted/65"
-                >
-                  <div className="flex items-start justify-between gap-3">
+        <div className="space-y-3">
+          {inboxData.conversations.length === 0 && (
+            <p className="text-sm text-muted-foreground">{t(resolvedLocale, "inbox.empty")}</p>
+          )}
+          {inboxData.conversations.map((conversation) => {
+            const participant = conversation.participants?.find((item) => item.name);
+            const palette = resolveConversationPalette(conversation.context_name, shellData.courses);
+            return (
+              <Link
+                key={conversation.id}
+                href={`/inbox/${conversation.id}`}
+                className="block rounded-2xl border border-border/70 bg-card/95 p-4 transition hover:border-foreground/15 hover:bg-muted/65"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-1 self-stretch rounded-full" style={{ backgroundColor: palette.borderColor }} />
+                  <div className="flex flex-1 items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
                       <Avatar className="border border-border/70">
-                        <AvatarImage src={participant?.avatar_url} alt={participant?.name ?? "Conversation"} />
+                        <AvatarImage src={participant?.avatar_url} alt={participant?.name ?? t(resolvedLocale, "inbox.conversationFallback")} />
                         <AvatarFallback>{getInitials(participant?.name ?? "CN")}</AvatarFallback>
                       </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{conversation.subject || "No subject"}</p>
-                        <p className="text-xs text-muted-foreground">{conversation.context_name ?? "Canvas"}</p>
-                        <p className="mt-1 text-sm text-foreground/80">{conversation.last_message ?? "No preview available."}</p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">{conversation.subject || t(resolvedLocale, "inbox.noSubject")}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span
+                            className="inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                            style={{ borderColor: palette.borderColor, backgroundColor: palette.backgroundColor, color: palette.color }}
+                          >
+                            {formatSubjectName(conversation.context_name ?? t(resolvedLocale, "common.canvas"))}
+                          </span>
+                          {conversation.workflow_state === "unread" && (
+                            <Badge variant="outline" className="border-border/70 text-foreground">
+                              {t(resolvedLocale, "inbox.unread")}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-foreground/80">{conversation.last_message ?? t(resolvedLocale, "inbox.noPreview")}</p>
                       </div>
                     </div>
-                    {conversation.workflow_state === "unread" && (
-                      <Badge variant="outline" className="border-border/70 text-foreground">
-                        Unread
-                      </Badge>
-                    )}
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span>{conversation.message_count ?? 0} messages</span>
-                    <span>{formatDueDate(conversation.last_message_at)}</span>
-                  </div>
-                </Link>
-              );
-            })}
-          </CardContent>
-        </Card>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                  <span>{t(resolvedLocale, "inbox.messageCount", { count: conversation.message_count ?? 0 })}</span>
+                  <span>{formatDueDate(resolvedLocale, conversation.last_message_at)}</span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
 
         <Link
           href="/inbox/new"
-          aria-label="New message"
+          aria-label={t(resolvedLocale, "inbox.newMessage")}
           className={floatingComposeButtonClassName}
         >
           <Plus className="h-6 w-6" />

@@ -13,7 +13,7 @@ import {
   Sigma,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { formatSubjectName, getSubjectColorPalette } from "@canvas/shared";
+import { formatSubjectName, getSubjectColorPalette, t } from "@canvas/shared";
 import { PlaceholderBlock } from "./app-ui";
 import { useCourseShell } from "../hooks/use-canvas-queries";
 import { useAppPreferences } from "../providers/app-preferences";
@@ -65,7 +65,7 @@ export function SubjectLayoutHeader() {
   const params = useGlobalSearchParams<{ courseId: string; peopleView?: string; tab?: string }>();
   const insets = useSafeAreaInsets();
   const courseId = Number(params.courseId);
-  const { resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
+  const { resolvedLocale, resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
   const { data: shellData } = useCourseShell(courseId);
   const course = shellData?.course;
   const activeTab = getActiveTab(pathname, params.tab, params.peopleView);
@@ -110,7 +110,7 @@ export function SubjectLayoutHeader() {
                   {formatSubjectName(course.name)}
                 </Text>
                 <Text style={[styles.courseCode, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {course.course_code ?? "Subject"}
+                  {course.course_code ?? t(resolvedLocale, "common.subject")}
                 </Text>
               </View>
             </View>
@@ -145,16 +145,16 @@ export function SubjectLayoutHeader() {
                       ]}
                     >
                       {tab === "modules"
-                        ? "Modules"
+                        ? t(resolvedLocale, "subjects.modules")
                         : tab === "assignments"
-                          ? "Assignments"
+                          ? t(resolvedLocale, "subjects.assignments")
                           : tab === "grades"
-                            ? "Grades"
+                            ? t(resolvedLocale, "subjects.grades")
                             : tab === "people"
-                              ? "People"
+                              ? t(resolvedLocale, "subjects.people")
                               : tab === "forums"
-                                ? "Forums"
-                                : "Files"}
+                                ? t(resolvedLocale, "subjects.forums")
+                                : t(resolvedLocale, "subjects.files")}
                     </Text>
                   </Pressable>
                 ))}
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   inner: {
     gap: 12,
     paddingBottom: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingTop: 10,
   },
   loadingTabs: {
@@ -220,8 +220,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   tabsScroll: {
-    marginHorizontal: -12,
-    paddingHorizontal: 12,
+    marginHorizontal: -10,
+    paddingHorizontal: 10,
   },
   tabText: {
     fontSize: 13,

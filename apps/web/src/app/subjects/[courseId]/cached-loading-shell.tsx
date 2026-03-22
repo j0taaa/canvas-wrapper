@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useMemo, useState } from "react";
+import { t } from "@canvas/shared";
 import { type LucideIcon } from "lucide-react";
 import type { CanvasDashboardData } from "@/lib/canvas";
 import type { CanvasBootstrapData } from "@/lib/app-bootstrap";
@@ -11,6 +12,7 @@ import {
   SUBJECT_PREFERENCES_EVENT,
 } from "@/lib/subject-preferences";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
+import { useLocale } from "@/components/locale-provider";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { Badge } from "@/components/ui/badge";
 import { formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
@@ -115,6 +117,7 @@ export function SubjectLoadingShell({
   icon: LucideIcon;
   title: string;
 }) {
+  const { resolvedLocale } = useLocale();
   const { course, dashboardData, subjectStyle } = useCachedSubjectLoadingData(courseId);
 
   return (
@@ -122,6 +125,7 @@ export function SubjectLoadingShell({
       profile={dashboardData?.profile}
       courses={dashboardData?.courses}
       currentCourseId={Number.isFinite(courseId) ? courseId : undefined}
+      contentClassName="p-4 pb-32 md:p-5 md:pb-6"
     >
       <div className="w-full">
         {backHref && (
@@ -131,7 +135,7 @@ export function SubjectLoadingShell({
         )}
 
         <div className="mb-6 overflow-hidden rounded-2xl border border-black/15 bg-gradient-to-br from-white via-white to-black/[0.03] dark:border-white/12 dark:from-card dark:via-card dark:to-white/[0.04]">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-5 py-5 dark:border-white/10 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-4 py-4 dark:border-white/10 sm:px-5">
             <div className="min-w-0">
               <div className="mb-3 flex items-center gap-3">
                 <span
@@ -143,7 +147,7 @@ export function SubjectLoadingShell({
                 <div className="min-w-0">
                   <h1 className="truncate text-2xl font-semibold">{title}</h1>
                   <p className="text-sm text-black/55 dark:text-white/55">
-                    {courseCode ?? course?.course_code ?? (course ? formatSubjectName(course.name) : "Loading subject")}
+                    {courseCode ?? course?.course_code ?? (course ? formatSubjectName(course.name) : t(resolvedLocale, "subjects.loadingSubject"))}
                   </p>
                 </div>
               </div>

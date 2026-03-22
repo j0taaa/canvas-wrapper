@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, EyeOff, MonitorCog, MoonStar, Palette, Smartphone, SunMedium } from "lucide-react";
+import { getLocaleDisplayName, t, type LanguagePreference } from "@canvas/shared";
+import { useLocale } from "@/components/locale-provider";
 import { formatSubjectName, getSubjectColorHex, getSubjectColorStyle, orderSubjectsByPreference } from "@/lib/utils";
 import {
   readHapticsPreference,
@@ -34,12 +36,57 @@ const themeOptions: Array<{
   label: string;
   value: ThemePreference;
 }> = [
-  { icon: MonitorCog, label: "System", value: "system" },
-  { icon: SunMedium, label: "Light", value: "light" },
-  { icon: MoonStar, label: "Dark", value: "dark" },
+  { icon: MonitorCog, label: "settings.systemTheme", value: "system" },
+  { icon: SunMedium, label: "settings.light", value: "light" },
+  { icon: MoonStar, label: "settings.dark", value: "dark" },
 ];
 
+const languageOptions: LanguagePreference[] = ["system", "en", "pt-BR"];
+
+function LanguagePreferenceSelector() {
+  const { languagePreference, resolvedLocale, setLanguagePreference } = useLocale();
+
+  return (
+    <div className="rounded-2xl border border-border/70 bg-muted/35 p-4">
+      <p className="mb-3 text-sm font-medium text-foreground">{t(resolvedLocale, "settings.appLanguageTitle")}</p>
+      <div className="flex flex-wrap gap-2">
+        {languageOptions.map((option) => {
+          const label = option === "system"
+            ? t(resolvedLocale, "common.system")
+            : getLocaleDisplayName(option, resolvedLocale);
+
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setLanguagePreference(option)}
+              className={
+                languagePreference === option
+                  ? "inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                  : "inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
+              }
+            >
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        {t(resolvedLocale, "settings.languageDescription")}
+      </p>
+      {languagePreference === "system" && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {t(resolvedLocale, "settings.languageSystemDescription", {
+            language: getLocaleDisplayName(resolvedLocale, resolvedLocale),
+          })}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ThemePreferenceSelector() {
+  const { resolvedLocale } = useLocale();
   const [themePreference, setThemePreference] = useState<ThemePreference>(DEFAULT_THEME_PREFERENCE);
 
   useEffect(() => {
@@ -57,7 +104,7 @@ function ThemePreferenceSelector() {
 
   return (
     <div className="rounded-2xl border border-border/70 bg-muted/35 p-4">
-      <p className="mb-3 text-sm font-medium text-foreground">Appearance</p>
+      <p className="mb-3 text-sm font-medium text-foreground">{t(resolvedLocale, "common.appearance")}</p>
       <div className="flex flex-wrap gap-2">
         {themeOptions.map((option) => {
           const Icon = option.icon;
@@ -74,19 +121,20 @@ function ThemePreferenceSelector() {
               }
             >
               <Icon className="h-4 w-4" />
-              <span>{option.label}</span>
+              <span>{t(resolvedLocale, option.label as "settings.systemTheme" | "settings.light" | "settings.dark")}</span>
             </button>
           );
         })}
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        Use the system theme by default, or force light or dark mode for the whole app.
+        {t(resolvedLocale, "settings.themeDescription")}
       </p>
     </div>
   );
 }
 
 function HapticsPreferenceSelector() {
+  const { resolvedLocale } = useLocale();
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
@@ -104,7 +152,7 @@ function HapticsPreferenceSelector() {
 
   return (
     <div className="rounded-2xl border border-border/70 bg-muted/35 p-4">
-      <p className="mb-3 text-sm font-medium text-foreground">Haptic feedback</p>
+      <p className="mb-3 text-sm font-medium text-foreground">{t(resolvedLocale, "settings.haptics")}</p>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -116,7 +164,7 @@ function HapticsPreferenceSelector() {
           }
         >
           <Smartphone className="h-4 w-4" />
-          <span>Off</span>
+          <span>{t(resolvedLocale, "common.off")}</span>
         </button>
         <button
           type="button"
@@ -128,17 +176,18 @@ function HapticsPreferenceSelector() {
           }
         >
           <Smartphone className="h-4 w-4" />
-          <span>On</span>
+          <span>{t(resolvedLocale, "common.on")}</span>
         </button>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        Optional tap feedback for supported phones and touch devices. It is queued asynchronously so it never waits on navigation.
+        {t(resolvedLocale, "settings.hapticsDescription")}
       </p>
     </div>
   );
 }
 
 function MobileSubjectBarSelector() {
+  const { resolvedLocale } = useLocale();
   const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
@@ -156,7 +205,7 @@ function MobileSubjectBarSelector() {
 
   return (
     <div className="rounded-2xl border border-border/70 bg-muted/35 p-4">
-      <p className="mb-3 text-sm font-medium text-foreground">Mobile subject bar</p>
+      <p className="mb-3 text-sm font-medium text-foreground">{t(resolvedLocale, "settings.mobileSubjectBar")}</p>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -167,7 +216,7 @@ function MobileSubjectBarSelector() {
               : "inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
           }
         >
-          <span>Show</span>
+          <span>{t(resolvedLocale, "common.show")}</span>
         </button>
         <button
           type="button"
@@ -178,17 +227,18 @@ function MobileSubjectBarSelector() {
               : "inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
           }
         >
-          <span>Hide</span>
+          <span>{t(resolvedLocale, "common.hide")}</span>
         </button>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        Show or hide the horizontal subject shortcuts above the mobile bottom navigation.
+        {t(resolvedLocale, "settings.mobileSubjectBarDescription")}
       </p>
     </div>
   );
 }
 
 function MobileDashboardSubjectSizeSelector() {
+  const { resolvedLocale } = useLocale();
   const [compact, setCompact] = useState(false);
 
   useEffect(() => {
@@ -206,7 +256,7 @@ function MobileDashboardSubjectSizeSelector() {
 
   return (
     <div className="rounded-2xl border border-border/70 bg-muted/35 p-4">
-      <p className="mb-3 text-sm font-medium text-foreground">Mobile dashboard subjects</p>
+      <p className="mb-3 text-sm font-medium text-foreground">{t(resolvedLocale, "settings.mobileDashboardSubjects")}</p>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -217,7 +267,7 @@ function MobileDashboardSubjectSizeSelector() {
               : "inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
           }
         >
-          <span>Default</span>
+          <span>{t(resolvedLocale, "common.default")}</span>
         </button>
         <button
           type="button"
@@ -228,17 +278,18 @@ function MobileDashboardSubjectSizeSelector() {
               : "inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
           }
         >
-          <span>Compact</span>
+          <span>{t(resolvedLocale, "common.compact")}</span>
         </button>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        Make dashboard subject cards smaller on mobile so two subjects fit per row.
+        {t(resolvedLocale, "settings.mobileDashboardSubjectsDescription")}
       </p>
     </div>
   );
 }
 
 function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["courses"] }) {
+  const { resolvedLocale } = useLocale();
   const [preferences, setPreferences] = useState(DEFAULT_SUBJECT_PREFERENCES);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -293,9 +344,9 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
         className="flex w-full items-center justify-between rounded-2xl border border-border/70 bg-muted/35 p-4 text-left transition hover:border-border hover:bg-muted/50"
       >
         <div>
-          <p className="text-sm font-medium text-foreground">Subjects</p>
+          <p className="text-sm font-medium text-foreground">{t(resolvedLocale, "common.subjects")}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Hide subjects, change their colors, and reorder them.
+            {t(resolvedLocale, "settings.subjectsDescription")}
           </p>
         </div>
         <ChevronDown className={`h-4 w-4 text-muted-foreground transition ${isExpanded ? "rotate-180" : ""}`} />
@@ -304,14 +355,14 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
       {isExpanded && (
         <div className="mt-3 space-y-3">
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-muted/35 px-4 py-3 text-xs text-muted-foreground">
-            <span>Use the arrows to reorder how active subjects appear in the dashboard and navigation.</span>
+            <span>{t(resolvedLocale, "settings.subjectsOrderDescription")}</span>
             {preferences.orderedCourseIds.length > 0 && (
               <button
                 type="button"
                 onClick={() => writeSubjectPreferences({ ...preferences, orderedCourseIds: [] })}
                 className="shrink-0 text-foreground transition hover:opacity-75"
               >
-                Reset order
+                {t(resolvedLocale, "common.resetOrder")}
               </button>
             )}
           </div>
@@ -341,7 +392,7 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
                         onClick={() => moveCourse(course.id, -1)}
                         disabled={index === 0}
                         className="rounded-full p-1 text-muted-foreground transition hover:bg-card hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
-                        aria-label={`Move ${formatSubjectName(course.name)} up`}
+                        aria-label={`${t(resolvedLocale, "common.back")} ${formatSubjectName(course.name)}`}
                       >
                         <ArrowUp className="h-3.5 w-3.5" />
                       </button>
@@ -350,7 +401,7 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
                         onClick={() => moveCourse(course.id, 1)}
                         disabled={index === orderedVisibleCourses.length - 1}
                         className="rounded-full p-1 text-muted-foreground transition hover:bg-card hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
-                        aria-label={`Move ${formatSubjectName(course.name)} down`}
+                        aria-label={`${t(resolvedLocale, "common.settings")} ${formatSubjectName(course.name)}`}
                       >
                         <ArrowDown className="h-3.5 w-3.5" />
                       </button>
@@ -371,7 +422,7 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
                         }}
                         className="h-4 w-4 rounded border-border/70 bg-background"
                       />
-                      Visible
+                      {t(resolvedLocale, "common.visible")}
                     </label>
                   </div>
                 </div>
@@ -379,7 +430,7 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <label className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Palette className="h-4 w-4" />
-                    Color
+                    {t(resolvedLocale, "common.color")}
                     <input
                       type="color"
                       value={inputColor}
@@ -393,7 +444,7 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
                         });
                       }}
                       className="h-8 w-10 rounded border border-border/70 bg-transparent p-0"
-                      aria-label={`Choose color for ${formatSubjectName(course.name)}`}
+                      aria-label={`${t(resolvedLocale, "common.color")} ${formatSubjectName(course.name)}`}
                     />
                   </label>
                   {preferredColor && (
@@ -410,13 +461,13 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
                       }}
                       className="text-xs text-muted-foreground transition hover:text-foreground"
                     >
-                      Reset color
+                      {t(resolvedLocale, "common.resetColor")}
                     </button>
                   )}
                   {isHidden && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/50 px-2 py-1 text-[11px] text-muted-foreground">
                       <EyeOff className="h-3 w-3" />
-                      Hidden
+                      {t(resolvedLocale, "common.hidden")}
                     </span>
                   )}
                 </div>
@@ -430,20 +481,22 @@ function SubjectPreferenceList({ courses }: { courses: ProfilePreferencesProps["
 }
 
 export function ProfilePreferences({ courses }: ProfilePreferencesProps) {
+  const { resolvedLocale } = useLocale();
   return (
     <div className="space-y-6">
+      <LanguagePreferenceSelector />
       <ThemePreferenceSelector />
       <HapticsPreferenceSelector />
       <MobileSubjectBarSelector />
       <MobileDashboardSubjectSizeSelector />
       <div className="rounded-2xl border border-border/70 bg-muted/35 p-4 text-sm text-muted-foreground">
-        Hide subjects from the dashboard and navigation, choose your own subject colors, or enable optional haptic feedback.
+        {t(resolvedLocale, "settings.overviewDescription")}
       </div>
       <SubjectPreferenceList courses={courses} />
       <div className="rounded-2xl border border-border/70 bg-muted/35 p-4 text-sm text-muted-foreground">
-        <p className="font-medium text-foreground">Made by Gabriel Jota Lizardo</p>
+        <p className="font-medium text-foreground">{t(resolvedLocale, "common.madeBy")}</p>
         <p className="mt-2">
-          Suggestions, fixes, or feedback:
+          {t(resolvedLocale, "settings.suggestions")}
           {" "}
           <a
             href="mailto:gabrieljotalizardo@gmail.com"
@@ -453,7 +506,7 @@ export function ProfilePreferences({ courses }: ProfilePreferencesProps) {
           </a>
         </p>
         <p className="mt-2">
-          LinkedIn:
+          {t(resolvedLocale, "settings.linkedIn")}
           {" "}
           <a
             href="https://www.linkedin.com/in/gabriel-jota-lizardo-4587a427b/"

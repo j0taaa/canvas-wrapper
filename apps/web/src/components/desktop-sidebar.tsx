@@ -4,7 +4,9 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Bookmark, CalendarDays, House, Inbox, LibraryBig, UserRound } from "lucide-react";
+import { t } from "@canvas/shared";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useLocale } from "@/components/locale-provider";
 import {
   DEFAULT_SUBJECT_PREFERENCES,
   readSubjectPreferences,
@@ -74,6 +76,7 @@ export function DesktopSidebar({
   initialPreferences = DEFAULT_SUBJECT_PREFERENCES,
 }: DesktopSidebarProps) {
   const router = useRouter();
+  const { resolvedLocale } = useLocale();
   const [preferences, setPreferences] = useState(initialPreferences);
 
   useEffect(() => {
@@ -122,7 +125,7 @@ export function DesktopSidebar({
           </div>
         </Link>
       )}
-      <h1 className="mb-6 text-xl font-bold">Canvas</h1>
+      <h1 className="mb-6 text-xl font-bold">{t(resolvedLocale, "common.canvas")}</h1>
       <nav className="space-y-2 text-sm">
         {navItems.map((item) => (
           <Link
@@ -134,12 +137,14 @@ export function DesktopSidebar({
                 : "block rounded-md border border-border bg-card/70 px-3 py-2 text-foreground/80 transition hover:border-foreground/15 hover:bg-muted/85 hover:text-foreground"
             }
           >
-            {item.label}
+            {t(resolvedLocale, `navigation.${item.key}`)}
           </Link>
         ))}
         {visibleCourses && visibleCourses.length > 0 && (
           <div className="mt-6 border-t border-border/80 pt-4">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Subjects</p>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t(resolvedLocale, "common.subjects")}
+            </p>
             <div className="space-y-1">
               {visibleCourses.map((course) => (
                 <Link
@@ -169,7 +174,7 @@ export function DesktopSidebar({
           onClick={clearKey}
           className="mt-4 text-xs text-muted-foreground transition hover:text-foreground"
         >
-          Change API key
+          {t(resolvedLocale, "common.changeApiKey")}
         </button>
       </nav>
     </aside>
@@ -184,6 +189,7 @@ export function MobileBottomNav({
 }: Omit<DesktopSidebarProps, "profile">) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { resolvedLocale } = useLocale();
   const subjectBarRef = useRef<HTMLDivElement | null>(null);
   const [preferences, setPreferences] = useState(initialPreferences);
   const [lastDashboardRoute, setLastDashboardRoute] = useState(() => {
@@ -457,7 +463,7 @@ export function MobileBottomNav({
               }
             >
               <Icon className="h-4 w-4" />
-              <span>{item.label}</span>
+              <span className="w-full text-center leading-tight">{t(resolvedLocale, `navigation.${item.key}`)}</span>
             </Link>
           );
         })}

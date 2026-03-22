@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Canvas Wrapper",
-    "slug": "canvas-wrapper-mobile",
-    "scheme": "canvaswrapper",
+    "name": "Janvas",
+    "slug": "janvas-mobile",
+    "scheme": "janvas",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -13,8 +13,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCalendarsFullAccessUsageDescription": "Canvas Wrapper uses your calendar to sync upcoming assignments and quizzes.",
-        "NSCalendarsUsageDescription": "Canvas Wrapper uses your calendar to sync upcoming assignments and quizzes."
+        "NSCalendarsFullAccessUsageDescription": "Janvas uses your calendar to sync upcoming assignments and quizzes.",
+        "NSCalendarsUsageDescription": "Janvas uses your calendar to sync upcoming assignments and quizzes."
       }
     },
     "android": {
@@ -31,7 +31,20 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-localization",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#111827",
+          "image": "./assets/icon.png",
+          "dark": {
+            "backgroundColor": "#020617",
+            "image": "./assets/icon.png"
+          },
+          "imageWidth": 180
+        }
+      ]
     ]
   }
 }

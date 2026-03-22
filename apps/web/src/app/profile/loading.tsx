@@ -63,14 +63,7 @@ export default function ProfileLoading() {
             </CardContent>
           </Card>
 
-          <Card className="border-border/80 bg-card/95">
-            <CardHeader className="border-b border-border/70">
-              <CardTitle>Configurations</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <ProfilePreferences courses={courses} />
-            </CardContent>
-          </Card>
+          <ProfilePreferences courses={courses} />
         </div>
       </div>
     </CachedAppShell>

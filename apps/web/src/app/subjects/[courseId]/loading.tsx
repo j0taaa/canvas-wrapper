@@ -1,8 +1,10 @@
 "use client";
 import { useParams, useSearchParams } from "next/navigation";
 import { BookOpen, CircleDot } from "lucide-react";
+import { t } from "@canvas/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useLocale } from "@/components/locale-provider";
 import { formatDueDateShort } from "@/lib/utils";
 import {
   HeaderBadge,
@@ -20,6 +22,7 @@ function normalizeTab(value?: string | null): SubjectTab {
 }
 
 export default function SubjectLoading() {
+  const { resolvedLocale } = useLocale();
   const params = useParams<{ courseId: string }>();
   const searchParams = useSearchParams();
   const courseId = Number(params.courseId);
@@ -63,18 +66,18 @@ export default function SubjectLoading() {
               }
             >
               {item === "overview"
-                ? "Overview"
+                ? t(resolvedLocale, "subjects.overview")
                 : item === "modules"
-                  ? "Modules"
+                  ? t(resolvedLocale, "subjects.modules")
                   : item === "assignments"
-                    ? "Assignments"
+                    ? t(resolvedLocale, "subjects.assignments")
                     : item === "grades"
-                      ? "Grades"
+                      ? t(resolvedLocale, "subjects.grades")
                       : item === "people"
-                        ? "People"
+                        ? t(resolvedLocale, "subjects.people")
                         : item === "forums"
-                          ? "Forums"
-                          : "Files"}
+                          ? t(resolvedLocale, "subjects.forums")
+                          : t(resolvedLocale, "subjects.files")}
             </span>
           );
         })}
@@ -85,8 +88,8 @@ export default function SubjectLoading() {
           {(effectiveTab === "overview" || effectiveTab === "modules") && (
             <Card className="border-black/15 bg-white/90 dark:border-white/12 dark:bg-card/90">
               <CardHeader className="border-b border-black/10 dark:border-white/10">
-                <CardTitle>Modules</CardTitle>
-                <CardDescription>Showing prefetched content while the latest data loads.</CardDescription>
+                <CardTitle>{t(resolvedLocale, "subjects.modules")}</CardTitle>
+                <CardDescription>{t(resolvedLocale, "common.loading")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {modules.slice(0, 4).map((module) => (
@@ -94,10 +97,10 @@ export default function SubjectLoading() {
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate font-medium">{module.name}</p>
-                        <p className="mt-1 text-xs text-black/50 dark:text-white/50">Course materials</p>
+                        <p className="mt-1 text-xs text-black/50 dark:text-white/50">{t(resolvedLocale, "subjects.courseMaterials")}</p>
                       </div>
                       <span className="shrink-0 rounded-full border border-black/15 px-2.5 py-1 text-xs text-black/60 dark:border-white/15 dark:text-white/60">
-                        {module.items_count ?? module.items?.length ?? 0} items
+                        {t(resolvedLocale, "subjects.itemsCount", { count: module.items_count ?? module.items?.length ?? 0 })}
                       </span>
                     </div>
                     <div className="space-y-2">
@@ -105,8 +108,8 @@ export default function SubjectLoading() {
                         <div key={item.id} className="flex items-start gap-2 rounded-lg border border-black/8 bg-white/80 px-3 py-2.5 text-sm dark:border-white/8 dark:bg-white/[0.04]">
                           <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: subjectStyle.borderColor }} />
                           <div className="min-w-0">
-                            <p className="truncate">{item.title ?? "Untitled item"}</p>
-                            <p className="mt-1 text-xs text-black/55 dark:text-white/55">{item.type ?? "Content"}</p>
+                            <p className="truncate">{item.title ?? t(resolvedLocale, "subjects.untitledItem")}</p>
+                            <p className="mt-1 text-xs text-black/55 dark:text-white/55">{item.type ?? t(resolvedLocale, "subjects.content")}</p>
                           </div>
                         </div>
                       ))}
@@ -120,8 +123,8 @@ export default function SubjectLoading() {
           {(effectiveTab === "overview" || effectiveTab === "assignments") && (
             <Card className="border-black/15 bg-white/90 dark:border-white/12 dark:bg-card/90">
               <CardHeader className="border-b border-black/10 dark:border-white/10">
-                <CardTitle>Assignments</CardTitle>
-                <CardDescription>Showing prefetched content while the latest data loads.</CardDescription>
+                <CardTitle>{t(resolvedLocale, "subjects.assignments")}</CardTitle>
+                <CardDescription>{t(resolvedLocale, "common.loading")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {assignments.slice(0, 5).map((assignment) => (
@@ -129,17 +132,17 @@ export default function SubjectLoading() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className={`truncate font-medium ${assignment.submission?.workflow_state === "submitted" ? "line-through opacity-65" : ""}`}>
-                          {assignment.name ?? "Untitled assignment"}
+                          {assignment.name ?? t(resolvedLocale, "subjects.assignments")}
                         </p>
                         <div className="mt-2 flex items-center gap-2 text-xs text-black/60 dark:text-white/60">
                           <CircleDot className="h-3 w-3" style={{ color: subjectStyle.borderColor }} />
-                          <span>{assignment.points_possible != null ? `${assignment.points_possible} pts` : "Assignment"}</span>
-                          {assignment.due_at && <span>Due {formatDueDateShort(assignment.due_at)}</span>}
+                          <span>{assignment.points_possible != null ? t(resolvedLocale, "subjects.pointsShort", { count: assignment.points_possible }) : t(resolvedLocale, "subjects.assignments")}</span>
+                          {assignment.due_at && <span>{t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}</span>}
                         </div>
                       </div>
                       {assignment.submission?.workflow_state === "submitted" && (
                         <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/10 dark:text-emerald-300">
-                          Done
+                          {t(resolvedLocale, "calendar.done")}
                         </Badge>
                       )}
                     </div>
@@ -155,20 +158,20 @@ export default function SubjectLoading() {
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="border-black/15 bg-white/90 dark:border-white/12 dark:bg-card/90">
             <CardHeader className="border-b border-black/10 dark:border-white/10">
-              <CardTitle>Grade %</CardTitle>
-              <CardDescription>Showing prefetched content while the latest data loads.</CardDescription>
+              <CardTitle>{t(resolvedLocale, "subjects.gradePercent")}</CardTitle>
+              <CardDescription>{t(resolvedLocale, "common.loading")}</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-semibold">
-                {formatGradePercentage(cachedCourseData.grades.enrollment?.grades?.current_score) ?? "No grade yet"}
+                {formatGradePercentage(cachedCourseData.grades.enrollment?.grades?.current_score) ?? t(resolvedLocale, "common.noGrade")}
                 {cachedCourseData.grades.enrollment?.grades?.current_score != null ? "%" : ""}
               </p>
             </CardContent>
           </Card>
           <Card className="border-black/15 bg-white/90 dark:border-white/12 dark:bg-card/90">
             <CardHeader className="border-b border-black/10 dark:border-white/10">
-              <CardTitle>Assignments</CardTitle>
-              <CardDescription>Scored work loaded from cache.</CardDescription>
+              <CardTitle>{t(resolvedLocale, "subjects.assignments")}</CardTitle>
+              <CardDescription>{t(resolvedLocale, "common.loading")}</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-semibold">{cachedCourseData.grades.assignments.length}</p>
@@ -180,13 +183,13 @@ export default function SubjectLoading() {
       {((effectiveTab === "people" || effectiveTab === "forums" || effectiveTab === "files") || !cachedCourseData) && (
         <Card className="border-black/15 bg-white/90 dark:border-white/12 dark:bg-card/90">
           <CardHeader className="border-b border-black/10 dark:border-white/10">
-            <CardTitle>Loading {effectiveTab === "people" ? "people" : effectiveTab === "forums" ? "forums" : effectiveTab === "files" ? "files" : "subject"}...</CardTitle>
+            <CardTitle>{t(resolvedLocale, "common.loading")}</CardTitle>
             <CardDescription>
-              This section is not part of the dashboard bootstrap cache yet, so the app is fetching the latest data now.
+              {t(resolvedLocale, "common.loading")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <LoadingInfoCard title="Loading latest data" description="The subject shell is already restored from cache. The content for this tab is still being refreshed." />
+            <LoadingInfoCard title={t(resolvedLocale, "common.loading")} description={t(resolvedLocale, "common.loading")} />
             <div className="h-16 rounded-xl border border-black/10 bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03]" />
             <div className="h-16 rounded-xl border border-black/10 bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03]" />
           </CardContent>

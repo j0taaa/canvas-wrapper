@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { APP_WELCOME_STORAGE_KEY, t, type AppLocale } from "@canvas/shared";
 import {
   BookOpen,
   Briefcase,
@@ -22,8 +23,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/components/locale-provider";
 import { DesktopSidebar, MobileBottomNav } from "@/components/desktop-sidebar";
 import { CanvasDashboardData } from "@/lib/canvas";
+import { WelcomePanel } from "./welcome-panel";
 import {
   readSubjectPreferences,
   type SubjectPreferences,
@@ -62,10 +65,10 @@ function getDateParts(value: Date | string) {
   };
 }
 
-function getActivityAccent(dueAt?: string) {
+function getActivityAccent(locale: AppLocale, dueAt?: string) {
   if (!dueAt) {
     return {
-      label: "Later",
+      label: t(locale, "relative.later"),
       className: "border-border bg-card/80 hover:border-foreground/15 hover:bg-muted/70",
       badgeClassName: "border-border text-muted-foreground",
     };
@@ -79,7 +82,7 @@ function getActivityAccent(dueAt?: string) {
 
   if (diffDays < 0) {
     return {
-      label: "Overdue",
+      label: t(locale, "relative.overdue"),
       className: "border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100/70 dark:border-red-400/70 dark:bg-red-950/35 dark:hover:bg-red-950/50",
       badgeClassName: "border-red-400 text-red-700 dark:border-red-400/70 dark:text-red-200",
     };
@@ -87,7 +90,7 @@ function getActivityAccent(dueAt?: string) {
 
   if (diffDays === 0) {
     return {
-      label: "Due today",
+      label: t(locale, "relative.dueToday"),
       className: "border-red-300 bg-red-50/80 hover:border-red-400 hover:bg-red-50 dark:border-red-400/65 dark:bg-red-950/30 dark:hover:bg-red-950/45",
       badgeClassName: "border-red-300 text-red-700 dark:border-red-400/65 dark:text-red-200",
     };
@@ -95,14 +98,14 @@ function getActivityAccent(dueAt?: string) {
 
   if (diffDays <= 6) {
     return {
-      label: "This week",
+      label: t(locale, "relative.thisWeek"),
       className: "border-amber-300 bg-amber-50/80 hover:border-amber-400 hover:bg-amber-50 dark:border-amber-400/65 dark:bg-amber-950/30 dark:hover:bg-amber-950/45",
       badgeClassName: "border-amber-300 text-amber-700 dark:border-amber-400/65 dark:text-amber-200",
     };
   }
 
   return {
-    label: "Later",
+    label: t(locale, "relative.later"),
     className: "border-slate-300 bg-slate-50/70 hover:border-slate-400 hover:bg-slate-50 dark:border-white/12 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]",
     badgeClassName: "border-slate-300 text-slate-700 dark:border-white/12 dark:text-slate-200",
   };
@@ -134,8 +137,8 @@ function getCourseGradePercentage(course: CanvasDashboardData["courses"][number]
   );
 }
 
-function formatGradePercentage(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
+function formatGradePercentage(locale: AppLocale, value: number) {
+  return new Intl.NumberFormat(locale, {
     maximumFractionDigits: value % 1 === 0 ? 0 : 1,
     minimumFractionDigits: 0,
   }).format(value);
@@ -202,6 +205,7 @@ function prefetchAppRoutes(router: ReturnType<typeof useRouter>, data: CanvasDas
 
 export default function HomeClient({ initialData, initialPreferences }: HomeClientProps) {
   const router = useRouter();
+  const { resolvedLocale } = useLocale();
   const prefetchedRoutesRef = useRef(new Set<string>());
   const [apiKey, setApiKey] = useState(() => {
     if (typeof window === "undefined") {
@@ -216,6 +220,13 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
     }
 
     return localStorage.getItem(CANVAS_API_BASE_STORAGE)?.trim() ?? "";
+  });
+  const [hasSeenWelcome, setHasSeenWelcome] = useState(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+
+    return localStorage.getItem(APP_WELCOME_STORAGE_KEY) === "true";
   });
   const [data, setData] = useState<CanvasDashboardData | null>(() => {
     if (initialData) {
@@ -260,7 +271,7 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
     const payload = (await response.json()) as CanvasDashboardData & { error?: string };
 
     if (!response.ok) {
-      throw new Error(payload.error ?? "Could not load Canvas data");
+      throw new Error(payload.error ?? "Could not load your Canvas data");
     }
 
     setData(payload);
@@ -279,7 +290,7 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
     const refreshDelay = Math.max(0, DASHBOARD_REFRESH_MIN_AGE_MS - getAgeMs(data?.generatedAt));
     return scheduleBackgroundTask(() => {
       loadDashboard(apiKey, providerUrl).catch((loadError: unknown) => {
-        const message = loadError instanceof Error ? loadError.message : "Could not load Canvas data";
+        const message = loadError instanceof Error ? loadError.message : "Could not load your Canvas data";
         setError(message);
         setLoading(false);
       });
@@ -373,36 +384,47 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
     try {
       await loadDashboard(apiKey.trim(), providerUrl.trim());
     } catch (loadError: unknown) {
-      const message = loadError instanceof Error ? loadError.message : "Could not load Canvas data";
+      const message = loadError instanceof Error ? loadError.message : "Could not load your Canvas data";
       setError(message);
       setLoading(false);
     }
   };
 
   if (!data) {
+    if (!hasSavedKey && !hasSeenWelcome) {
+      return (
+        <WelcomePanel
+          onContinue={() => {
+            localStorage.setItem(APP_WELCOME_STORAGE_KEY, "true");
+            setHasSeenWelcome(true);
+          }}
+        />
+      );
+    }
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
           <Card className="w-full max-w-xl border-border/80 bg-card">
           <CardHeader>
-            <CardTitle>Connect your Canvas account</CardTitle>
-            <CardDescription>Paste your Canvas API key. It is saved on this device for future sessions.</CardDescription>
+            <CardTitle>{t(resolvedLocale, "connect.accountTitle")}</CardTitle>
+            <CardDescription>{t(resolvedLocale, "connect.accountSubtitle")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="mb-4 rounded-2xl border border-border/70 bg-muted/35 p-4">
-              <p className="mb-2 text-sm font-medium text-foreground">How to get your API key</p>
+              <p className="mb-2 text-sm font-medium text-foreground">{t(resolvedLocale, "connect.howToGetKeyTitle")}</p>
               <ol className="space-y-1 text-sm text-muted-foreground">
-                <li>1. Open Canvas and go to your profile or account settings page.</li>
-                <li>2. Find the <span className="font-medium text-foreground">Approved Integrations</span> section.</li>
-                <li>3. Click <span className="font-medium text-foreground">New Access Token</span> or <span className="font-medium text-foreground">Generate Token</span>.</li>
-                <li>4. Add a purpose if Canvas asks for it, then generate the token.</li>
-                <li>5. Copy it immediately and paste it here, because Canvas only shows it once.</li>
+                <li>{t(resolvedLocale, "connect.keyStep1")}</li>
+                <li>{t(resolvedLocale, "connect.keyStep2")}</li>
+                <li>{t(resolvedLocale, "connect.keyStep3")}</li>
+                <li>{t(resolvedLocale, "connect.keyStep4")}</li>
+                <li>{t(resolvedLocale, "connect.keyStep5")}</li>
               </ol>
-              <p className="mb-2 mt-4 text-sm font-medium text-foreground">What Canvas URL to use</p>
+              <p className="mb-2 mt-4 text-sm font-medium text-foreground">{t(resolvedLocale, "connect.whatUrlTitle")}</p>
               <ol className="space-y-1 text-sm text-muted-foreground">
-                <li>1. Open your Canvas in the browser.</li>
-                <li>2. Copy the main site URL before any page-specific path.</li>
-                <li>3. Example: if you are on <span className="font-medium text-foreground">https://school.instructure.com/courses/123</span>, use <span className="font-medium text-foreground">https://school.instructure.com</span>.</li>
-                <li>4. You can also paste the full <span className="font-medium text-foreground">/api/v1</span> URL if you already know it.</li>
+                <li>{t(resolvedLocale, "connect.urlStep1")}</li>
+                <li>{t(resolvedLocale, "connect.urlStep2")}</li>
+                <li>{t(resolvedLocale, "connect.urlStep3")}</li>
+                <li>{t(resolvedLocale, "connect.urlStep4")}</li>
               </ol>
               <a
                 href="https://developerdocs.instructure.com/services/canvas/oauth2/file.oauth"
@@ -410,26 +432,26 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
                 rel="noreferrer"
                 className="mt-3 inline-flex text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
               >
-                Official Canvas docs
+                {t(resolvedLocale, "connect.docsLink")}
               </a>
             </div>
             <form onSubmit={onSubmit} className="space-y-3">
               <input
                 type="text"
-                placeholder="Canvas URL (for example https://school.instructure.com)"
+                placeholder={t(resolvedLocale, "connect.urlPlaceholder")}
                 value={providerUrl}
                 onChange={(event) => setProviderUrl(event.target.value)}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
               />
               <input
                 type="password"
-                placeholder="Canvas API key"
+                placeholder={t(resolvedLocale, "connect.apiKeyPlaceholder")}
                 value={apiKey}
                 onChange={(event) => setApiKey(event.target.value)}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
               />
               <Button type="submit" disabled={!hasSavedKey || loading}>
-                {loading ? "Connecting..." : "Save key and connect"}
+                {loading ? t(resolvedLocale, "connect.connecting") : t(resolvedLocale, "connect.saveAndConnect")}
               </Button>
             </form>
             {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
@@ -482,14 +504,14 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
         <main className="order-0 flex flex-col p-6 pb-32 md:order-1 md:pb-6">
           <section className={`order-0 ${isCompactMobileSubjectGrid ? "mb-3 sm:mb-6" : "mb-6"}`}>
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">Subjects</h2>
+              <h2 className="text-lg font-semibold">{t(resolvedLocale, "dashboard.subjects")}</h2>
               {data.pastCourses.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setShowPastCourses((current) => !current)}
                   className="text-xs text-muted-foreground transition hover:text-foreground"
                 >
-                  {showPastCourses ? "Hide old subjects" : "Show old subjects"}
+                  {showPastCourses ? t(resolvedLocale, "dashboard.hideOldSubjects") : t(resolvedLocale, "dashboard.showOldSubjects")}
                 </button>
               )}
             </div>
@@ -510,12 +532,12 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
                           </CardTitle>
                           {gradePercentage != null && (
                             <span className={subjectGradeClassName}>
-                              {formatGradePercentage(gradePercentage)}%
+                              {formatGradePercentage(resolvedLocale, gradePercentage)}%
                             </span>
                           )}
                         </div>
                         {!isCompactMobileSubjectGrid && (
-                          <CardDescription className={subjectDescriptionClassName}>{course.course_code ?? "No code"}</CardDescription>
+                          <CardDescription className={subjectDescriptionClassName}>{course.course_code ?? t(resolvedLocale, "dashboard.noCode")}</CardDescription>
                         )}
                       </CardHeader>
                     </Card>
@@ -525,7 +547,7 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
             </div>
               {showPastCourses && visiblePastCourses.length > 0 && (
               <div className="mt-4">
-                <p className="mb-3 text-sm font-medium text-muted-foreground">Old subjects</p>
+                <p className="mb-3 text-sm font-medium text-muted-foreground">{t(resolvedLocale, "dashboard.oldSubjects")}</p>
                 <div className={subjectGridClassName}>
                   {visiblePastCourses.map((course) => {
                     const subjectName = formatSubjectName(course.name);
@@ -541,7 +563,7 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
                             </CardTitle>
                             {!isCompactMobileSubjectGrid && (
                               <CardDescription className={subjectDescriptionClassName}>
-                                {course.course_code ?? "Old subject"}
+                                {course.course_code ?? t(resolvedLocale, "dashboard.oldSubject")}
                               </CardDescription>
                             )}
                           </CardHeader>
@@ -559,29 +581,29 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
               <CardHeader>
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <CardTitle>To-Do</CardTitle>
-                    <CardDescription>Upcoming activities</CardDescription>
+                    <CardTitle>{t(resolvedLocale, "dashboard.todoTitle")}</CardTitle>
+                    <CardDescription>{t(resolvedLocale, "dashboard.upcomingActivities")}</CardDescription>
                   </div>
                   <span className="text-sm font-medium text-muted-foreground">{visibleTodo.length}</span>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {visibleTodo.length === 0 && <p className="text-sm text-muted-foreground">No pending activities right now.</p>}
+                {visibleTodo.length === 0 && <p className="text-sm text-muted-foreground">{t(resolvedLocale, "dashboard.noPendingActivities")}</p>}
                 {visibleTodo.map((item) => {
-                  const subjectName = formatSubjectName(item.context_name ?? "Unknown course");
+                  const subjectName = formatSubjectName(item.context_name ?? t(resolvedLocale, "subjects.unknownCourse"));
                   const subjectColor = getSubjectColorStyle(
-                    item.context_name ?? "Unknown course",
+                    item.context_name ?? t(resolvedLocale, "subjects.unknownCourse"),
                     item.assignment?.course_id ? preferences.colors[item.assignment.course_id] : undefined,
                   );
-                  const activityAccent = getActivityAccent(item.assignment?.due_at);
+                  const activityAccent = getActivityAccent(resolvedLocale, item.assignment?.due_at);
                   const activityContent = (
                     <div className={`${todoCardClassName} ${activityAccent.className}`}>
                       <div className="flex items-start justify-between gap-3">
-                        <p className={todoTitleClassName}>{item.assignment?.name ?? "Untitled task"}</p>
+                        <p className={todoTitleClassName}>{item.assignment?.name ?? t(resolvedLocale, "dashboard.untitledTask")}</p>
                         <div className="flex shrink-0 items-center gap-2">
                           {item.assignment?.completed && (
                             <span className={todoDoneBadgeClassName}>
-                              Done
+                              {t(resolvedLocale, "calendar.done")}
                             </span>
                           )}
                           <span className={`${todoBadgeClassName} ${activityAccent.badgeClassName}`}>
@@ -598,7 +620,7 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
                             />
                             <span className={todoCompactSubjectTextClassName}>{subjectName}</span>
                           </p>
-                          <p className="shrink-0">Due: {formatDueDateShort(item.assignment?.due_at)}</p>
+                          <p className="shrink-0">{t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, item.assignment?.due_at) })}</p>
                         </div>
                       ) : (
                         <>
@@ -609,7 +631,7 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
                             />
                             <span>{subjectName}</span>
                           </p>
-                          <p className={todoDueClassName}>Due: {formatDueDateShort(item.assignment?.due_at)}</p>
+                          <p className={todoDueClassName}>{t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, item.assignment?.due_at) })}</p>
                         </>
                       )}
                     </div>

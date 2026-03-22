@@ -18,6 +18,7 @@ import {
   formatSubjectName,
   getSubjectColorPalette,
   orderSubjectsByPreference,
+  t,
   type CanvasCourse,
   type CanvasDashboardData,
 } from "@canvas/shared";
@@ -31,16 +32,6 @@ import { useCanvasSession } from "../../src/providers/canvas-session";
 
 type DashboardColors = ReturnType<typeof getDashboardColors>;
 
-const dueDateFormatter = new Intl.DateTimeFormat("pt-BR", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: DISPLAY_TIME_ZONE,
-});
-
 export default function DashboardTab() {
   return (
     <RequireCanvasConfig>
@@ -53,7 +44,7 @@ function DashboardScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { config } = useCanvasSession();
-  const { resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
+  const { resolvedLocale, resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
   const colors = useMemo(() => getDashboardColors(resolvedTheme), [resolvedTheme]);
   const [showPastCourses, setShowPastCourses] = useState(false);
   const { data, error, isLoading, isFetching, refetch } = useDashboard();
@@ -114,7 +105,7 @@ function DashboardScreen() {
       >
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Subjects</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t(resolvedLocale, "dashboard.subjects")}</Text>
             {data && data.pastCourses.length > 0 ? (
               <Pressable
                 onPress={() => {
@@ -124,19 +115,19 @@ function DashboardScreen() {
                 style={({ pressed }) => [pressed && styles.pressed]}
               >
                 <Text style={[styles.sectionAction, { color: colors.subtleText }]}>
-                  {showPastCourses ? "Hide old subjects" : "Show old subjects"}
+                  {showPastCourses ? t(resolvedLocale, "dashboard.hideOldSubjects") : t(resolvedLocale, "dashboard.showOldSubjects")}
                 </Text>
               </Pressable>
             ) : null}
           </View>
 
-          {showColdLoading ? <LoadingState label="Loading dashboard..." /> : null}
+          {showColdLoading ? <LoadingState label={t(resolvedLocale, "dashboard.title")} /> : null}
           {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
 
           {data ? (
             <View style={styles.subjectList}>
               {visibleCourses.length === 0 ? (
-                <EmptyState label="No active subjects available." />
+                <EmptyState label={t(resolvedLocale, "dashboard.noActiveSubjects")} />
               ) : (
                 <View style={isCompactMobileSubjectGrid ? styles.subjectGrid : styles.subjectList}>
                   {visibleCourses.map((course) => (
@@ -145,6 +136,7 @@ function DashboardScreen() {
                       compact={isCompactMobileSubjectGrid}
                       colors={colors}
                       course={course}
+                      locale={resolvedLocale}
                       onPress={() => {
                         triggerSelectionHaptic();
                         router.push(`/subjects/${course.id}`);
@@ -157,7 +149,7 @@ function DashboardScreen() {
 
               {showPastCourses && visiblePastCourses.length > 0 ? (
                 <View style={styles.pastSection}>
-                  <Text style={[styles.pastTitle, { color: colors.subtleText }]}>Old subjects</Text>
+                  <Text style={[styles.pastTitle, { color: colors.subtleText }]}>{t(resolvedLocale, "dashboard.oldSubjects")}</Text>
                   <View style={isCompactMobileSubjectGrid ? styles.subjectGrid : styles.subjectList}>
                     {visiblePastCourses.map((course) => (
                       <SubjectCard
@@ -165,6 +157,7 @@ function DashboardScreen() {
                         compact={isCompactMobileSubjectGrid}
                         colors={colors}
                         course={course}
+                        locale={resolvedLocale}
                         muted
                         onPress={() => {
                           triggerSelectionHaptic();
@@ -184,23 +177,23 @@ function DashboardScreen() {
           <View style={[styles.todoSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.todoHeader}>
               <View style={styles.todoHeaderText}>
-                <Text style={[styles.todoTitle, { color: colors.foreground }]}>To-Do</Text>
-                <Text style={[styles.todoSubtitle, { color: colors.subtleText }]}>Upcoming activities</Text>
+                <Text style={[styles.todoTitle, { color: colors.foreground }]}>{t(resolvedLocale, "dashboard.todoTitle")}</Text>
+                <Text style={[styles.todoSubtitle, { color: colors.subtleText }]}>{t(resolvedLocale, "dashboard.upcomingActivities")}</Text>
               </View>
               <Text style={[styles.todoCount, { color: colors.subtleText }]}>{visibleTodo.length}</Text>
             </View>
 
             {visibleTodo.length === 0 ? (
               <Text style={[styles.emptyTodoText, { color: colors.subtleText }]}>
-                No pending activities right now.
+                {t(resolvedLocale, "dashboard.noPendingActivities")}
               </Text>
             ) : (
               <View style={styles.todoList}>
                 {visibleTodo.map((item, index) => {
-                  const activityAccent = getActivityAccent(item.assignment?.due_at, colors);
+                  const activityAccent = getActivityAccent(resolvedLocale, item.assignment?.due_at, colors);
                   const canOpen = Boolean(item.assignment?.course_id && item.assignment?.id);
                   const courseColor = getSubjectColorPalette(
-                    item.context_name ?? "Unknown course",
+                    item.context_name ?? t(resolvedLocale, "subjects.unknownCourse"),
                     item.assignment?.course_id ? subjectPreferences.colors[item.assignment.course_id] : undefined,
                   );
 
@@ -234,12 +227,12 @@ function DashboardScreen() {
                             { color: colors.foreground },
                           ]}
                         >
-                          {item.assignment?.name ?? "Untitled task"}
+                          {item.assignment?.name ?? t(resolvedLocale, "dashboard.untitledTask")}
                         </Text>
                         <View style={styles.todoBadgeRow}>
                           {item.assignment?.completed ? (
                             <View style={styles.todoDoneBadge}>
-                              <Text style={styles.todoDoneBadgeText}>Done</Text>
+                              <Text style={styles.todoDoneBadgeText}>{t(resolvedLocale, "calendar.done")}</Text>
                             </View>
                           ) : null}
                           <View
@@ -286,19 +279,19 @@ function DashboardScreen() {
                             ]}
                             numberOfLines={1}
                           >
-                            {formatSubjectName(item.context_name ?? "Unknown course")}
+                            {formatSubjectName(item.context_name ?? t(resolvedLocale, "subjects.unknownCourse"))}
                           </Text>
                         </View>
                         {isCompactMobileSubjectGrid ? (
                           <Text style={[styles.todoDueCompactText, { color: colors.subtleText }]}>
-                            Due: {formatDueDateShort(item.assignment?.due_at)}
+                            {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, item.assignment?.due_at) })}
                           </Text>
                         ) : null}
                       </View>
 
                       {!isCompactMobileSubjectGrid ? (
                         <Text style={[styles.todoDueText, { color: colors.subtleText }]}>
-                          Due: {formatDueDateShort(item.assignment?.due_at)}
+                          {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, item.assignment?.due_at) })}
                         </Text>
                       ) : null}
                     </Pressable>
@@ -317,6 +310,7 @@ function SubjectCard({
   compact = false,
   colors,
   course,
+  locale,
   muted = false,
   onPress,
   preferredColor,
@@ -324,6 +318,7 @@ function SubjectCard({
   compact?: boolean;
   colors: DashboardColors;
   course: CanvasCourse;
+  locale: "en" | "pt-BR";
   muted?: boolean;
   onPress: () => void;
   preferredColor?: string;
@@ -368,7 +363,7 @@ function SubjectCard({
           </Text>
           {!compact ? (
             <Text style={[styles.subjectMeta, { color: colors.subtleText }]} numberOfLines={1}>
-              {course.course_code ?? (muted ? "Old subject" : "No code")}
+              {course.course_code ?? (muted ? t(locale, "dashboard.oldSubject") : t(locale, "dashboard.noCode"))}
             </Text>
           ) : null}
         </View>
@@ -377,7 +372,7 @@ function SubjectCard({
           <Text
             style={[styles.subjectGrade, compact && styles.subjectGradeCompact, { color: colors.softText }]}
           >
-            {formatGradePercentage(gradePercentage)}
+            {formatGradePercentage(locale, gradePercentage)}
           </Text>
         ) : null}
       </View>
@@ -445,14 +440,14 @@ function getDateParts(value: Date | string) {
   };
 }
 
-function getActivityAccent(dueAt: string | undefined, colors: DashboardColors) {
+function getActivityAccent(locale: "en" | "pt-BR", dueAt: string | undefined, colors: DashboardColors) {
   if (!dueAt) {
     return {
       backgroundColor: colors.todoBlueBackground,
       badgeBorderColor: colors.todoBlueBorder,
       badgeTextColor: colors.badgeBlueText,
       borderColor: colors.todoBlueBorder,
-      label: "Later",
+      label: t(locale, "relative.later"),
     };
   }
 
@@ -468,7 +463,7 @@ function getActivityAccent(dueAt: string | undefined, colors: DashboardColors) {
       badgeBorderColor: colors.todoRedBorder,
       badgeTextColor: colors.badgeRedText,
       borderColor: colors.todoRedBorder,
-      label: diffDays < 0 ? "Overdue" : "Due today",
+      label: diffDays < 0 ? t(locale, "relative.overdue") : t(locale, "relative.dueToday"),
     };
   }
 
@@ -478,7 +473,7 @@ function getActivityAccent(dueAt: string | undefined, colors: DashboardColors) {
       badgeBorderColor: colors.todoAmberBorder,
       badgeTextColor: colors.badgeAmberText,
       borderColor: colors.todoAmberBorder,
-      label: "This week",
+      label: t(locale, "relative.thisWeek"),
     };
   }
 
@@ -487,7 +482,7 @@ function getActivityAccent(dueAt: string | undefined, colors: DashboardColors) {
     badgeBorderColor: colors.todoBlueBorder,
     badgeTextColor: colors.badgeBlueText,
     borderColor: colors.todoBlueBorder,
-    label: "Later",
+    label: t(locale, "relative.later"),
   };
 }
 
@@ -557,19 +552,27 @@ function getCourseGradePercentage(course: CanvasDashboardData["courses"][number]
   );
 }
 
-function formatGradePercentage(value: number) {
-  return `${new Intl.NumberFormat("pt-BR", {
+function formatGradePercentage(locale: "en" | "pt-BR", value: number) {
+  return `${new Intl.NumberFormat(locale, {
     maximumFractionDigits: value % 1 === 0 ? 0 : 1,
     minimumFractionDigits: 0,
   }).format(value)}%`;
 }
 
-function formatDueDateShort(value?: string) {
+function formatDueDateShort(locale: "en" | "pt-BR", value?: string) {
   if (!value) {
-    return "No due date";
+    return t(locale, "common.noDueDate");
   }
 
-  return dueDateFormatter.format(new Date(value));
+  return new Intl.DateTimeFormat(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: DISPLAY_TIME_ZONE,
+  }).format(new Date(value));
 }
 
 const styles = StyleSheet.create({

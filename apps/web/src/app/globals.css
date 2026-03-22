@@ -150,7 +150,49 @@
   }
 }
 
+@keyframes welcome-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(3deg);
+  }
+}
+
+@keyframes welcome-drift {
+  0%,
+  100% {
+    transform: translateY(0) rotate(3deg);
+  }
+  50% {
+    transform: translateY(10px) rotate(-3deg);
+  }
+}
+
+@keyframes welcome-pulse {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.02);
+  }
+}
+
 @layer utilities {
+  .welcome-float {
+    animation: welcome-float 6s ease-in-out infinite;
+  }
+
+  .welcome-drift {
+    animation: welcome-drift 7.4s ease-in-out infinite;
+  }
+
+  .welcome-pulse {
+    animation: welcome-pulse 5.6s ease-in-out infinite;
+  }
+
   .rich-content a,
   .rich-content a:visited {
     color: rgb(37 99 235);

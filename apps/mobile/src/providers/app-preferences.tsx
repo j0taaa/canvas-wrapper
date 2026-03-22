@@ -1,4 +1,5 @@
 import * as Haptics from "expo-haptics";
+import { getLocales } from "expo-localization";
 import {
   createContext,
   useCallback,
@@ -10,8 +11,12 @@ import {
 } from "react";
 import { useColorScheme } from "react-native";
 import {
+  DEFAULT_LANGUAGE_PREFERENCE,
   DEFAULT_SUBJECT_PREFERENCES,
   DEFAULT_DEVICE_INTEGRATION_PREFERENCES,
+  resolveAppLocale,
+  type AppLocale,
+  type LanguagePreference,
   type DeviceIntegrationPreferences,
   type SubjectPreferences,
   type ThemePreference,
@@ -20,6 +25,7 @@ import {
   readAllPreferences,
   writeDeviceIntegrationPreferences,
   writeHapticsPreference,
+  writeLanguagePreference,
   writeSubjectPreferences,
   writeThemePreference,
 } from "../lib/preferences";
@@ -27,13 +33,16 @@ import {
 type AppPreferencesValue = {
   deviceIntegrationPreferences: DeviceIntegrationPreferences;
   hapticsEnabled: boolean;
+  languagePreference: LanguagePreference;
   ready: boolean;
+  resolvedLocale: AppLocale;
   resolvedTheme: "light" | "dark";
   subjectPreferences: SubjectPreferences;
   themePreference: ThemePreference;
   triggerSelectionHaptic: () => void;
   updateDeviceIntegrationPreferences: (preferences: DeviceIntegrationPreferences) => Promise<void>;
   updateHapticsEnabled: (enabled: boolean) => Promise<void>;
+  updateLanguagePreference: (preference: LanguagePreference) => Promise<void>;
   updateSubjectPreferences: (preferences: SubjectPreferences) => Promise<void>;
   updateThemePreference: (preference: ThemePreference) => Promise<void>;
 };
@@ -43,6 +52,7 @@ const AppPreferencesContext = createContext<AppPreferencesValue | null>(null);
 export function AppPreferencesProvider({ children }: { children: ReactNode }) {
   const systemColorScheme = useColorScheme();
   const [ready, setReady] = useState(false);
+  const [languagePreference, setLanguagePreference] = useState<LanguagePreference>(DEFAULT_LANGUAGE_PREFERENCE);
   const [themePreference, setThemePreference] = useState<ThemePreference>("system");
   const [hapticsEnabled, setHapticsEnabled] = useState(false);
   const [deviceIntegrationPreferences, setDeviceIntegrationPreferences] =
@@ -59,6 +69,7 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      setLanguagePreference(preferences.languagePreference);
       setThemePreference(preferences.themePreference);
       setHapticsEnabled(preferences.hapticsEnabled);
       setDeviceIntegrationPreferences(preferences.deviceIntegrationPreferences);
@@ -74,10 +85,16 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resolvedTheme = themePreference === "system" ? (systemColorScheme === "dark" ? "dark" : "light") : themePreference;
+  const resolvedLocale = resolveAppLocale(languagePreference, getLocales().map((locale) => locale.languageTag));
 
   const handleThemePreference = useCallback(async (preference: ThemePreference) => {
     await writeThemePreference(preference);
     setThemePreference(preference);
+  }, []);
+
+  const handleLanguagePreference = useCallback(async (preference: LanguagePreference) => {
+    await writeLanguagePreference(preference);
+    setLanguagePreference(preference);
   }, []);
 
   const handleHapticsEnabled = useCallback(async (enabled: boolean) => {
@@ -108,13 +125,16 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppPreferencesValue>(() => ({
     deviceIntegrationPreferences,
     hapticsEnabled,
+    languagePreference,
     ready,
+    resolvedLocale,
     resolvedTheme,
     subjectPreferences,
     themePreference,
     triggerSelectionHaptic,
     updateDeviceIntegrationPreferences: handleDeviceIntegrationPreferences,
     updateHapticsEnabled: handleHapticsEnabled,
+    updateLanguagePreference: handleLanguagePreference,
     updateSubjectPreferences: handleSubjectPreferences,
     updateThemePreference: handleThemePreference,
   }), [
@@ -122,9 +142,12 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
     handleDeviceIntegrationPreferences,
     hapticsEnabled,
     handleHapticsEnabled,
+    handleLanguagePreference,
     handleSubjectPreferences,
     handleThemePreference,
+    languagePreference,
     ready,
+    resolvedLocale,
     resolvedTheme,
     subjectPreferences,
     themePreference,

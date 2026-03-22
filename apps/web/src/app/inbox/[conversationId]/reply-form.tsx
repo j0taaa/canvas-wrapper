@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { LoaderCircle, Reply, SendHorizonal } from "lucide-react";
+import { t } from "@canvas/shared";
+import { useLocale } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 
 type ReplyFormProps = {
@@ -14,6 +16,7 @@ const fieldClassName =
 
 export function ReplyForm({ conversationId }: ReplyFormProps) {
   const router = useRouter();
+  const { resolvedLocale } = useLocale();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -21,7 +24,7 @@ export function ReplyForm({ conversationId }: ReplyFormProps) {
 
   const handleSubmit = () => {
     if (!message.trim()) {
-      setError("Write a reply before sending.");
+      setError(t(resolvedLocale, "inbox.replyRequired"));
       return;
     }
 
@@ -41,28 +44,28 @@ export function ReplyForm({ conversationId }: ReplyFormProps) {
         const payload = (await response.json()) as { error?: string };
 
         if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to send reply.");
+          throw new Error(payload.error ?? t(resolvedLocale, "inbox.unableToSendReply"));
         }
 
         setMessage("");
-        setSuccess("Reply sent.");
+        setSuccess(t(resolvedLocale, "inbox.replySent"));
         router.refresh();
       } catch (submitError) {
-        setError(submitError instanceof Error ? submitError.message : "Unable to send reply.");
+        setError(submitError instanceof Error ? submitError.message : t(resolvedLocale, "inbox.unableToSendReply"));
       }
     });
   };
 
   return (
-    <div className="rounded-3xl border border-border/80 bg-card/95 p-5">
-      <div className="mb-4 flex items-center gap-2">
+    <div className="rounded-2xl border border-border/80 bg-card/95 p-4">
+      <div className="mb-3 flex items-center gap-2">
         <Reply className="h-4 w-4 text-muted-foreground" />
-        <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Reply</p>
+        <p className="text-sm font-semibold text-foreground">{t(resolvedLocale, "inbox.reply")}</p>
       </div>
       <textarea
         value={message}
         onChange={(event) => setMessage(event.target.value)}
-        placeholder="Write your reply"
+        placeholder={t(resolvedLocale, "inbox.writeReply")}
         className={`${fieldClassName} min-h-36 resize-y`}
       />
       {(error || success) && (
@@ -73,7 +76,7 @@ export function ReplyForm({ conversationId }: ReplyFormProps) {
       <div className="mt-4 flex justify-end">
         <Button type="button" onClick={handleSubmit} disabled={isPending || !message.trim()}>
           {isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-4 w-4" />}
-          <span>{isPending ? "Sending..." : "Send reply"}</span>
+          <span>{isPending ? t(resolvedLocale, "inbox.sendingReply") : t(resolvedLocale, "inbox.sendReply")}</span>
         </Button>
       </div>
     </div>

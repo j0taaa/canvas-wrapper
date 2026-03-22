@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import "./globals.css";
+import { LocaleProvider } from "@/components/locale-provider";
 import { GlobalHaptics } from "@/components/global-haptics";
+import { getRequestLocale } from "@/lib/request-locale";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { ThemeSync } from "@/components/theme-sync";
 import {
@@ -12,8 +14,8 @@ import {
 } from "@/lib/theme-preference";
 
 export const metadata: Metadata = {
-  title: "Canvas Wrapper",
-  description: "A simple Canvas dashboard clone built with Next.js and shadcn/ui.",
+  title: "Janvas",
+  description: "Janvas is a calmer dashboard for Canvas built with Next.js and shadcn/ui.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/canvas-icon.svg",
@@ -21,7 +23,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "Canvas Wrapper",
+    title: "Janvas",
     statusBarStyle: "default",
   },
 };
@@ -50,6 +52,7 @@ async function RootLayoutInner({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
+  const { languagePreference, resolvedLocale } = await getRequestLocale();
   const initialThemePreference = parseThemePreference(
     cookieStore.get(THEME_PREFERENCE_COOKIE)?.value,
   );
@@ -83,7 +86,7 @@ async function RootLayoutInner({
 
   return (
     <html
-      lang="en"
+      lang={resolvedLocale}
       className={initialThemePreference === "dark" ? "dark" : undefined}
       suppressHydrationWarning
       data-theme-preference={initialThemePreference}
@@ -92,10 +95,12 @@ async function RootLayoutInner({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="antialiased">
-        {children}
-        <GlobalHaptics />
-        <ThemeSync initialPreference={initialThemePreference as ThemePreference} />
-        <ServiceWorkerRegister />
+        <LocaleProvider initialLanguagePreference={languagePreference} initialResolvedLocale={resolvedLocale}>
+          {children}
+          <GlobalHaptics />
+          <ThemeSync initialPreference={initialThemePreference as ThemePreference} />
+          <ServiceWorkerRegister />
+        </LocaleProvider>
       </body>
     </html>
   );

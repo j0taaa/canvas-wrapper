@@ -5,6 +5,7 @@ import { ChevronLeft, ListChecks } from "lucide-react-native";
 import {
   formatSubjectName,
   getSubjectColorPalette,
+  t,
 } from "@canvas/shared";
 import {
   AppScreen,
@@ -20,7 +21,7 @@ import { RestorableScrollView } from "../../../../src/components/restorable-scro
 import { SubjectLayoutHeader } from "../../../../src/components/subject-layout";
 import { useQuiz, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
 import { formatDueDateShort } from "../../../../src/lib/format";
-import { goBackOrPush } from "../../../../src/lib/navigation";
+import { goBackOrPush, openCanvasUrl } from "../../../../src/lib/navigation";
 import { useAppPreferences } from "../../../../src/providers/app-preferences";
 import { useCanvasSession } from "../../../../src/providers/canvas-session";
 
@@ -30,7 +31,7 @@ export default function QuizDetailScreen() {
   const courseId = Number(params.courseId);
   const quizId = Number(params.quizId);
   const { config } = useCanvasSession();
-  const { resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
+  const { resolvedLocale, resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
 
   const colors = useMemo(() => {
     const isDark = resolvedTheme === "dark";
@@ -62,7 +63,7 @@ export default function QuizDetailScreen() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen scroll={false}>
+      <AppScreen contentStyle={styles.screenContent} scroll={false}>
         <RestorableScrollView 
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -74,23 +75,24 @@ export default function QuizDetailScreen() {
           }
         >
           <View style={styles.container}>
-            {showColdLoading ? <LoadingState label="Loading quiz..." /> : null}
-            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             <SubjectLayoutHeader />
+            {showColdLoading ? <LoadingState label={t(resolvedLocale, "subjects.loadingQuiz")} /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             
             {course && quiz ? (
               <>
                 {/* Navigation Bar */}
                 <View style={styles.navBar}>
                   <Pressable
+                    accessibilityLabel={t(resolvedLocale, "subjects.backToSubject")}
+                    accessibilityRole="button"
                     onPress={() => {
                       triggerSelectionHaptic();
                       goBackOrPush(router, `/subjects/${courseId}`);
                     }}
-                    style={styles.backButton}
+                    style={[styles.backButton, { borderColor: colors.border }]}
                   >
                     <ChevronLeft size={20} color={colors.foreground} />
-                    <Text style={[styles.backText, { color: colors.foreground }]}>Back to subject</Text>
                   </Pressable>
                   {course && quiz ? (
                     <BookmarkButton
@@ -100,7 +102,7 @@ export default function QuizDetailScreen() {
                         id: `quiz-${courseId}-${quizId}`,
                         kind: "quiz",
                         subjectName: course.name,
-                        title: quiz.title ?? "Untitled quiz",
+                        title: quiz.title ?? t(resolvedLocale, "subjects.untitledQuiz"),
                       }}
                       borderColor={colors.border}
                       fillColor={colors.foreground}
@@ -119,7 +121,7 @@ export default function QuizDetailScreen() {
                       </View>
                       <View style={styles.headerText}>
                         <Text style={[styles.quizTitle, { color: colors.foreground }]} numberOfLines={2}>
-                          {quiz.title ?? "Untitled quiz"}
+                          {quiz.title ?? t(resolvedLocale, "subjects.untitledQuiz")}
                         </Text>
                         <Pressable onPress={() => goBackOrPush(router, `/subjects/${courseId}`)}>
                           <Text style={[styles.courseLink, { color: colors.mutedForeground }]}>
@@ -132,21 +134,21 @@ export default function QuizDetailScreen() {
                       {quiz.question_count != null && (
                         <View style={[styles.badge, { borderColor: colors.border }]}>
                           <Text style={[styles.badgeText, { color: colors.mutedForeground }]}>
-                            {quiz.question_count} questions
+                            {t(resolvedLocale, "subjects.questionCount", { count: quiz.question_count })}
                           </Text>
                         </View>
                       )}
                       {quiz.points_possible != null && (
                         <View style={[styles.badge, { borderColor: colors.border }]}>
                           <Text style={[styles.badgeText, { color: colors.mutedForeground }]}>
-                            {quiz.points_possible} points
+                            {t(resolvedLocale, "subjects.points", { count: quiz.points_possible })}
                           </Text>
                         </View>
                       )}
                       {quiz.due_at && (
                         <View style={[styles.badge, { borderColor: colors.border }]}>
                           <Text style={[styles.badgeText, { color: colors.mutedForeground }]}>
-                            Due {formatDueDateShort(quiz.due_at)}
+                            {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, quiz.due_at) })}
                           </Text>
                         </View>
                       )}
@@ -157,7 +159,7 @@ export default function QuizDetailScreen() {
                 {/* Quiz Details Card */}
                 <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>Quiz details</Text>
+                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.quizDetails")}</Text>
                   </View>
                   <View style={styles.cardContent}>
                     {quiz.description ? (
@@ -168,11 +170,11 @@ export default function QuizDetailScreen() {
                         <PlaceholderBlock height={132} />
                       </>
                     ) : (
-                      <RichText currentCourseId={courseId} html="<p>No quiz description available.</p>" providerUrl={config?.apiBase} />
+                      <RichText currentCourseId={courseId} html={`<p>${t(resolvedLocale, "subjects.noQuizDescription")}</p>`} providerUrl={config?.apiBase} />
                     )}
                     {quiz.html_url && (
-                      <Pressable onPress={() => {}} style={[styles.openButton, { borderColor: colors.border }]}>
-                        <Text style={[styles.openButtonText, { color: colors.foreground }]}>Open in Canvas</Text>
+                      <Pressable onPress={() => void openCanvasUrl(quiz.html_url)} style={[styles.openButton, { borderColor: colors.border }]}>
+                        <Text style={[styles.openButtonText, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.openInCanvas")}</Text>
                       </Pressable>
                     )}
                   </View>
@@ -181,7 +183,7 @@ export default function QuizDetailScreen() {
                 {/* Questions Card */}
                 <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>Questions</Text>
+                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.questions")}</Text>
                   </View>
                   <View style={styles.cardContent}>
                     {questions.length === 0 && showInlineRefresh ? (
@@ -191,28 +193,28 @@ export default function QuizDetailScreen() {
                       </>
                     ) : questions.length === 0 ? (
                       <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                        Questions are not available for this quiz through the API.
+                        {t(resolvedLocale, "subjects.questionsUnavailable")}
                       </Text>
                     ) : (
                       questions.map((question, index) => (
                         <View key={question.id} style={[styles.questionCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}>
                           <View style={styles.questionHeader}>
                             <Text style={[styles.questionName, { color: colors.foreground }]} numberOfLines={1}>
-                              {question.question_name ?? `Question ${index + 1}`}
+                              {question.question_name ?? t(resolvedLocale, "subjects.questionLabel", { number: index + 1 })}
                             </Text>
                             {question.points_possible != null && (
                               <Text style={[styles.pointsText, { color: colors.mutedForeground }]}>
-                                {question.points_possible} pts
+                                {t(resolvedLocale, "subjects.pointsShort", { count: question.points_possible })}
                               </Text>
                             )}
                           </View>
-                          <RichText currentCourseId={courseId} html={question.question_text || "<p>No question text available.</p>"} providerUrl={config?.apiBase} />
+                          <RichText currentCourseId={courseId} html={question.question_text || `<p>${t(resolvedLocale, "subjects.noQuestionText")}</p>`} providerUrl={config?.apiBase} />
                           {question.answers && question.answers.length > 0 && (
                             <View style={styles.answersList}>
                               {question.answers.map((answer, answerIndex) => (
                                 <View key={`${question.id}-${answer.id ?? answerIndex}`} style={[styles.answerOption, { borderColor: colors.border, backgroundColor: colors.muted }]}>
                                   <Text style={[styles.answerText, { color: colors.foreground }]}>
-                                    {answer.text ?? `Option ${answerIndex + 1}`}
+                                    {answer.text ?? t(resolvedLocale, "subjects.optionLabel", { number: answerIndex + 1 })}
                                   </Text>
                                 </View>
                               ))}
@@ -233,9 +235,12 @@ export default function QuizDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    padding: 0,
+  },
   container: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     gap: 12,
   },
   navBar: {
@@ -245,13 +250,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   backButton: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 8,
-  },
-  backText: {
-    fontSize: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
   },
   headerCard: {
     borderRadius: 16,
@@ -259,8 +263,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   headerTop: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     borderBottomWidth: 1,
   },
   headerContent: {
@@ -309,7 +313,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cardHeader: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
@@ -318,7 +322,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   cardContent: {
-    padding: 16,
+    padding: 14,
     gap: 12,
   },
   openButton: {

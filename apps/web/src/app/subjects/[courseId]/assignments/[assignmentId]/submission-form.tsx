@@ -2,6 +2,8 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { Download, FileDown, FileUp, MessageSquarePlus, SendHorizontal } from "lucide-react";
+import { t, type AppLocale } from "@canvas/shared";
+import { useLocale } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import type { CanvasSubmissionAttachment, CanvasSubmissionComment } from "@/lib/canvas";
 
@@ -17,24 +19,24 @@ type AssignmentSubmissionFormProps = {
 
 type SubmitMode = "online_text_entry" | "online_url" | "online_upload";
 
-function formatSubmissionTypeLabel(type: SubmitMode) {
+function formatSubmissionTypeLabel(locale: AppLocale, type: SubmitMode) {
   if (type === "online_text_entry") {
-    return "Text entry";
+    return t(locale, "subjects.textEntry");
   }
 
   if (type === "online_url") {
-    return "Website URL";
+    return t(locale, "subjects.websiteUrl");
   }
 
-  return "File upload";
+  return t(locale, "subjects.fileUpload");
 }
 
-function formatCommentDate(value?: string) {
+function formatCommentDate(locale: AppLocale, value?: string) {
   if (!value) {
-    return "Unknown date";
+    return t(locale, "common.noDate");
   }
 
-  return new Intl.DateTimeFormat("pt-BR", {
+  return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -54,6 +56,7 @@ export function AssignmentSubmissionForm({
   existingComments,
   submissionTypes,
 }: AssignmentSubmissionFormProps) {
+  const { resolvedLocale } = useLocale();
   const availableTypes = useMemo(
     () => submissionTypes.filter((type): type is SubmitMode =>
       type === "online_text_entry" || type === "online_url" || type === "online_upload",
@@ -117,12 +120,12 @@ export function AssignmentSubmissionForm({
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      setStatus(payload.error ?? "Could not submit assignment");
+      setStatus(payload.error ?? t(resolvedLocale, "subjects.couldNotSubmitAssignment"));
       setSaving(false);
       return;
     }
 
-    setStatus("Submitted successfully");
+    setStatus(t(resolvedLocale, "subjects.submittedSuccessfully"));
     setSaving(false);
     setFiles([]);
     setComment("");
@@ -147,12 +150,12 @@ export function AssignmentSubmissionForm({
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      setCommentStatus(payload.error ?? "Could not submit comment");
+      setCommentStatus(payload.error ?? t(resolvedLocale, "subjects.couldNotSubmitComment"));
       setSavingComment(false);
       return;
     }
 
-    setCommentStatus("Comment sent successfully");
+    setCommentStatus(t(resolvedLocale, "subjects.commentSentSuccessfully"));
     setCommentText("");
     setSavingComment(false);
   };
@@ -163,7 +166,7 @@ export function AssignmentSubmissionForm({
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
           <div className="mb-3 flex items-center gap-2 text-emerald-800">
             <FileDown className="h-4 w-4" />
-            <p className="text-xs font-medium uppercase tracking-wide">Submitted files</p>
+            <p className="text-xs font-medium uppercase tracking-wide">{t(resolvedLocale, "subjects.submittedFiles")}</p>
           </div>
           <div className="space-y-2">
             {attachments.map((attachment, index) => (
@@ -175,10 +178,10 @@ export function AssignmentSubmissionForm({
                   rel="noreferrer"
                   className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm text-emerald-900 transition hover:border-emerald-300 hover:bg-emerald-100/40"
                 >
-                  <span className="truncate font-medium">{attachment.display_name ?? attachment.filename ?? "Download submitted file"}</span>
+                  <span className="truncate font-medium">{attachment.display_name ?? attachment.filename ?? t(resolvedLocale, "subjects.downloadSubmittedFile")}</span>
                   <span className="flex shrink-0 items-center gap-1 rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
                     <Download className="h-3 w-3" />
-                    Download
+                    {t(resolvedLocale, "common.download")}
                   </span>
                 </a>
               ) : null
@@ -190,7 +193,7 @@ export function AssignmentSubmissionForm({
       <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-black/10 bg-black/[0.015] p-3">
         <div className="flex items-center gap-2 text-black/80">
           <FileUp className="h-4 w-4" />
-          <p className="text-sm font-medium">New submission</p>
+          <p className="text-sm font-medium">{t(resolvedLocale, "subjects.newSubmission")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {availableTypes.map((type) => (
@@ -204,7 +207,7 @@ export function AssignmentSubmissionForm({
                   : "cursor-pointer rounded-full border border-black/15 px-3 py-1.5 text-xs text-black/60 transition hover:border-black/30 hover:text-black"
               }
             >
-              {formatSubmissionTypeLabel(type)}
+              {formatSubmissionTypeLabel(resolvedLocale, type)}
             </button>
           ))}
         </div>
@@ -215,7 +218,7 @@ export function AssignmentSubmissionForm({
             onChange={(event) => setBody(event.target.value)}
             rows={6}
             className="w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm"
-            placeholder="Write your submission here"
+            placeholder={t(resolvedLocale, "subjects.writeSubmissionHere")}
           />
         ) : submissionType === "online_url" ? (
           <input
@@ -235,7 +238,7 @@ export function AssignmentSubmissionForm({
             />
             {files.length > 0 && (
               <p className="text-xs text-black/55">
-                {files.length} file{files.length === 1 ? "" : "s"} selected
+                {t(resolvedLocale, "subjects.filesSelected", { count: files.length })}
               </p>
             )}
           </div>
@@ -246,12 +249,12 @@ export function AssignmentSubmissionForm({
           onChange={(event) => setComment(event.target.value)}
           rows={3}
           className="w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm"
-          placeholder="Optional submission comment"
+          placeholder={t(resolvedLocale, "subjects.optionalSubmissionComment")}
         />
 
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={saving}>
-            {saving ? "Submitting..." : "Submit assignment"}
+            {saving ? t(resolvedLocale, "subjects.submittingAssignmentAction") : t(resolvedLocale, "subjects.submitAssignmentAction")}
           </Button>
           {status && <p className="text-sm text-black/60">{status}</p>}
         </div>
@@ -260,15 +263,15 @@ export function AssignmentSubmissionForm({
       <div className="rounded-xl border border-black/10 bg-black/[0.015] p-3">
         <div className="mb-3 flex items-center gap-2 text-black/80">
           <MessageSquarePlus className="h-4 w-4" />
-          <p className="text-sm font-medium text-black/85">Comments</p>
+          <p className="text-sm font-medium text-black/85">{t(resolvedLocale, "subjects.comments")}</p>
         </div>
         {comments.length > 0 ? (
           <div className="mb-4 space-y-3">
             {comments.map((submissionComment, index) => (
               <div key={`${submissionComment.created_at ?? "comment"}-${index}`} className="rounded-lg border border-black/10 bg-white/80 p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-black/80">{submissionComment.author_name ?? "Canvas user"}</p>
-                  <p className="text-xs text-black/45">{formatCommentDate(submissionComment.created_at)}</p>
+                  <p className="text-sm font-medium text-black/80">{submissionComment.author_name ?? t(resolvedLocale, "subjects.canvasUser")}</p>
+                  <p className="text-xs text-black/45">{formatCommentDate(resolvedLocale, submissionComment.created_at)}</p>
                 </div>
                 {submissionComment.comment && (
                   <p className="mt-2 whitespace-pre-wrap text-sm text-black/70">{submissionComment.comment}</p>
@@ -284,7 +287,7 @@ export function AssignmentSubmissionForm({
                           rel="noreferrer"
                           className="block text-sm text-black/70 underline-offset-4 transition hover:text-black hover:underline"
                         >
-                          {attachment.display_name ?? attachment.filename ?? "Attachment"}
+                          {attachment.display_name ?? attachment.filename ?? t(resolvedLocale, "subjects.attachment")}
                         </a>
                       ) : null
                     ))}
@@ -294,7 +297,7 @@ export function AssignmentSubmissionForm({
             ))}
           </div>
         ) : (
-          <p className="mb-4 text-sm text-black/55">No comments yet.</p>
+          <p className="mb-4 text-sm text-black/55">{t(resolvedLocale, "subjects.noCommentsYet")}</p>
         )}
 
         <form onSubmit={onCommentSubmit} className="space-y-3">
@@ -303,12 +306,12 @@ export function AssignmentSubmissionForm({
             onChange={(event) => setCommentText(event.target.value)}
             rows={3}
             className="w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm"
-            placeholder="Add a comment"
+            placeholder={t(resolvedLocale, "subjects.addComment")}
           />
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={savingComment}>
               <SendHorizontal className="h-4 w-4" />
-              {savingComment ? "Sending..." : "Send comment"}
+              {savingComment ? t(resolvedLocale, "subjects.sendingComment") : t(resolvedLocale, "subjects.sendComment")}
             </Button>
             {commentStatus && <p className="text-sm text-black/60">{commentStatus}</p>}
           </div>

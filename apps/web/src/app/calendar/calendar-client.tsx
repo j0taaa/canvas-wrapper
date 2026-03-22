@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { getWeekdayLabels, t } from "@canvas/shared";
+import { useLocale } from "@/components/locale-provider";
 import {
   Card,
   CardContent,
@@ -17,8 +19,6 @@ import {
 } from "@/lib/subject-preferences";
 import { formatDueDate, getSubjectColorStyle } from "@/lib/utils";
 
-const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MOBILE_WEEK_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const CALENDAR_VIEW_STORAGE_KEY = "canvasCalendarViewMode";
 const CALENDAR_MONTH_CACHE_KEY = "canvasCalendarMonthCache";
 
@@ -109,8 +109,8 @@ function getDayKey(value: string) {
   return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
 
-function getDayLabel(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
+function getDayLabel(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     timeZone: DISPLAY_TIME_ZONE,
     weekday: "long",
     month: "long",
@@ -167,6 +167,7 @@ export default function CalendarClient({
   monthLabel,
   todayKey,
 }: CalendarClientProps) {
+  const { resolvedLocale } = useLocale();
   const latestRequestKey = useRef<string | null>(null);
   const [displayedMonth, setDisplayedMonth] = useState({ month: initialMonth, year: initialYear });
   const [currentMonthLabel, setCurrentMonthLabel] = useState(monthLabel);
@@ -183,6 +184,8 @@ export default function CalendarClient({
     [displayedMonth.month, displayedMonth.year, visibleEntries],
   );
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const weekdayLabels = useMemo(() => getWeekdayLabels(resolvedLocale, "short"), [resolvedLocale]);
+  const mobileWeekdayLabels = useMemo(() => getWeekdayLabels(resolvedLocale, "narrow"), [resolvedLocale]);
   useEffect(() => {
     writeCalendarMonthToCache({
       entries: initialEntries,
@@ -235,11 +238,11 @@ export default function CalendarClient({
     return Array.from(groups.entries())
       .map(([key, dayEntries]) => ({
         key,
-        label: getDayLabel(dayEntries[0]?.date ?? key),
+        label: getDayLabel(dayEntries[0]?.date ?? key, resolvedLocale),
         entries: dayEntries.sort((left, right) => left.date.localeCompare(right.date)),
       }))
       .sort((left, right) => left.key.localeCompare(right.key));
-  }, [visibleEntries]);
+  }, [resolvedLocale, visibleEntries]);
 
   const applyMonthPayload = useCallback((payload: CalendarMonthPayload) => {
     setDisplayedMonth({ month: payload.month, year: payload.year });
@@ -265,7 +268,7 @@ export default function CalendarClient({
       const payload = (await response.json()) as Partial<CalendarMonthPayload> & { error?: string };
 
       if (!response.ok || !payload.entries || !payload.month || !payload.year || !payload.monthLabel) {
-        throw new Error(payload.error ?? "Could not load calendar month");
+        throw new Error(payload.error ?? t(resolvedLocale, "calendar.noScheduledItemsFound"));
       }
 
       const normalizedPayload: CalendarMonthPayload = {
@@ -292,7 +295,7 @@ export default function CalendarClient({
         setLoadingMonth(false);
       }
     }
-  }, [applyMonthPayload]);
+  }, [applyMonthPayload, resolvedLocale]);
 
   const prefetchMonth = useCallback((year: number, month: number) => {
     const normalized = normalizeMonth(year, month);
@@ -312,7 +315,7 @@ export default function CalendarClient({
 
     setSelectedDay(null);
     setDisplayedMonth({ month: nextMonth.month, year: nextMonth.year });
-    setCurrentMonthLabel(cachedPayload?.monthLabel ?? new Intl.DateTimeFormat("en-US", {
+    setCurrentMonthLabel(cachedPayload?.monthLabel ?? new Intl.DateTimeFormat(resolvedLocale, {
       timeZone: DISPLAY_TIME_ZONE,
       month: "long",
       year: "numeric",
@@ -336,12 +339,12 @@ export default function CalendarClient({
       .catch(() => {
         // Keep showing cached or previous optimistic state if refresh fails.
       });
-  }, [applyMonthPayload, fetchMonth, prefetchMonth]);
+  }, [applyMonthPayload, fetchMonth, prefetchMonth, resolvedLocale]);
 
   useEffect(() => {
     prefetchMonth(displayedMonth.year, displayedMonth.month - 1);
     prefetchMonth(displayedMonth.year, displayedMonth.month + 1);
-  }, [displayedMonth.month, displayedMonth.year, prefetchMonth]);
+  }, [displayedMonth.month, displayedMonth.year, prefetchMonth, resolvedLocale]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.45fr_0.75fr]">
@@ -351,7 +354,7 @@ export default function CalendarClient({
             <div className="flex items-end justify-between gap-3">
               <div>
                 <CardTitle>{currentMonthLabel}</CardTitle>
-                <CardDescription>{visibleEntries.length} scheduled items</CardDescription>
+                <CardDescription>{t(resolvedLocale, "calendar.scheduledItems", { count: visibleEntries.length })}</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 <div className="hidden rounded-full border border-border/70 bg-muted/35 p-0.5 sm:flex">
@@ -364,7 +367,7 @@ export default function CalendarClient({
                         : "rounded-full px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
                     }
                   >
-                    Calendar
+                    {t(resolvedLocale, "calendar.viewCalendar")}
                   </button>
                   <button
                     type="button"
@@ -375,14 +378,14 @@ export default function CalendarClient({
                         : "rounded-full px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
                     }
                   >
-                    List
+                    {t(resolvedLocale, "calendar.viewList")}
                   </button>
                 </div>
                 <button
                   type="button"
                   onClick={() => loadMonth(displayedMonth.year, displayedMonth.month - 1)}
                   className="rounded-full border border-border/70 bg-card p-2 transition hover:border-foreground/15 hover:bg-muted/75"
-                  aria-label="Previous month"
+                  aria-label={t(resolvedLocale, "calendar.previousMonth")}
                   disabled={loadingMonth}
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -391,7 +394,7 @@ export default function CalendarClient({
                   type="button"
                   onClick={() => loadMonth(displayedMonth.year, displayedMonth.month + 1)}
                   className="rounded-full border border-border/70 bg-card p-2 transition hover:border-foreground/15 hover:bg-muted/75"
-                  aria-label="Next month"
+                  aria-label={t(resolvedLocale, "calendar.nextMonth")}
                   disabled={loadingMonth}
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -410,7 +413,7 @@ export default function CalendarClient({
                     : "flex-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground"
                 }
               >
-                Calendar
+                {t(resolvedLocale, "calendar.viewCalendar")}
               </button>
               <button
                 type="button"
@@ -421,15 +424,15 @@ export default function CalendarClient({
                     : "flex-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground"
                 }
               >
-                List
+                {t(resolvedLocale, "calendar.viewList")}
               </button>
             </div>
 
             {viewMode === "calendar" ? (
               <div className="grid grid-cols-7 gap-1 sm:gap-2">
-              {WEEK_DAYS.map((weekDay, index) => (
+              {weekdayLabels.map((weekDay, index) => (
                 <div key={weekDay} className="pb-1 text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:pb-2 sm:text-xs">
-                  <span className="sm:hidden">{MOBILE_WEEK_DAYS[index]}</span>
+                  <span className="sm:hidden">{mobileWeekdayLabels[index]}</span>
                   <span className="hidden sm:inline">{weekDay}</span>
                 </div>
               ))}
@@ -485,7 +488,7 @@ export default function CalendarClient({
                               <p className={`line-clamp-1 font-medium ${entry.completed ? "text-black/55 line-through" : ""}`}>{entry.title}</p>
                               {entry.completed && (
                                 <span className="rounded-full border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700">
-                                  Done
+                                  {t(resolvedLocale, "calendar.done")}
                                 </span>
                               )}
                             </div>
@@ -508,7 +511,7 @@ export default function CalendarClient({
                       })}
                       {cell.entries.length > 3 && (
                         <p className={`px-1 text-[11px] ${cell.isToday ? "text-muted-foreground" : "text-black/55"}`}>
-                          +{cell.entries.length - 3} more
+                          {t(resolvedLocale, "calendar.more", { count: cell.entries.length - 3 })}
                         </p>
                       )}
                     </div>
@@ -517,7 +520,7 @@ export default function CalendarClient({
               })}
               </div>
             ) : groupedEntries.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No scheduled items found.</p>
+              <p className="text-sm text-muted-foreground">{t(resolvedLocale, "calendar.noScheduledItemsFound")}</p>
             ) : (
               <div className="space-y-4">
                 {groupedEntries.map((group) => (
@@ -538,17 +541,17 @@ export default function CalendarClient({
                                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: subjectColor.borderColor }} />
                                   <span>{entry.contextName}</span>
                                 </p>
-                                <p className="mt-1 text-xs text-black/55">{formatDueDate(entry.date)}</p>
+                                <p className="mt-1 text-xs text-black/55">{formatDueDate(resolvedLocale, entry.date)}</p>
                                 {entry.locationName && <p className="mt-1 text-xs text-black/50">{entry.locationName}</p>}
                               </div>
                               <div className="flex items-center gap-2">
                                 {entry.completed && (
                                   <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                                    Done
+                                    {t(resolvedLocale, "calendar.done")}
                                   </span>
                                 )}
                                 <span className="text-[11px] font-medium text-black/45">
-                                  {entry.kind === "assignment" ? "Assignment" : "Event"}
+                                  {entry.kind === "assignment" ? t(resolvedLocale, "calendar.assignmentKind") : t(resolvedLocale, "calendar.eventKind")}
                                 </span>
                               </div>
                             </div>
@@ -575,15 +578,15 @@ export default function CalendarClient({
 
         <Card className="border-border/80 bg-card/95 sm:hidden">
           <CardHeader>
-            <CardTitle>{selectedCell ? `Day ${selectedCell.dayNumber}` : "Upcoming"}</CardTitle>
+            <CardTitle>{selectedCell ? t(resolvedLocale, "calendar.dayTitle", { day: selectedCell.dayNumber }) : t(resolvedLocale, "calendar.upcoming")}</CardTitle>
             <CardDescription>
-              {selectedCell ? "Activities due on the selected day" : "Next assignments and events"}
+              {selectedCell ? t(resolvedLocale, "calendar.selectedDayDescription") : t(resolvedLocale, "calendar.upcomingDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {!selectedCell ? (
               visibleUpcomingEntries.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No upcoming items found.</p>
+                <p className="text-sm text-muted-foreground">{t(resolvedLocale, "calendar.noUpcomingItemsFound")}</p>
               ) : (
                 visibleUpcomingEntries.map((entry) => {
                   const content = (
@@ -593,11 +596,11 @@ export default function CalendarClient({
                         <div className="flex items-center gap-2">
                           {entry.completed && (
                             <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                              Done
+                              {t(resolvedLocale, "calendar.done")}
                             </span>
                           )}
                           <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${entry.kind === "assignment" ? "border-red-300 bg-red-100 text-red-700" : "border-border/70 bg-muted/70 text-muted-foreground"}`}>
-                            {entry.kind === "assignment" ? "Assignment" : "Event"}
+                            {entry.kind === "assignment" ? t(resolvedLocale, "calendar.assignmentKind") : t(resolvedLocale, "calendar.eventKind")}
                           </span>
                         </div>
                       </div>
@@ -608,7 +611,7 @@ export default function CalendarClient({
                         />
                         <span>{entry.contextName}</span>
                       </p>
-                      <p className="mt-1 text-xs">{formatDueDate(entry.date)}</p>
+                      <p className="mt-1 text-xs">{formatDueDate(resolvedLocale, entry.date)}</p>
                       {entry.locationName && <p className="mt-1 text-xs text-black/60">{entry.locationName}</p>}
                     </div>
                   );
@@ -625,7 +628,7 @@ export default function CalendarClient({
                 })
               )
             ) : selectedCell.entries.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No activities scheduled for this day.</p>
+              <p className="text-sm text-muted-foreground">{t(resolvedLocale, "calendar.noActivitiesForDay")}</p>
             ) : (
               selectedCell.entries.map((entry) => {
                 const content = (
@@ -635,11 +638,11 @@ export default function CalendarClient({
                       <div className="flex items-center gap-2">
                         {entry.completed && (
                           <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                            Done
+                            {t(resolvedLocale, "calendar.done")}
                           </span>
                         )}
                         <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${entry.kind === "assignment" ? "border-red-300 bg-red-100 text-red-700" : "border-border/70 bg-muted/70 text-muted-foreground"}`}>
-                          {entry.kind === "assignment" ? "Assignment" : "Event"}
+                          {entry.kind === "assignment" ? t(resolvedLocale, "calendar.assignmentKind") : t(resolvedLocale, "calendar.eventKind")}
                         </span>
                       </div>
                     </div>
@@ -650,7 +653,7 @@ export default function CalendarClient({
                       />
                       <span>{entry.contextName}</span>
                     </p>
-                    <p className="mt-1 text-xs">{formatDueDate(entry.date)}</p>
+                    <p className="mt-1 text-xs">{formatDueDate(resolvedLocale, entry.date)}</p>
                     {entry.locationName && <p className="mt-1 text-xs text-black/60">{entry.locationName}</p>}
                   </div>
                 );
@@ -672,12 +675,12 @@ export default function CalendarClient({
 
       <Card className="hidden border-border/80 bg-card/95 lg:block">
         <CardHeader>
-          <CardTitle className="mb-1">{selectedCell ? `Day ${selectedCell.dayNumber}` : "Upcoming"}</CardTitle>
+          <CardTitle className="mb-1">{selectedCell ? t(resolvedLocale, "calendar.dayTitle", { day: selectedCell.dayNumber }) : t(resolvedLocale, "calendar.upcoming")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {!selectedCell ? (
               visibleUpcomingEntries.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No upcoming items found.</p>
+                <p className="text-sm text-muted-foreground">{t(resolvedLocale, "calendar.noUpcomingItemsFound")}</p>
               ) : (
                 visibleUpcomingEntries.map((entry) => {
                   const subjectColor = getSubjectColorStyle(entry.contextName, entry.courseId ? preferences.colors[entry.courseId] : undefined);
@@ -691,11 +694,11 @@ export default function CalendarClient({
                       <div className="flex items-center gap-2">
                         {entry.completed && (
                           <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                            Done
+                            {t(resolvedLocale, "calendar.done")}
                           </span>
                         )}
                         <span className="text-[11px] font-medium text-black/45">
-                          {entry.kind === "assignment" ? "Assignment" : "Event"}
+                          {entry.kind === "assignment" ? t(resolvedLocale, "calendar.assignmentKind") : t(resolvedLocale, "calendar.eventKind")}
                         </span>
                       </div>
                     </div>
@@ -703,7 +706,7 @@ export default function CalendarClient({
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: subjectColor.borderColor }} />
                       <span>{entry.contextName}</span>
                     </p>
-                    <p className="mt-1 text-xs">{formatDueDate(entry.date)}</p>
+                    <p className="mt-1 text-xs">{formatDueDate(resolvedLocale, entry.date)}</p>
                     {entry.locationName && <p className="mt-1 text-xs text-black/60">{entry.locationName}</p>}
                   </div>
                 );
@@ -720,7 +723,7 @@ export default function CalendarClient({
               })
             )
           ) : selectedCell.entries.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No activities scheduled for this day.</p>
+            <p className="text-sm text-muted-foreground">{t(resolvedLocale, "calendar.noActivitiesForDay")}</p>
           ) : (
             selectedCell.entries.map((entry) => {
               const subjectColor = getSubjectColorStyle(entry.contextName);
@@ -734,11 +737,11 @@ export default function CalendarClient({
                     <div className="flex items-center gap-2">
                       {entry.completed && (
                         <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                          Done
+                          {t(resolvedLocale, "calendar.done")}
                         </span>
                       )}
                       <span className="text-[11px] font-medium text-black/45">
-                        {entry.kind === "assignment" ? "Assignment" : "Event"}
+                        {entry.kind === "assignment" ? t(resolvedLocale, "calendar.assignmentKind") : t(resolvedLocale, "calendar.eventKind")}
                       </span>
                     </div>
                   </div>
@@ -746,7 +749,7 @@ export default function CalendarClient({
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: subjectColor.borderColor }} />
                     <span>{entry.contextName}</span>
                   </p>
-                  <p className="mt-1 text-xs">{formatDueDate(entry.date)}</p>
+                  <p className="mt-1 text-xs">{formatDueDate(resolvedLocale, entry.date)}</p>
                   {entry.locationName && <p className="mt-1 text-xs text-black/60">{entry.locationName}</p>}
                 </div>
               );

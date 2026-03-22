@@ -1,4 +1,4 @@
-# Canvas Wrapper Monorepo
+# Janvas Monorepo
 
 This repository is a monorepo with:
 

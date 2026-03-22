@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { t } from "@canvas/shared";
+import { useLocale } from "@/components/locale-provider";
 
 const CANVAS_API_KEY_STORAGE = "canvasApiKey";
 const CANVAS_API_BASE_STORAGE = "canvasApiBase";
@@ -9,6 +11,7 @@ const CANVAS_BOOTSTRAP_STORAGE = "canvasBootstrapData";
 
 export function ProfileActions() {
   const router = useRouter();
+  const { resolvedLocale } = useLocale();
 
   const clearKey = async () => {
     await fetch("/api/dashboard", { method: "DELETE" });
@@ -26,7 +29,7 @@ export function ProfileActions() {
       onClick={clearKey}
       className="text-sm text-black/50 transition hover:text-black/70"
     >
-      Change API key
+      {t(resolvedLocale, "common.changeApiKey")}
     </button>
   );
 }

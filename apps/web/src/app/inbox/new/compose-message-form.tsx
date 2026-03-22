@@ -202,7 +202,7 @@ export function ComposeMessageForm({ courses, currentUserId, initialCoursePeople
           </Link>
           <div>
             <h1 className="text-2xl font-bold">New message</h1>
-            <p className="text-sm text-muted-foreground">Start a Canvas conversation without leaving the app.</p>
+            <p className="text-sm text-muted-foreground">Start a Canvas conversation without leaving Janvas.</p>
           </div>
         </div>
         <Button

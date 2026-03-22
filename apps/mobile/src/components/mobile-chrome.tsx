@@ -1,19 +1,26 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Bookmark, CalendarDays, House, Inbox, LibraryBig, UserRound } from "lucide-react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { formatSubjectName, getSubjectColorPalette, orderSubjectsByPreference } from "@canvas/shared";
+import {
+  APP_WELCOME_STORAGE_KEY,
+  formatSubjectName,
+  getSubjectColorPalette,
+  orderSubjectsByPreference,
+  t,
+} from "@canvas/shared";
 import { useAppShell } from "../hooks/use-canvas-queries";
 import { useAppPreferences } from "../providers/app-preferences";
 import { useCanvasSession } from "../providers/canvas-session";
 
 const navItems = [
-  { href: "/", key: "dashboard", label: "Dashboard", icon: House },
-  { href: "/calendar", key: "calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/inbox", key: "inbox", label: "Inbox", icon: Inbox },
-  { href: "/bookmarks", key: "bookmarks", label: "Bookmarks", icon: Bookmark },
-  { href: "/profile", key: "profile", label: "Profile", icon: UserRound },
+  { href: "/", key: "dashboard", icon: House },
+  { href: "/calendar", key: "calendar", icon: CalendarDays },
+  { href: "/inbox", key: "inbox", icon: Inbox },
+  { href: "/bookmarks", key: "bookmarks", icon: Bookmark },
+  { href: "/profile", key: "profile", icon: UserRound },
 ] as const;
 
 function useChromeColors() {
@@ -53,8 +60,9 @@ export function MobileChrome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useChromeColors();
-  const { config } = useCanvasSession();
-  const { subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
+  const { config, ready } = useCanvasSession();
+  const { resolvedLocale, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
+  const [hasSeenWelcome, setHasSeenWelcome] = useState<boolean | null>(null);
   const isDashboardSection = pathname === "/" || pathname.startsWith("/subjects/");
   const currentCourseId = useMemo(() => {
     const match = pathname.match(/^\/subjects\/(\d+)/);
@@ -62,6 +70,39 @@ export function MobileChrome() {
     return Number.isFinite(parsed) ? parsed : null;
   }, [pathname]);
   const { data: shellData } = useAppShell();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!ready) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (config) {
+      setHasSeenWelcome(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void AsyncStorage.getItem(APP_WELCOME_STORAGE_KEY)
+      .then((value) => {
+        if (!cancelled) {
+          setHasSeenWelcome(value === "true");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHasSeenWelcome(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [config, ready]);
 
   const visibleCourses = useMemo(() => {
     const courses = shellData?.courses ?? [];
@@ -74,6 +115,11 @@ export function MobileChrome() {
   const showSubjectBar = Boolean(
     config && subjectPreferences.showMobileSubjectBar && visibleCourses.length > 0,
   );
+  const hideForSetup = !config;
+
+  if (hideForSetup) {
+    return null;
+  }
 
   return (
     <View>
@@ -165,7 +211,7 @@ export function MobileChrome() {
             >
               <Icon color={active ? colors.tabTextActive : colors.tabInactive} size={18} />
               <Text style={[styles.tabLabel, { color: active ? colors.tabTextActive : colors.tabTextInactive }]}>
-                {item.label}
+                {t(resolvedLocale, `navigation.${item.key}`)}
               </Text>
             </Pressable>
           );
@@ -226,11 +272,14 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     flex: 1,
     gap: 5,
+    justifyContent: "center",
     paddingHorizontal: 4,
     paddingVertical: 9,
   },
   tabLabel: {
     fontSize: 11,
     fontWeight: "500",
+    textAlign: "center",
+    width: "100%",
   },
 });

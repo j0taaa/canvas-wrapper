@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { Mail, UserRound } from "lucide-react";
+import { t } from "@canvas/shared";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAppShellData } from "@/lib/canvas";
+import { getRequestLocale } from "@/lib/request-locale";
 import { ProfileActions } from "./profile-actions";
 import { ProfilePreferences } from "./profile-preferences";
 
@@ -21,6 +23,7 @@ function getInitials(name: string) {
 
 export default async function ProfilePage() {
   const cookieStore = await cookies();
+  const { resolvedLocale } = await getRequestLocale();
   const apiKey = cookieStore.get(CANVAS_API_KEY_COOKIE)?.value;
 
   if (!apiKey) {
@@ -33,13 +36,13 @@ export default async function ProfilePage() {
     <DesktopAppShell active="profile" profile={shellData.profile} courses={shellData.courses}>
       <div className="w-full">
         <div className="mb-6 border-b border-border/80 pb-4">
-          <h1 className="text-2xl font-bold">Profile</h1>
+          <h1 className="text-2xl font-bold">{t(resolvedLocale, "common.profile")}</h1>
         </div>
 
         <div className="space-y-6">
           <Card className="border-border/80 bg-card/95">
             <CardHeader className="border-b border-border/70">
-              <CardTitle>Account</CardTitle>
+              <CardTitle>{t(resolvedLocale, "common.account")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5 pt-6">
               <div className="flex items-center gap-4">
@@ -57,16 +60,18 @@ export default async function ProfilePage() {
                 <div className="rounded-2xl border border-border/70 bg-muted/35 p-4">
                   <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                     <UserRound className="h-4 w-4" />
-                    Name
+                    {t(resolvedLocale, "common.name")}
                   </div>
                   <p className="text-sm text-foreground">{shellData.profile.name}</p>
                 </div>
                 <div className="rounded-2xl border border-border/70 bg-muted/35 p-4">
                   <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                     <Mail className="h-4 w-4" />
-                    Email
+                    {t(resolvedLocale, "common.email")}
                   </div>
-                  <p className="text-sm text-foreground">{shellData.profile.primary_email ?? "No email available"}</p>
+                  <p className="text-sm text-foreground">
+                    {shellData.profile.primary_email ?? t(resolvedLocale, "common.noEmailAvailable")}
+                  </p>
                 </div>
               </div>
 
@@ -74,14 +79,7 @@ export default async function ProfilePage() {
             </CardContent>
           </Card>
 
-          <Card className="border-border/80 bg-card/95">
-            <CardHeader className="border-b border-border/70">
-              <CardTitle>Configurations</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <ProfilePreferences courses={shellData.courses} />
-            </CardContent>
-          </Card>
+          <ProfilePreferences courses={shellData.courses} />
         </div>
       </div>
     </DesktopAppShell>

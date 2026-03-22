@@ -1,62 +1,52 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { getSubjectColorPalette } from "@canvas/shared"
+import {
+  formatDueDate as formatLocalizedDueDate,
+  formatDueDateShort as formatLocalizedDueDateShort,
+  getSubjectColorPalette,
+  t,
+  type AppLocale,
+} from "@canvas/shared"
 export { formatSubjectName, getSubjectColorHex, orderSubjectsByPreference } from "@canvas/shared"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-const dueDateFormatter = new Intl.DateTimeFormat("pt-BR", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-  timeZone: "America/Sao_Paulo",
-})
-
-const shortDueDateFormatter = new Intl.DateTimeFormat("pt-BR", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "America/Sao_Paulo",
-})
-
-export function formatDueDate(value?: string) {
-  if (!value) {
-    return "No due date"
-  }
-
-  return dueDateFormatter.format(new Date(value))
+function isLocale(value?: string | null): value is AppLocale {
+  return value === "en" || value === "pt-BR"
 }
 
-export function formatDueDateShort(value?: string) {
-  if (!value) {
-    return "No due date"
-  }
+export function formatDueDate(localeOrValue?: AppLocale | string, maybeValue?: string) {
+  const locale = isLocale(localeOrValue) ? localeOrValue : "en"
+  const value = isLocale(localeOrValue) ? maybeValue : localeOrValue
 
-  return shortDueDateFormatter.format(new Date(value))
+  return formatLocalizedDueDate(locale, value)
+}
+
+export function formatDueDateShort(localeOrValue?: AppLocale | string, maybeValue?: string) {
+  const locale = isLocale(localeOrValue) ? localeOrValue : "en"
+  const value = isLocale(localeOrValue) ? maybeValue : localeOrValue
+
+  return formatLocalizedDueDateShort(locale, value)
 }
 
 export function getSubjectColorStyle(name?: string | null, preferredColor?: string | null) {
   return getSubjectColorPalette(name, preferredColor)
 }
 
-export function formatGroupJoinLevel(value?: string | null) {
+export function formatGroupJoinLevel(localeOrValue?: AppLocale | string | null, maybeValue?: string | null) {
+  const locale = isLocale(localeOrValue) ? localeOrValue : "en"
+  const value = isLocale(localeOrValue) ? maybeValue : localeOrValue
+
   if (!value) {
-    return "Managed"
+    return t(locale, "common.managed")
   }
 
   const normalized = value.replace(/[_-]+/g, " ").trim()
 
   if (!normalized) {
-    return "Managed"
+    return t(locale, "common.managed")
   }
 
   return normalized

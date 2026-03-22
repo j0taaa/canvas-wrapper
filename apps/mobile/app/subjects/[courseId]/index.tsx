@@ -10,6 +10,7 @@ import {
   createCourseGroup,
   formatGroupJoinLevel,
   getSubjectColorPalette,
+  t,
 } from "@canvas/shared";
 import {
   AppScreen,
@@ -105,7 +106,7 @@ export default function SubjectScreen() {
   const courseId = Number(params.courseId);
   const activeTab = normalizeTab(params.tab);
   const activePeopleView = normalizePeopleSubtab(params.peopleView);
-  const { resolvedTheme, subjectPreferences } = useAppPreferences();
+  const { resolvedLocale, resolvedTheme, subjectPreferences } = useAppPreferences();
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
   const [creatingGroup, setCreatingGroup] = useState(false);
@@ -148,7 +149,7 @@ export default function SubjectScreen() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen scroll={false}>
+      <AppScreen contentStyle={styles.screenContent} scroll={false}>
         <RestorableScrollView 
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -159,9 +160,9 @@ export default function SubjectScreen() {
             />
           }
         >
-          {showColdLoading ? <LoadingState label="Loading subject..." /> : null}
-          {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
           <SubjectLayoutHeader />
+          {showColdLoading ? <LoadingState label={t(resolvedLocale, "subjects.loadingSubject")} /> : null}
+          {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
           
           {course && data ? (
             <View style={styles.container}>
@@ -170,9 +171,9 @@ export default function SubjectScreen() {
                 <View style={styles.twoColumnGrid}>
                   {/* Modules Section */}
                   {(activeTab !== "assignments") && (
-                    <SectionCard title="Modules" subtitle="Lessons and organized course materials">
+                    <View style={styles.sectionStack}>
                       {data.content.modules.length === 0 ? (
-                        <EmptyState label="No modules available for this subject." />
+                        <EmptyState label={t(resolvedLocale, "subjects.noModules")} />
                       ) : (
                         data.content.modules.map((module) => (
                           <View key={module.id} style={[styles.moduleCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
@@ -181,11 +182,11 @@ export default function SubjectScreen() {
                                 <Text style={[styles.moduleName, { color: colors.foreground }]} numberOfLines={1}>
                                   {module.name}
                                 </Text>
-                                <Text style={[styles.moduleSubtitle, { color: colors.mutedForeground }]}>Course materials</Text>
+                                <Text style={[styles.moduleSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.courseMaterials")}</Text>
                               </View>
                               <View style={[styles.itemCountBadge, { borderColor: colors.badgeBorder }]}>
                                 <Text style={[styles.itemCountText, { color: colors.mutedForeground }]}>
-                                  {module.items_count ?? module.items?.length ?? 0} items
+                                  {t(resolvedLocale, "subjects.itemsCount", { count: module.items_count ?? module.items?.length ?? 0 })}
                                 </Text>
                               </View>
                             </View>
@@ -203,7 +204,7 @@ export default function SubjectScreen() {
                                       <View style={styles.subHeaderContent}>
                                         <View style={[styles.itemDot, { backgroundColor: palette.borderColor }]} />
                                         <Text style={[styles.subHeaderTitle, { color: colors.foreground }]} numberOfLines={1}>
-                                          {item.title ?? "Section"}
+                                          {item.title ?? t(resolvedLocale, "subjects.section")}
                                         </Text>
                                       </View>
                                     </View>
@@ -224,16 +225,16 @@ export default function SubjectScreen() {
                                       <View style={[styles.itemDot, { backgroundColor: palette.borderColor }]} />
                                       <View style={styles.itemTextSection}>
                                         <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>
-                                          {item.title ?? "Untitled item"}
+                                          {item.title ?? t(resolvedLocale, "subjects.untitledItem")}
                                         </Text>
                                         <Text style={[styles.itemType, { color: colors.mutedForeground }]}>
-                                          {item.type ?? "Content"}
+                                          {item.type ?? t(resolvedLocale, "subjects.content")}
                                         </Text>
                                       </View>
                                     </View>
                                     {item.completion_requirement?.completed && (
                                       <View style={[styles.doneBadge, { borderColor: colors.successText + "40", backgroundColor: colors.successBg }]}>
-                                        <Text style={[styles.doneBadgeText, { color: colors.successText }]}>Done</Text>
+                                        <Text style={[styles.doneBadgeText, { color: colors.successText }]}>{t(resolvedLocale, "calendar.done")}</Text>
                                       </View>
                                     )}
                                   </Pressable>
@@ -243,14 +244,14 @@ export default function SubjectScreen() {
                           </View>
                         ))
                       )}
-                    </SectionCard>
+                    </View>
                   )}
 
                   {/* Assignments Section */}
                   {(activeTab !== "modules") && (
-                    <SectionCard title="Assignments" subtitle="Upcoming and recent work for this subject">
+                    <View style={styles.sectionStack}>
                       {data.content.assignments.length === 0 ? (
-                        <EmptyState label="No assignments available for this subject." />
+                        <EmptyState label={t(resolvedLocale, "subjects.noAssignments")} />
                       ) : (
                         data.content.assignments.map((assignment) => {
                           const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
@@ -271,22 +272,22 @@ export default function SubjectScreen() {
                                   </View>
                                   {isCompleted && (
                                     <View style={[styles.doneBadge, { borderColor: colors.successText + "40", backgroundColor: colors.successBg }]}>
-                                      <Text style={[styles.doneBadgeText, { color: colors.successText }]}>Done</Text>
+                                      <Text style={[styles.doneBadgeText, { color: colors.successText }]}>{t(resolvedLocale, "calendar.done")}</Text>
                                     </View>
                                   )}
                                 </View>
                                 <Text style={[styles.assignmentDue, { color: colors.mutedForeground }]}>
-                                  Due: {formatDueDateShort(assignment.due_at)}
+                                  {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
                                 </Text>
                                 <Text style={[styles.assignmentPoints, { color: colors.mutedForeground }]}>
-                                  {assignment.points_possible != null ? `${assignment.points_possible} points` : "No points listed"}
+                                  {assignment.points_possible != null ? t(resolvedLocale, "subjects.points", { count: assignment.points_possible }) : t(resolvedLocale, "subjects.noPointsListed")}
                                 </Text>
                               </View>
                             </Pressable>
                           );
                         })
                       )}
-                    </SectionCard>
+                    </View>
                   )}
                 </View>
               )}
@@ -296,21 +297,21 @@ export default function SubjectScreen() {
                 <View style={styles.gradesContainer}>
                   <View style={styles.gradesGrid}>
                     <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                      <Text style={[styles.metricTitle, { color: colors.foreground }]}>Grade %</Text>
+                      <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.gradePercent")}</Text>
                       <Text style={[styles.metricValue, { color: colors.foreground }]}>
                         {gradePercentage != null ? `${formatMetricNumber(gradePercentage)}%` : "--"}
                       </Text>
-                      <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>Overall percentage in the subject</Text>
+                      <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.overallPercentage")}</Text>
                     </View>
                     <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                      <Text style={[styles.metricTitle, { color: colors.foreground }]}>Absolute</Text>
+                      <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.absolute")}</Text>
                       <Text style={[styles.metricValue, { color: colors.foreground }]}>
                         {formatMetricNumber(absolutePoints)}
                       </Text>
-                      <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>Total points earned by you</Text>
+                      <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.totalPointsEarned")}</Text>
                     </View>
                     <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                      <Text style={[styles.metricTitle, { color: colors.foreground }]}>Trend</Text>
+                      <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.trend")}</Text>
                       <View style={styles.trendChart}>
                         {gradeTrendPoints.length > 1 ? (
                           <View style={styles.chartContainer}>
@@ -335,15 +336,15 @@ export default function SubjectScreen() {
                             ))}
                           </View>
                         ) : (
-                          <Text style={[styles.noTrendText, { color: colors.mutedForeground }]}>Not enough graded activities yet</Text>
+                          <Text style={[styles.noTrendText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.notEnoughGradedActivities")}</Text>
                         )}
                       </View>
                     </View>
                   </View>
 
-                  <SectionCard title="Assignment grades" subtitle="Scores and submission status for this subject">
+                  <SectionCard density="compact" title={t(resolvedLocale, "subjects.assignmentGrades")} subtitle={t(resolvedLocale, "subjects.scoresAndSubmissionStatus")}>
                     {data.grades.assignments.length === 0 ? (
-                      <EmptyState label="No grade data available for this subject." />
+                      <EmptyState label={t(resolvedLocale, "subjects.noGradeData")} />
                     ) : (
                       data.grades.assignments.map((assignment) => {
                         const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
@@ -359,7 +360,7 @@ export default function SubjectScreen() {
                                 {assignment.name}
                               </Text>
                               <Text style={[styles.gradeAssignmentDue, { color: colors.mutedForeground }]}>
-                                Due: {formatDueDateShort(assignment.due_at)}
+                                {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
                               </Text>
                             </View>
                             <View style={styles.gradeAssignmentScore}>
@@ -367,7 +368,7 @@ export default function SubjectScreen() {
                                 {assignment.submission?.grade ?? (assignment.submission?.score != null ? String(assignment.submission.score) : "--")}
                               </Text>
                               <Text style={[styles.scoreTotal, { color: colors.mutedForeground }]}>
-                                {assignment.points_possible != null ? `of ${assignment.points_possible}` : "No points listed"}
+                                {assignment.points_possible != null ? `of ${assignment.points_possible}` : t(resolvedLocale, "subjects.noPointsListed")}
                               </Text>
                             </View>
                           </Pressable>
@@ -386,17 +387,17 @@ export default function SubjectScreen() {
                       onPress={() => router.replace({ params: { courseId: String(courseId), tab: "people" }, pathname: "/subjects/[courseId]" })}
                       style={[styles.peopleTab, { borderColor: activePeopleView === "people" ? colors.primary : colors.border }, activePeopleView === "people" && { backgroundColor: colors.primary }]}
                     >
-                      <Text style={[styles.peopleTabText, { color: activePeopleView === "people" ? colors.primaryText : colors.mutedForeground }]}>People</Text>
+                      <Text style={[styles.peopleTabText, { color: activePeopleView === "people" ? colors.primaryText : colors.mutedForeground }]}>{t(resolvedLocale, "subjects.people")}</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => router.replace({ params: { courseId: String(courseId), peopleView: "groups", tab: "people" }, pathname: "/subjects/[courseId]" })}
                       style={[styles.peopleTab, { borderColor: activePeopleView === "groups" ? colors.primary : colors.border }, activePeopleView === "groups" && { backgroundColor: colors.primary }]}
                     >
-                      <Text style={[styles.peopleTabText, { color: activePeopleView === "groups" ? colors.primaryText : colors.mutedForeground }]}>Groups</Text>
+                      <Text style={[styles.peopleTabText, { color: activePeopleView === "groups" ? colors.primaryText : colors.mutedForeground }]}>{t(resolvedLocale, "subjects.groups")}</Text>
                     </Pressable>
                   </View>
 
-                  <SectionCard title={activePeopleView === "groups" ? "Groups" : "People"} subtitle={activePeopleView === "groups" ? "All groups visible in this subject" : "Everyone currently visible in this subject"}>
+                  <View style={styles.sectionStack}>
                     {activePeopleView === "people" ? (
                       data.people.length === 0 && showInlineRefresh ? (
                         <>
@@ -404,7 +405,7 @@ export default function SubjectScreen() {
                           <PlaceholderBlock height={76} />
                         </>
                       ) : data.people.length === 0 ? (
-                        <EmptyState label="No people available for this subject." />
+                        <EmptyState label={t(resolvedLocale, "subjects.noPeople")} />
                       ) : (
                         data.people.map((person) => (
                           <Pressable
@@ -425,7 +426,7 @@ export default function SubjectScreen() {
                             <View style={styles.personInfo}>
                               <Text style={[styles.personName, { color: colors.foreground }]} numberOfLines={1}>{person.name}</Text>
                               <Text style={[styles.personRole, { color: colors.mutedForeground }]} numberOfLines={1}>
-                                {person.short_name ?? person.sortable_name ?? "Canvas user"}
+                                {person.short_name ?? person.sortable_name ?? t(resolvedLocale, "subjects.canvasUser")}
                               </Text>
                             </View>
                           </Pressable>
@@ -438,7 +439,7 @@ export default function SubjectScreen() {
                           <PlaceholderBlock height={88} />
                         </>
                       ) : data.groups.length === 0 ? (
-                        <EmptyState label="No groups available for this subject." />
+                        <EmptyState label={t(resolvedLocale, "subjects.noGroups")} />
                       ) : (
                         data.groups.map((group) => (
                           <View key={group.id} style={[styles.groupCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}>
@@ -446,24 +447,24 @@ export default function SubjectScreen() {
                               <View style={styles.groupInfo}>
                                 <Text style={[styles.groupName, { color: colors.foreground }]} numberOfLines={1}>{group.name}</Text>
                                 <Text style={[styles.groupDescription, { color: colors.mutedForeground }]} numberOfLines={1}>
-                                  {group.description || "Canvas group"}
+                                  {group.description || t(resolvedLocale, "subjects.canvasGroup")}
                                 </Text>
                               </View>
                               <View style={styles.groupMeta}>
-                                <Text style={[styles.groupMetaText, { color: colors.mutedForeground }]}>{group.members_count ?? 0} members</Text>
+                                <Text style={[styles.groupMetaText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.members", { count: group.members_count ?? 0 })}</Text>
                                 <Text style={[styles.groupMetaText, { color: colors.mutedForeground }]}>{formatGroupJoinLevel(group.join_level)}</Text>
                               </View>
                             </View>
                             <View style={styles.groupAction}>
                               {group.canOpen ? (
                                 <Pressable onPress={() => router.push(`/subjects/${courseId}/groups/${group.id}`)} style={styles.groupLink}>
-                                  <Text style={[styles.groupLinkText, { color: colors.foreground }]}>Enter group</Text>
+                                  <Text style={[styles.groupLinkText, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.enterGroup")}</Text>
                                   <ArrowRight size={14} color={colors.mutedForeground} />
                                 </Pressable>
                               ) : (
                                 <View style={styles.groupLocked}>
                                   <LockKeyhole size={14} color={colors.mutedForeground} />
-                                  <Text style={[styles.groupLockedText, { color: colors.mutedForeground }]}>Locked</Text>
+                                  <Text style={[styles.groupLockedText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.locked")}</Text>
                                 </View>
                               )}
                             </View>
@@ -471,20 +472,20 @@ export default function SubjectScreen() {
                         ))
                       )
                     )}
-                  </SectionCard>
+                  </View>
                 </View>
               )}
 
               {/* Forums Tab */}
               {activeTab === "forums" && data && (
-                <SectionCard title="Forums" subtitle="Discussion topics for this subject">
+                <View style={styles.sectionStack}>
                   {data.discussions.length === 0 && showInlineRefresh ? (
                     <>
                       <PlaceholderBlock height={100} />
                       <PlaceholderBlock height={100} />
                     </>
                   ) : data.discussions.length === 0 ? (
-                    <EmptyState label="No forums available for this subject." />
+                    <EmptyState label={t(resolvedLocale, "subjects.noForums")} />
                   ) : (
                     data.discussions.map((discussion) => (
                       <Pressable
@@ -493,33 +494,33 @@ export default function SubjectScreen() {
                         style={[styles.forumCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
                       >
                         <View style={styles.forumContent}>
-                          <Text style={[styles.forumTitle, { color: colors.foreground }]} numberOfLines={1}>{discussion.title ?? "Untitled forum"}</Text>
+                          <Text style={[styles.forumTitle, { color: colors.foreground }]} numberOfLines={1}>{discussion.title ?? t(resolvedLocale, "subjects.untitledForum")}</Text>
                           <Text style={[styles.forumMessage, { color: colors.mutedForeground }]} numberOfLines={2}>
-                            {discussion.message?.replace(/<[^>]+>/g, " ") ?? "No preview available."}
+                            {discussion.message?.replace(/<[^>]+>/g, " ") ?? t(resolvedLocale, "inbox.noPreview")}
                           </Text>
                           <View style={styles.forumMeta}>
-                            <Text style={[styles.forumMetaText, { color: colors.mutedForeground }]}>{discussion.discussion_subentry_count ?? 0} replies</Text>
+                            <Text style={[styles.forumMetaText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.replies", { count: discussion.discussion_subentry_count ?? 0 })}</Text>
                             {discussion.unread_count != null && (
-                              <Text style={[styles.forumMetaText, { color: colors.mutedForeground }]}>{discussion.unread_count} unread</Text>
+                              <Text style={[styles.forumMetaText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.unreadCount", { count: discussion.unread_count })}</Text>
                             )}
                           </View>
                         </View>
                       </Pressable>
                     ))
                   )}
-                </SectionCard>
+                </View>
               )}
 
               {/* Files Tab */}
               {activeTab === "files" && data && (
-                <SectionCard title="Files" subtitle="Course files and materials">
+                <View style={styles.sectionStack}>
                   {data.files.length === 0 && showInlineRefresh ? (
                     <>
                       <PlaceholderBlock height={88} />
                       <PlaceholderBlock height={88} />
                     </>
                   ) : data.files.length === 0 ? (
-                    <EmptyState label="No files available for this subject." />
+                    <EmptyState label={t(resolvedLocale, "subjects.noFiles")} />
                   ) : (
                     data.files.map((file) => (
                       <Pressable
@@ -530,9 +531,9 @@ export default function SubjectScreen() {
                         <View style={styles.fileContent}>
                           <View style={styles.fileInfo}>
                             <Text style={[styles.fileName, { color: colors.foreground }]} numberOfLines={1}>
-                              {file.display_name ?? file.filename ?? "Untitled file"}
+                              {file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.untitledFile")}
                             </Text>
-                            <Text style={[styles.fileType, { color: colors.mutedForeground }]}>{file["content-type"] ?? "File"}</Text>
+                            <Text style={[styles.fileType, { color: colors.mutedForeground }]}>{file["content-type"] ?? t(resolvedLocale, "subjects.files")}</Text>
                           </View>
                           <View style={styles.fileMeta}>
                             <Text style={[styles.fileMetaText, { color: colors.mutedForeground }]}>
@@ -546,7 +547,7 @@ export default function SubjectScreen() {
                       </Pressable>
                     ))
                   )}
-                </SectionCard>
+                </View>
               )}
             </View>
           ) : null}
@@ -557,9 +558,15 @@ export default function SubjectScreen() {
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    padding: 0,
+  },
   container: {
     paddingHorizontal: 8,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  sectionStack: {
     gap: 12,
   },
   twoColumnGrid: {

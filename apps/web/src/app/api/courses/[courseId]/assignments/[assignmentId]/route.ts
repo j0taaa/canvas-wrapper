@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { addAssignmentComment, submitAssignment, uploadAssignmentSubmissionFiles } from "@/lib/canvas";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
+type RequestFormData = {
+  get: (name: string) => FormDataEntryValue | null;
+  getAll: (name: string) => FormDataEntryValue[];
+};
 
 export async function POST(
   request: Request,
@@ -24,7 +28,7 @@ export async function POST(
     let submission;
 
     if (contentType.includes("multipart/form-data")) {
-      const formData = await request.formData();
+      const formData = await request.formData() as unknown as RequestFormData;
       const action = formData.get("action");
 
       if (action === "comment") {

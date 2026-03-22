@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Download, FileImage, FileText, Presentation } from "lucide-react";
+import { t } from "@canvas/shared";
 import { BookmarkButton } from "@/components/bookmark-button";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { HistoryBackButton } from "@/components/history-back-button";
@@ -9,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getFileById, getFileContent, getSubjectShellData } from "@/lib/canvas";
 import { generateOfficePreview, getOfficePreviewKind } from "@/lib/office-preview";
+import { getRequestLocale } from "@/lib/request-locale";
 import { formatDueDateShort, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
@@ -37,6 +39,7 @@ export default async function SubjectFilePage({
   const { courseId, fileId } = await params;
   const parsedCourseId = Number(courseId);
   const parsedFileId = Number(fileId);
+  const { resolvedLocale } = await getRequestLocale();
 
   if (!Number.isFinite(parsedCourseId) || !Number.isFinite(parsedFileId)) {
     notFound();
@@ -76,7 +79,12 @@ export default async function SubjectFilePage({
   const PreviewIcon = officePreviewKind === "pptx" ? Presentation : isPdf || officePreviewKind === "docx" ? FileText : FileImage;
 
   return (
-    <DesktopAppShell profile={courseShellData.profile} courses={courseShellData.courses} currentCourseId={parsedCourseId}>
+    <DesktopAppShell
+      profile={courseShellData.profile}
+      courses={courseShellData.courses}
+      currentCourseId={parsedCourseId}
+      contentClassName="p-4 pb-32 md:p-5 md:pb-6"
+    >
       <div className="w-full">
         <div className="mb-4 flex items-center justify-between gap-3">
           <HistoryBackButton fallbackHref={`/subjects/${parsedCourseId}?tab=files`} />
@@ -85,7 +93,7 @@ export default async function SubjectFilePage({
               href={fileSrc}
               download={file.filename ?? file.display_name ?? `file-${parsedFileId}`}
               className="inline-flex size-7 shrink-0 items-center justify-center rounded-[min(var(--radius-md),12px)] border border-border bg-background text-foreground transition-all outline-none select-none hover:bg-muted/80 hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              aria-label="Download file"
+              aria-label={t(resolvedLocale, "common.download")}
             >
               <Download className="h-4 w-4" />
             </a>
@@ -93,7 +101,7 @@ export default async function SubjectFilePage({
               bookmark={{
                 id: `file-${parsedCourseId}-${parsedFileId}`,
                 kind: "file",
-                title: file.display_name ?? file.filename ?? "Untitled file",
+                title: file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.untitledFile"),
                 href: `/subjects/${parsedCourseId}/files/${parsedFileId}`,
                 subjectName: course.name,
                 courseId: parsedCourseId,
@@ -102,7 +110,7 @@ export default async function SubjectFilePage({
           </div>
         </div>
         <div className="mb-6 overflow-hidden rounded-2xl border border-black/15 bg-gradient-to-br from-white via-white to-black/[0.03]">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-5 py-5 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-5">
             <div className="min-w-0">
               <div className="mb-3 flex items-center gap-3">
                 <span
@@ -112,7 +120,7 @@ export default async function SubjectFilePage({
                   <PreviewIcon className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
-                  <h1 className="truncate text-2xl font-semibold">{file.display_name ?? file.filename ?? "Untitled file"}</h1>
+                  <h1 className="truncate text-2xl font-semibold">{file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.untitledFile")}</h1>
                   <Link
                     href={`/subjects/${parsedCourseId}`}
                     className="text-sm text-black/55 transition hover:text-black hover:underline"
@@ -124,42 +132,42 @@ export default async function SubjectFilePage({
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="border-black/25 bg-white/80 text-black">
-                {file["content-type"] ?? "File"}
+                {file["content-type"] ?? t(resolvedLocale, "subjects.files")}
               </Badge>
               {file.updated_at && (
                 <Badge variant="outline" className="border-black/25 bg-white/80 text-black/70">
-                  Updated {formatDueDateShort(file.updated_at)}
+                  {t(resolvedLocale, "common.updated")} {formatDueDateShort(resolvedLocale, file.updated_at)}
                 </Badge>
               )}
             </div>
           </div>
         </div>
 
-        <Card className="border-black/15 bg-white/90">
+        <Card size="sm" className="border-black/15 bg-white/90">
           <CardHeader className="border-b border-black/10">
-            <CardTitle>Preview</CardTitle>
+            <CardTitle>{t(resolvedLocale, "subjects.preview")}</CardTitle>
           </CardHeader>
           <CardContent>
             {!previewable ? (
-              <p className="text-sm text-black/70">This file type can’t be previewed here.</p>
+              <p className="text-sm text-black/70">{t(resolvedLocale, "subjects.previewUnavailable")}</p>
             ) : isPdf ? (
               <iframe
                 src={fileSrc}
-                title={file.display_name ?? file.filename ?? "File preview"}
+                title={file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.preview")}
                 className="h-[75vh] w-full rounded-xl border border-black/10"
               />
             ) : isImage ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={fileSrc}
-                alt={file.display_name ?? file.filename ?? "File preview"}
+                alt={file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.preview")}
                 className="max-h-[75vh] w-full rounded-xl border border-black/10 object-contain"
               />
             ) : officePreview?.kind === "docx" ? (
               <div className="space-y-4">
                 {officePreview.warnings.length > 0 && (
                   <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                    Some complex Word formatting may not render exactly the same in this preview.
+                    {t(resolvedLocale, "subjects.previewWordWarning")}
                   </div>
                 )}
                 <div
@@ -170,10 +178,10 @@ export default async function SubjectFilePage({
             ) : officePreview?.kind === "pptx" ? (
               <div className="space-y-4">
                 <div className="rounded-xl border border-black/10 bg-black/[0.02] px-4 py-3 text-sm text-black/70">
-                  This preview shows the extracted slide text. Complex layouts, animations, and some media may still look better in the original file.
+                  {t(resolvedLocale, "subjects.previewSlidesDescription")}
                 </div>
                 {officePreview.slides.length === 0 ? (
-                  <p className="text-sm text-black/70">No previewable slide text was found in this presentation.</p>
+                  <p className="text-sm text-black/70">{t(resolvedLocale, "subjects.noPreviewableSlideText")}</p>
                 ) : (
                   <div className="space-y-3">
                     {officePreview.slides.map((slide) => (
@@ -181,7 +189,7 @@ export default async function SubjectFilePage({
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <p className="text-base font-semibold">{slide.title}</p>
                           <span className="shrink-0 rounded-full border border-black/10 px-2.5 py-1 text-xs text-black/55">
-                            Slide {slide.number}
+                            {t(resolvedLocale, "subjects.slide", { number: slide.number })}
                           </span>
                         </div>
                         {slide.items.length > 0 ? (
@@ -194,7 +202,7 @@ export default async function SubjectFilePage({
                             ))}
                           </ul>
                         ) : (
-                          <p className="text-sm text-black/55">No additional text found on this slide.</p>
+                          <p className="text-sm text-black/55">{t(resolvedLocale, "subjects.noAdditionalSlideText")}</p>
                         )}
                       </div>
                     ))}
@@ -202,7 +210,7 @@ export default async function SubjectFilePage({
                 )}
               </div>
             ) : (
-              <p className="text-sm text-black/70">This file type can’t be previewed here.</p>
+              <p className="text-sm text-black/70">{t(resolvedLocale, "subjects.previewUnavailable")}</p>
             )}
           </CardContent>
         </Card>

@@ -2,12 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { ListChecks } from "lucide-react";
+import { t } from "@canvas/shared";
 import { BookmarkButton } from "@/components/bookmark-button";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getQuizDetails, getQuizQuestions, getSubjectShellData } from "@/lib/canvas";
+import { getRequestLocale } from "@/lib/request-locale";
 import { formatDueDateShort, formatSubjectName, getSubjectColorStyle, rewriteCanvasHtmlLinks } from "@/lib/utils";
 import { OpenInCanvasButton } from "./open-in-canvas-button";
 
@@ -21,6 +23,7 @@ export default async function QuizPage({
   const { courseId, quizId } = await params;
   const parsedCourseId = Number(courseId);
   const parsedQuizId = Number(quizId);
+  const { resolvedLocale } = await getRequestLocale();
 
   if (!Number.isFinite(parsedCourseId) || !Number.isFinite(parsedQuizId)) {
     notFound();
@@ -46,13 +49,18 @@ export default async function QuizPage({
 
   const subjectStyle = getSubjectColorStyle(course.name);
   const renderedDescription = rewriteCanvasHtmlLinks(
-    quizResult.description || "<p>No quiz description available.</p>",
+    quizResult.description || `<p>${t(resolvedLocale, "subjects.noQuizDescription")}</p>`,
     courseShellData.apiBase,
     parsedCourseId,
   );
 
   return (
-    <DesktopAppShell profile={courseShellData.profile} courses={courseShellData.courses} currentCourseId={parsedCourseId}>
+    <DesktopAppShell
+      profile={courseShellData.profile}
+      courses={courseShellData.courses}
+      currentCourseId={parsedCourseId}
+      contentClassName="p-4 pb-32 md:p-5 md:pb-6"
+    >
       <div className="w-full">
         <div className="mb-4 flex items-center justify-between gap-3">
           <HistoryBackButton fallbackHref={`/subjects/${parsedCourseId}`} />
@@ -60,7 +68,7 @@ export default async function QuizPage({
             bookmark={{
               id: `quiz-${parsedCourseId}-${parsedQuizId}`,
               kind: "quiz",
-              title: quizResult.title ?? "Untitled quiz",
+              title: quizResult.title ?? t(resolvedLocale, "subjects.untitledQuiz"),
               href: `/subjects/${parsedCourseId}/quizzes/${parsedQuizId}`,
               subjectName: course.name,
               courseId: parsedCourseId,
@@ -69,7 +77,7 @@ export default async function QuizPage({
         </div>
 
         <div className="mb-6 overflow-hidden rounded-2xl border border-black/15 bg-gradient-to-br from-white via-white to-black/[0.03]">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-5 py-5 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-5">
             <div className="min-w-0">
               <div className="mb-3 flex items-center gap-3">
                 <span
@@ -79,7 +87,7 @@ export default async function QuizPage({
                   <ListChecks className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
-                  <h1 className="truncate text-2xl font-semibold">{quizResult.title ?? "Untitled quiz"}</h1>
+                  <h1 className="truncate text-2xl font-semibold">{quizResult.title ?? t(resolvedLocale, "subjects.untitledQuiz")}</h1>
                   <Link
                     href={`/subjects/${parsedCourseId}`}
                     className="text-sm text-black/55 transition hover:text-black hover:underline"
@@ -92,17 +100,17 @@ export default async function QuizPage({
             <div className="flex flex-wrap items-center gap-2">
               {quizResult.question_count != null && (
                 <Badge variant="outline" className="border-black/25 bg-white/80 text-black/70">
-                  {quizResult.question_count} questions
+                  {t(resolvedLocale, "subjects.questionCount", { count: quizResult.question_count })}
                 </Badge>
               )}
               {quizResult.points_possible != null && (
                 <Badge variant="outline" className="border-black/25 bg-white/80 text-black/70">
-                  {quizResult.points_possible} points
+                  {t(resolvedLocale, "subjects.points", { count: quizResult.points_possible })}
                 </Badge>
               )}
               {quizResult.due_at && (
                 <Badge variant="outline" className="border-black/25 bg-white/80 text-black/70">
-                  Due {formatDueDateShort(quizResult.due_at)}
+                  {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, quizResult.due_at) })}
                 </Badge>
               )}
             </div>
@@ -110,9 +118,9 @@ export default async function QuizPage({
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-          <Card className="border-black/15 bg-white/90">
+          <Card size="sm" className="border-black/15 bg-white/90">
             <CardHeader className="border-b border-black/10">
-              <CardTitle>Quiz details</CardTitle>
+              <CardTitle>{t(resolvedLocale, "subjects.quizDetails")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div
@@ -125,13 +133,13 @@ export default async function QuizPage({
             </CardContent>
           </Card>
 
-          <Card className="border-black/15 bg-white/90">
+          <Card size="sm" className="border-black/15 bg-white/90">
             <CardHeader className="border-b border-black/10">
-              <CardTitle>Questions</CardTitle>
+              <CardTitle>{t(resolvedLocale, "subjects.questions")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {questionsResult.length === 0 && (
-                <p className="text-sm text-black/70">Questions are not available for this quiz through the API.</p>
+                <p className="text-sm text-black/70">{t(resolvedLocale, "subjects.questionsUnavailable")}</p>
               )}
               {questionsResult.map((question, index) => (
                 <div
@@ -140,16 +148,16 @@ export default async function QuizPage({
                   style={{ boxShadow: `inset 3px 0 0 ${subjectStyle.borderColor}` }}
                 >
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium">{question.question_name ?? `Question ${index + 1}`}</p>
+                    <p className="text-sm font-medium">{question.question_name ?? t(resolvedLocale, "subjects.questionLabel", { number: index + 1 })}</p>
                     {question.points_possible != null && (
-                      <span className="text-xs text-black/55">{question.points_possible} pts</span>
+                      <span className="text-xs text-black/55">{t(resolvedLocale, "subjects.pointsShort", { count: question.points_possible })}</span>
                     )}
                   </div>
                   <div
                     className="rich-content prose prose-sm max-w-none prose-p:my-0 dark:prose-invert"
                     dangerouslySetInnerHTML={{
                       __html: rewriteCanvasHtmlLinks(
-                        question.question_text || "<p>No question text available.</p>",
+                        question.question_text || `<p>${t(resolvedLocale, "subjects.noQuestionText")}</p>`,
                         courseShellData.apiBase,
                         parsedCourseId,
                       ),
@@ -159,7 +167,7 @@ export default async function QuizPage({
                     <div className="mt-3 space-y-2">
                       {question.answers.map((answer, answerIndex) => (
                         <div key={`${question.id}-${answer.id ?? answerIndex}`} className="rounded-lg border border-black/8 bg-black/[0.02] px-3 py-2 text-sm text-black/75">
-                          {answer.text ?? `Option ${answerIndex + 1}`}
+                          {answer.text ?? t(resolvedLocale, "subjects.optionLabel", { number: answerIndex + 1 })}
                         </div>
                       ))}
                     </div>

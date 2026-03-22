@@ -6,6 +6,7 @@ import {
   formatSubjectName,
   formatGroupJoinLevel,
   getSubjectColorPalette,
+  t,
 } from "@canvas/shared";
 import {
   AppScreen,
@@ -36,7 +37,7 @@ export default function GroupDetailScreen() {
   const params = useLocalSearchParams<{ courseId: string; groupId: string }>();
   const courseId = Number(params.courseId);
   const groupId = Number(params.groupId);
-  const { resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
+  const { resolvedLocale, resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
 
   const colors = useMemo(() => {
     const isDark = resolvedTheme === "dark";
@@ -70,7 +71,7 @@ export default function GroupDetailScreen() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen scroll={false}>
+      <AppScreen contentStyle={styles.screenContent} scroll={false}>
         <RestorableScrollView 
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -82,23 +83,24 @@ export default function GroupDetailScreen() {
           }
         >
           <View style={styles.container}>
-            {showColdLoading ? <LoadingState label="Loading group..." /> : null}
-            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             <SubjectLayoutHeader />
+            {showColdLoading ? <LoadingState label={t(resolvedLocale, "subjects.loadingGroup")} /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
             
             {course && (!!group || accessDenied) ? (
               <>
                 {/* Navigation Bar */}
                 <View style={styles.navBar}>
                   <Pressable
+                    accessibilityLabel={t(resolvedLocale, "subjects.backToGroups")}
+                    accessibilityRole="button"
                     onPress={() => {
                       triggerSelectionHaptic();
                       goBackOrPush(router, `/subjects/${courseId}?tab=people&peopleView=groups`);
                     }}
-                    style={styles.backButton}
+                    style={[styles.backButton, { borderColor: colors.border }]}
                   >
                     <ChevronLeft size={20} color={colors.foreground} />
-                    <Text style={[styles.backText, { color: colors.foreground }]}>Back to groups</Text>
                   </Pressable>
                 </View>
 
@@ -115,10 +117,10 @@ export default function GroupDetailScreen() {
                       </View>
                       <View style={styles.headerText}>
                         <Text style={[styles.groupName, { color: colors.foreground }]} numberOfLines={1}>
-                          {group?.name ?? "Group"}
+                          {group?.name ?? t(resolvedLocale, "subjects.group")}
                         </Text>
                         <Text style={[styles.courseName, { color: colors.mutedForeground }]}>
-                          {course?.name ? formatSubjectName(course.name) : "Unknown course"}
+                          {course?.name ? formatSubjectName(course.name) : t(resolvedLocale, "subjects.unknownCourse")}
                         </Text>
                       </View>
                     </View>
@@ -126,7 +128,7 @@ export default function GroupDetailScreen() {
                       <View style={styles.badges}>
                         <View style={[styles.badge, { borderColor: colors.border }]}>
                           <Text style={[styles.badgeText, { color: colors.foreground }]}>
-                            {group.members_count ?? members.length} members
+                            {t(resolvedLocale, "subjects.members", { count: group.members_count ?? members.length })}
                           </Text>
                         </View>
                         <View style={[styles.badge, { borderColor: colors.border }]}>
@@ -143,12 +145,12 @@ export default function GroupDetailScreen() {
                 <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
                     <Text style={[styles.cardTitle, { color: colors.foreground }]}>
-                      {accessDenied ? "Group locked" : "Members"}
+                      {accessDenied ? t(resolvedLocale, "subjects.groupLocked") : t(resolvedLocale, "subjects.people")}
                     </Text>
                     <Text style={[styles.cardSubtitle, { color: colors.mutedForeground }]}>
                       {accessDenied 
-                        ? "Canvas does not allow this account to open this group."
-                        : "People visible inside this group"
+                        ? t(resolvedLocale, "subjects.noPermissionToViewGroup")
+                        : t(resolvedLocale, "subjects.peopleVisibleInGroup")
                       }
                     </Text>
                   </View>
@@ -156,7 +158,7 @@ export default function GroupDetailScreen() {
                     {accessDenied ? (
                       <View style={[styles.accessDeniedBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
                         <Text style={[styles.accessDeniedText, { color: colors.mutedForeground }]}>
-                          You do not have permission to view this group. Canvas currently only allows this account to open groups you are authorized to access.
+                          {t(resolvedLocale, "subjects.noPermissionToViewGroup")}
                         </Text>
                       </View>
                     ) : members.length === 0 && showInlineRefresh ? (
@@ -166,7 +168,7 @@ export default function GroupDetailScreen() {
                       </>
                     ) : members.length === 0 ? (
                       <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                        No members available for this group.
+                        {t(resolvedLocale, "subjects.noMembersInGroup")}
                       </Text>
                     ) : (
                       members.map((person) => (
@@ -190,7 +192,7 @@ export default function GroupDetailScreen() {
                               {person.name}
                             </Text>
                             <Text style={[styles.memberMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
-                              {person.short_name ?? person.sortable_name ?? "Canvas user"}
+                              {person.short_name ?? person.sortable_name ?? t(resolvedLocale, "subjects.canvasUser")}
                             </Text>
                           </View>
                         </Pressable>
@@ -208,9 +210,12 @@ export default function GroupDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    padding: 0,
+  },
   container: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     gap: 12,
   },
   navBar: {
@@ -219,13 +224,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   backButton: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 8,
-  },
-  backText: {
-    fontSize: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
   },
   headerCard: {
     borderRadius: 16,
@@ -233,8 +237,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   headerTop: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     borderBottomWidth: 1,
   },
   headerContent: {
@@ -282,7 +286,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cardHeader: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
@@ -295,7 +299,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   cardContent: {
-    padding: 16,
+    padding: 14,
     gap: 10,
   },
   accessDeniedBox: {
