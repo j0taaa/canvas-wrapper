@@ -5,12 +5,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { CalendarClock, ChevronLeft, ClipboardCheck, LockKeyhole, Send, Trophy } from "lucide-react-native";
 import {
   addAssignmentComment,
-  getSubjectShellData,
-  submitAssignment,
-  uploadAssignmentSubmissionFiles,
   formatSubjectName,
+  getSubjectContentNavigation,
   getSubjectColorPalette,
+  submitAssignment,
   t,
+  uploadAssignmentSubmissionFiles,
 } from "@canvas/shared";
 import {
   AppScreen,
@@ -21,10 +21,11 @@ import {
 } from "../../../../src/components/app-ui";
 import { BookmarkButton } from "../../../../src/components/bookmark-button";
 import { RichText } from "../../../../src/components/rich-text";
+import { SubjectContentPagination } from "../../../../src/components/subject-content-pagination";
 import { useRefreshControl } from "../../../../src/hooks/use-refresh-control";
 import { RestorableScrollView } from "../../../../src/components/restorable-scroll-view";
 import { SubjectLayoutHeader } from "../../../../src/components/subject-layout";
-import { useAssignment, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
+import { useAssignment, useCourseContent, useCourseFiles, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
 import { formatDueDateShort, formatDateTime } from "../../../../src/lib/format";
 import { goBackOrPush, openCanvasUrl } from "../../../../src/lib/navigation";
 import { useAppPreferences } from "../../../../src/providers/app-preferences";
@@ -104,6 +105,8 @@ export default function AssignmentDetailScreen() {
   }, [resolvedTheme]);
 
   const { data: shellData } = useCourseShell(courseId);
+  const { data: courseContent } = useCourseContent(courseId);
+  const { data: courseFiles } = useCourseFiles(courseId);
   const { data: assignmentData, error, isLoading, isFetching, refetch } = useAssignment(courseId, assignmentId);
   const { onRefresh, refreshing } = useRefreshControl(refetch);
   const { config } = useCanvasSession();
@@ -135,6 +138,16 @@ export default function AssignmentDetailScreen() {
   const showColdLoading = isLoading && !course && !assignment && !error;
   const showBlockingError = !!error && !course && !assignment;
   const showInlineRefresh = !!course && !!assignment && (isFetching || isLoading);
+  const navigation = useMemo(() => {
+    if (!courseContent) {
+      return null;
+    }
+
+    return getSubjectContentNavigation(courseId, courseContent, courseFiles ?? [], {
+      identifier: assignmentId,
+      kind: "assignment",
+    });
+  }, [assignmentId, courseContent, courseFiles, courseId]);
 
   return (
     <RequireCanvasConfig>
@@ -588,6 +601,14 @@ export default function AssignmentDetailScreen() {
                     </View>
                   </View>
                 )}
+
+                <SubjectContentPagination
+                  colors={colors}
+                  locale={resolvedLocale}
+                  next={navigation?.next ?? null}
+                  previous={navigation?.previous ?? null}
+                  router={router}
+                />
               </>
             ) : null}
           </View>

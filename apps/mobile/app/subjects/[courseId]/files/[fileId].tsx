@@ -4,7 +4,14 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import * as FileSystem from "expo-file-system/legacy";
 import * as IntentLauncher from "expo-intent-launcher";
 import { ChevronLeft, Download, FileImage, FileText, Presentation } from "lucide-react-native";
-import { formatSubjectName, getSubjectColorPalette, type CanvasClientConfig, type CanvasCourseFile, t } from "@canvas/shared";
+import {
+  formatSubjectName,
+  getSubjectContentNavigation,
+  getSubjectColorPalette,
+  type CanvasClientConfig,
+  type CanvasCourseFile,
+  t,
+} from "@canvas/shared";
 import {
   AppScreen,
   ErrorState,
@@ -14,10 +21,11 @@ import {
   RequireCanvasConfig,
 } from "../../../../src/components/app-ui";
 import { BookmarkButton } from "../../../../src/components/bookmark-button";
+import { SubjectContentPagination } from "../../../../src/components/subject-content-pagination";
 import { useRefreshControl } from "../../../../src/hooks/use-refresh-control";
 import { RestorableScrollView } from "../../../../src/components/restorable-scroll-view";
 import { SubjectLayoutHeader } from "../../../../src/components/subject-layout";
-import { useFile, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
+import { useCourseContent, useCourseFiles, useFile, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
 import { formatDueDateShort } from "../../../../src/lib/format";
 import { goBackOrPush } from "../../../../src/lib/navigation";
 import { useAppPreferences } from "../../../../src/providers/app-preferences";
@@ -160,6 +168,8 @@ export default function FileDetailScreen() {
   }, [resolvedTheme]);
 
   const { data: shellData } = useCourseShell(courseId);
+  const { data: courseContent } = useCourseContent(courseId);
+  const { data: courseFiles } = useCourseFiles(courseId);
   const { data: fileData, error, isLoading, isFetching, refetch } = useFile(courseId, fileId);
   const { onRefresh, refreshing } = useRefreshControl(refetch);
 
@@ -186,6 +196,16 @@ export default function FileDetailScreen() {
   const showColdLoading = isLoading && !course && !file && !error;
   const showBlockingError = !!error && !course && !file;
   const showInlineRefresh = !!course && !!file && (isFetching || isLoading);
+  const navigation = useMemo(() => {
+    if (!courseContent) {
+      return null;
+    }
+
+    return getSubjectContentNavigation(courseId, courseContent, courseFiles ?? [], {
+      identifier: fileId,
+      kind: "file",
+    });
+  }, [courseContent, courseFiles, courseId, fileId]);
 
   const handleOpenFile = async () => {
     if (!file || !config) {
@@ -381,6 +401,14 @@ export default function FileDetailScreen() {
                     </View>
                   )}
                 </View>
+
+                <SubjectContentPagination
+                  colors={colors}
+                  locale={resolvedLocale}
+                  next={navigation?.next ?? null}
+                  previous={navigation?.previous ?? null}
+                  router={router}
+                />
               </>
             ) : null}
           </View>

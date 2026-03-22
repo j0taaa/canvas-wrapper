@@ -8,3 +8,4 @@ export * from "./canvas-links";
 export * from "./due-activities";
 export * from "./locale";
 export * from "./onboarding";
+export * from "./subject-content-navigation";

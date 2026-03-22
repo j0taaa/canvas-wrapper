@@ -2,13 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { CalendarClock, ClipboardCheck, LockKeyhole, Send, Trophy } from "lucide-react";
-import { t, type AppLocale } from "@canvas/shared";
+import { getSubjectContentNavigation, t, type AppLocale } from "@canvas/shared";
 import { BookmarkButton } from "@/components/bookmark-button";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { HistoryBackButton } from "@/components/history-back-button";
+import { SubjectContentPagination } from "@/components/subject-content-pagination";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getAssignmentDetails, getSubjectShellData } from "@/lib/canvas";
+import { getAssignmentDetails, getCourseContent, getCourseFiles, getSubjectShellData } from "@/lib/canvas";
 import { getRequestLocale } from "@/lib/request-locale";
 import { formatDueDateShort, formatSubjectName, getSubjectColorStyle, rewriteCanvasHtmlLinks } from "@/lib/utils";
 import { AssignmentSubmissionForm } from "./submission-form";
@@ -97,9 +98,11 @@ export default async function AssignmentPage({
     redirect("/");
   }
 
-  const [courseShellData, assignment] = await Promise.all([
+  const [courseShellData, assignment, courseContent, files] = await Promise.all([
     getSubjectShellData(parsedCourseId, apiKey),
     getAssignmentDetails(parsedCourseId, parsedAssignmentId, apiKey),
+    getCourseContent(parsedCourseId, apiKey),
+    getCourseFiles(parsedCourseId, apiKey).catch(() => []),
   ]);
   const course = courseShellData.course;
 
@@ -120,6 +123,10 @@ export default async function AssignmentPage({
     courseShellData.apiBase,
     parsedCourseId,
   );
+  const navigation = getSubjectContentNavigation(parsedCourseId, courseContent, files, {
+    identifier: parsedAssignmentId,
+    kind: "assignment",
+  });
 
   return (
     <DesktopAppShell
@@ -303,6 +310,12 @@ export default async function AssignmentPage({
             </CardContent>
           </Card>
         </div>
+
+        <SubjectContentPagination
+          locale={resolvedLocale}
+          next={navigation.next}
+          previous={navigation.previous}
+        />
       </div>
     </DesktopAppShell>
   );

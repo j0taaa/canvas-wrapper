@@ -281,11 +281,13 @@ async function syncCalendarEvents(options: {
 
   for (const activity of options.desiredActivities) {
     const previousRecord = options.previousState.activities[activity.syncKey];
+    const dueDate = new Date(activity.dueAt);
+    const startDate = new Date(dueDate.getTime() - CALENDAR_EVENT_DURATION_MS);
     const eventPayload = {
       alarms: [],
-      endDate: new Date(new Date(activity.dueAt).getTime() + CALENDAR_EVENT_DURATION_MS),
+      endDate: dueDate,
       notes: buildCalendarEventNotes(activity),
-      startDate: new Date(activity.dueAt),
+      startDate,
       timeZone: DISPLAY_TIME_ZONE,
       title: activity.title,
     };

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { BookOpenText, ChevronLeft } from "lucide-react-native";
 import {
   formatSubjectName,
+  getSubjectContentNavigation,
   getSubjectColorPalette,
   t,
 } from "@canvas/shared";
@@ -16,10 +17,11 @@ import {
 } from "../../../../src/components/app-ui";
 import { BookmarkButton } from "../../../../src/components/bookmark-button";
 import { RichText } from "../../../../src/components/rich-text";
+import { SubjectContentPagination } from "../../../../src/components/subject-content-pagination";
 import { useRefreshControl } from "../../../../src/hooks/use-refresh-control";
 import { RestorableScrollView } from "../../../../src/components/restorable-scroll-view";
 import { SubjectLayoutHeader } from "../../../../src/components/subject-layout";
-import { usePage, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
+import { useCourseContent, useCourseFiles, usePage, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
 import { formatDueDateShort } from "../../../../src/lib/format";
 import { goBackOrPush } from "../../../../src/lib/navigation";
 import { useAppPreferences } from "../../../../src/providers/app-preferences";
@@ -42,10 +44,13 @@ export default function PageDetailScreen() {
       muted: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.05)",
       border: isDark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
       primary: isDark ? "#f8fafc" : "#0f172a",
+      primaryText: isDark ? "#0f172a" : "#ffffff",
     };
   }, [resolvedTheme]);
 
   const { data: shellData } = useCourseShell(courseId);
+  const { data: courseContent } = useCourseContent(courseId);
+  const { data: courseFiles } = useCourseFiles(courseId);
   const { data: pageData, error, isLoading, isFetching, refetch } = usePage(courseId, pageId);
   const { onRefresh, refreshing } = useRefreshControl(refetch);
 
@@ -59,6 +64,16 @@ export default function PageDetailScreen() {
     if (!course) return { backgroundColor: "rgba(59, 130, 246, 0.16)", borderColor: "#3b82f6", color: "rgba(29, 78, 216, 0.95)" };
     return getSubjectColorPalette(course.name);
   }, [course]);
+  const navigation = useMemo(() => {
+    if (!courseContent) {
+      return null;
+    }
+
+    return getSubjectContentNavigation(courseId, courseContent, courseFiles ?? [], {
+      identifier: pageId,
+      kind: "page",
+    });
+  }, [courseContent, courseFiles, courseId, pageId]);
 
   return (
     <RequireCanvasConfig>
@@ -164,6 +179,14 @@ export default function PageDetailScreen() {
                     )}
                   </View>
                 </View>
+
+                <SubjectContentPagination
+                  colors={colors}
+                  locale={resolvedLocale}
+                  next={navigation?.next ?? null}
+                  previous={navigation?.previous ?? null}
+                  router={router}
+                />
               </>
             ) : null}
           </View>

@@ -2,13 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { ListChecks } from "lucide-react";
-import { t } from "@canvas/shared";
+import { getSubjectContentNavigation, t } from "@canvas/shared";
 import { BookmarkButton } from "@/components/bookmark-button";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { HistoryBackButton } from "@/components/history-back-button";
+import { SubjectContentPagination } from "@/components/subject-content-pagination";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getQuizDetails, getQuizQuestions, getSubjectShellData } from "@/lib/canvas";
+import { getCourseContent, getCourseFiles, getQuizDetails, getQuizQuestions, getSubjectShellData } from "@/lib/canvas";
 import { getRequestLocale } from "@/lib/request-locale";
 import { formatDueDateShort, formatSubjectName, getSubjectColorStyle, rewriteCanvasHtmlLinks } from "@/lib/utils";
 import { OpenInCanvasButton } from "./open-in-canvas-button";
@@ -36,10 +37,12 @@ export default async function QuizPage({
     redirect("/");
   }
 
-  const [courseShellData, quizResult, questionsResult] = await Promise.all([
+  const [courseShellData, quizResult, questionsResult, courseContent, files] = await Promise.all([
     getSubjectShellData(parsedCourseId, apiKey),
     getQuizDetails(parsedCourseId, parsedQuizId, apiKey),
     getQuizQuestions(parsedCourseId, parsedQuizId, apiKey).catch(() => []),
+    getCourseContent(parsedCourseId, apiKey),
+    getCourseFiles(parsedCourseId, apiKey).catch(() => []),
   ]);
   const course = courseShellData.course;
 
@@ -53,6 +56,10 @@ export default async function QuizPage({
     courseShellData.apiBase,
     parsedCourseId,
   );
+  const navigation = getSubjectContentNavigation(parsedCourseId, courseContent, files, {
+    identifier: parsedQuizId,
+    kind: "quiz",
+  });
 
   return (
     <DesktopAppShell
@@ -177,6 +184,12 @@ export default async function QuizPage({
             </CardContent>
           </Card>
         </div>
+
+        <SubjectContentPagination
+          locale={resolvedLocale}
+          next={navigation.next}
+          previous={navigation.previous}
+        />
       </div>
     </DesktopAppShell>
   );
