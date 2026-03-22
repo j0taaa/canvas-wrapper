@@ -27,6 +27,7 @@ RUN groupadd --system nodejs && useradd --system --gid nodejs nextjs
 COPY --from=builder /app/apps/web/public ./public
 COPY --from=builder /app/apps/web/.next/standalone /app
 COPY --from=builder /app/apps/web/.next/static ./.next/static
+RUN mkdir -p /app/apps/web/.next/cache && chown -R nextjs:nodejs /app
 
 USER nextjs
 EXPOSE 3000

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowLeft, LoaderCircle, MailPlus, Search, SendHorizonal, UsersRound, X } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
 
 type ComposeMessageFormProps = {

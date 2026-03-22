@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { t, type AppLocale, type SubjectContentNavigationTarget } from "@canvas/shared";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 
 function getTargetTitle(locale: AppLocale, target: SubjectContentNavigationTarget | null) {
   if (!target) {
