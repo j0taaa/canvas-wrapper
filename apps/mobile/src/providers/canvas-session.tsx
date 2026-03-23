@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { type CanvasClientConfig, normalizeCanvasProviderUrl } from "@canvas/shared";
 import { clearCanvasConfig, getStoredCanvasConfig, saveCanvasConfig } from "../lib/canvas-config";
+import { clearLocalAccountData } from "../lib/account-cleanup";
 
 type CanvasSessionValue = {
   clearConfig: () => Promise<void>;
@@ -43,11 +44,18 @@ export function CanvasSessionProvider({ children }: { children: ReactNode }) {
       apiKey: input.apiKey,
     });
 
+    if (config && (config.apiBase !== nextConfig.apiBase || config.apiKey !== nextConfig.apiKey)) {
+      await clearLocalAccountData();
+    }
+
     setConfig(nextConfig);
-  }, []);
+  }, [config]);
 
   const handleClearConfig = useCallback(async () => {
-    await clearCanvasConfig();
+    await Promise.all([
+      clearCanvasConfig(),
+      clearLocalAccountData(),
+    ]);
     setConfig(null);
   }, []);
 

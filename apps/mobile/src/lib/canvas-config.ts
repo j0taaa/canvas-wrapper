@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { normalizeCanvasProviderUrl } from "@canvas/shared";
 
 export const CANVAS_API_KEY_STORAGE = "canvasApiKey";
@@ -9,7 +10,7 @@ export type StoredCanvasConfig = {
   apiKey: string;
 };
 
-export async function getStoredCanvasConfig(): Promise<StoredCanvasConfig | null> {
+async function readLegacyCanvasConfig(): Promise<StoredCanvasConfig | null> {
   const [apiKey, apiBase] = await Promise.all([
     AsyncStorage.getItem(CANVAS_API_KEY_STORAGE),
     AsyncStorage.getItem(CANVAS_API_BASE_STORAGE),
@@ -27,6 +28,43 @@ export async function getStoredCanvasConfig(): Promise<StoredCanvasConfig | null
   };
 }
 
+async function writeSecureCanvasConfig(config: StoredCanvasConfig) {
+  await Promise.all([
+    SecureStore.setItemAsync(CANVAS_API_KEY_STORAGE, config.apiKey),
+    SecureStore.setItemAsync(CANVAS_API_BASE_STORAGE, config.apiBase),
+  ]);
+}
+
+export async function getStoredCanvasConfig(): Promise<StoredCanvasConfig | null> {
+  const [apiKey, apiBase] = await Promise.all([
+    SecureStore.getItemAsync(CANVAS_API_KEY_STORAGE),
+    SecureStore.getItemAsync(CANVAS_API_BASE_STORAGE),
+  ]);
+
+  const trimmedApiKey = apiKey?.trim() ?? "";
+
+  if (trimmedApiKey) {
+    return {
+      apiBase: normalizeCanvasProviderUrl(apiBase),
+      apiKey: trimmedApiKey,
+    };
+  }
+
+  const legacyConfig = await readLegacyCanvasConfig();
+
+  if (!legacyConfig) {
+    return null;
+  }
+
+  await Promise.all([
+    writeSecureCanvasConfig(legacyConfig),
+    AsyncStorage.removeItem(CANVAS_API_KEY_STORAGE),
+    AsyncStorage.removeItem(CANVAS_API_BASE_STORAGE),
+  ]);
+
+  return legacyConfig;
+}
+
 export async function saveCanvasConfig(input: { apiBase?: string | null; apiKey: string }) {
   const apiKey = input.apiKey.trim();
 
@@ -37,8 +75,12 @@ export async function saveCanvasConfig(input: { apiBase?: string | null; apiKey:
   const apiBase = normalizeCanvasProviderUrl(input.apiBase);
 
   await Promise.all([
-    AsyncStorage.setItem(CANVAS_API_KEY_STORAGE, apiKey),
-    AsyncStorage.setItem(CANVAS_API_BASE_STORAGE, apiBase),
+    writeSecureCanvasConfig({
+      apiBase,
+      apiKey,
+    }),
+    AsyncStorage.removeItem(CANVAS_API_KEY_STORAGE),
+    AsyncStorage.removeItem(CANVAS_API_BASE_STORAGE),
   ]);
 
   return {
@@ -49,6 +91,8 @@ export async function saveCanvasConfig(input: { apiBase?: string | null; apiKey:
 
 export async function clearCanvasConfig() {
   await Promise.all([
+    SecureStore.deleteItemAsync(CANVAS_API_KEY_STORAGE),
+    SecureStore.deleteItemAsync(CANVAS_API_BASE_STORAGE),
     AsyncStorage.removeItem(CANVAS_API_KEY_STORAGE),
     AsyncStorage.removeItem(CANVAS_API_BASE_STORAGE),
   ]);

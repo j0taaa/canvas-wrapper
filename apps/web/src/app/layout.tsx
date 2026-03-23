@@ -15,7 +15,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Janvas",
-  description: "Janvas is a calmer dashboard for Canvas built with Next.js and shadcn/ui.",
+  description: "Janvas brings your Canvas subjects, deadlines, calendar, and messages into one calmer dashboard.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/canvas-icon.svg",

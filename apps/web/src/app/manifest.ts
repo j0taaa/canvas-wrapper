@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Janvas",
     short_name: "Janvas",
-    description: "Janvas is a PWA dashboard for Canvas built with Next.js.",
+    description: "Janvas brings your Canvas subjects, deadlines, calendar, and messages into one calmer dashboard.",
     start_url: "/",
     display: "standalone",
     background_color: "#111827",

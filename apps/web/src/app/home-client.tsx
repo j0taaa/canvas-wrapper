@@ -434,6 +434,12 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
               >
                 {t(resolvedLocale, "connect.docsLink")}
               </a>
+              <a
+                href="/privacy"
+                className="ml-4 mt-3 inline-flex text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                {t(resolvedLocale, "common.privacyPolicy")}
+              </a>
             </div>
             <form onSubmit={onSubmit} className="space-y-3">
               <input

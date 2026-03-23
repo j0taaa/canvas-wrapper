@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PropsWithChildren, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Animated,
@@ -610,6 +611,7 @@ export function CanvasConfigForm({
   const colors = useAppColors();
   const { resolvedLocale } = useAppPreferences();
   const { clearConfig, config, saveConfig } = useCanvasSession();
+  const router = useRouter();
   const [apiBase, setApiBase] = useState(() => config?.apiBase ?? normalizeCanvasProviderUrl(undefined));
   const [apiKey, setApiKey] = useState(() => config?.apiKey ?? "");
   const [saving, setSaving] = useState(false);
@@ -712,6 +714,17 @@ export function CanvasConfigForm({
       />
 
       {showClear ? <SecondaryButton label={t(resolvedLocale, "connect.clearCredentials")} onPress={() => void clearConfig()} /> : null}
+
+      <Pressable
+        onPress={() => {
+          router.push("/privacy");
+        }}
+        style={({ pressed }) => [styles.instructionsLinkButton, pressed && styles.rowPressed]}
+      >
+        <Text style={[styles.instructionsLink, { color: colors.foreground }]}>
+          {t(resolvedLocale, "common.privacyPolicy")}
+        </Text>
+      </Pressable>
     </SectionCard>
   );
 }

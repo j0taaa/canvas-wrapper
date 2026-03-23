@@ -274,6 +274,7 @@ function ProfilePreferences({
   themePreference: ThemePreference;
   updateLanguagePreference: (preference: LanguagePreference) => Promise<void>;
 }) {
+  const router = useRouter();
   const {
     deviceIntegrationPreferences,
     hapticsEnabled,
@@ -743,6 +744,16 @@ function ProfilePreferences({
       {/* Footer */}
       <View style={[styles.descriptionCard, styles.footerCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
         <Text style={[styles.footerTitle, { color: colors.foreground }]}>{t(resolvedLocale, "common.madeBy")}</Text>
+        <Pressable
+          onPress={() => {
+            triggerSelectionHaptic();
+            router.push("/privacy");
+          }}
+        >
+          <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
+            <Text style={[styles.footerLink, { color: colors.foreground }]}>{t(resolvedLocale, "common.privacyPolicy")}</Text>
+          </Text>
+        </Pressable>
         <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
           {t(resolvedLocale, "settings.suggestions")} <Text style={[styles.footerLink, { color: colors.foreground }]}>gabrieljotalizardo@gmail.com</Text>
         </Text>

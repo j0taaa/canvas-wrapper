@@ -11,18 +11,27 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "NSCalendarsFullAccessUsageDescription": "Janvas uses your calendar to sync upcoming assignments and quizzes.",
         "NSCalendarsUsageDescription": "Janvas uses your calendar to sync upcoming assignments and quizzes."
       }
     },
     "android": {
+      "allowBackup": false,
       "permissions": [
         "android.permission.READ_CALENDAR",
         "android.permission.WRITE_CALENDAR",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -32,7 +41,14 @@
     "plugins": [
       "expo-router",
       "expo-notifications",
+      "expo-background-task",
       "expo-localization",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ],
       [
         "expo-splash-screen",
         {

@@ -22,6 +22,17 @@ export function normalizeCanvasProviderUrl(value?: string | null) {
   const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   const url = new URL(withProtocol);
   const path = url.pathname.replace(/\/+$/, "");
+  const isLocalDevelopmentHost = [
+    "127.0.0.1",
+    "10.0.2.2",
+    "10.0.3.2",
+    "::1",
+    "localhost",
+  ].includes(url.hostname);
+
+  if (url.protocol !== "https:" && !isLocalDevelopmentHost) {
+    url.protocol = "https:";
+  }
 
   url.pathname = path.endsWith("/api/v1") ? path : `${path}/api/v1`;
   url.search = "";

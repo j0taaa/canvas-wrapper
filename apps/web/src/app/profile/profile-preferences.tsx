@@ -496,6 +496,14 @@ export function ProfilePreferences({ courses }: ProfilePreferencesProps) {
       <div className="rounded-2xl border border-border/70 bg-muted/35 p-4 text-sm text-muted-foreground">
         <p className="font-medium text-foreground">{t(resolvedLocale, "common.madeBy")}</p>
         <p className="mt-2">
+          <a
+            href="/privacy"
+            className="text-foreground underline underline-offset-4 transition hover:opacity-75"
+          >
+            {t(resolvedLocale, "common.privacyPolicy")}
+          </a>
+        </p>
+        <p className="mt-2">
           {t(resolvedLocale, "settings.suggestions")}
           {" "}
           <a

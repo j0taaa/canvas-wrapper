@@ -52,6 +52,7 @@ const messages = {
       on: "On",
       portugueseBrazil: "Português (Brasil)",
       profile: "Profile",
+      privacyPolicy: "Privacy policy",
       remove: "Remove",
       retry: "Retry",
       resetColor: "Reset color",
@@ -65,6 +66,7 @@ const messages = {
       type: "Type",
       unknown: "unknown",
       updated: "Updated",
+      lastUpdated: "Last updated",
       visible: "Visible",
     },
     navigation: {
@@ -107,7 +109,7 @@ const messages = {
     },
     connect: {
       accountTitle: "Connect your Canvas account",
-      accountSubtitle: "Paste your Canvas API key. It is saved on this device for future sessions.",
+      accountSubtitle: "Paste your Canvas API key. It is stored securely on this device for future sessions.",
       credentialsTitle: "Credentials",
       urlLabel: "Canvas URL",
       urlPlaceholder: "Canvas URL (for example https://school.instructure.com)",
@@ -129,7 +131,7 @@ const messages = {
       saveAndConnect: "Save key and connect",
       savingConfig: "Saving...",
       saveConfig: "Save configuration",
-      clearCredentials: "Clear saved credentials",
+      clearCredentials: "Remove account from this device",
       saveError: "Could not save the configuration",
     },
     welcome: {
@@ -442,6 +444,7 @@ const messages = {
       on: "Ativado",
       portugueseBrazil: "Português (Brasil)",
       profile: "Perfil",
+      privacyPolicy: "Política de privacidade",
       remove: "Remover",
       retry: "Tentar novamente",
       resetColor: "Redefinir cor",
@@ -455,6 +458,7 @@ const messages = {
       type: "Tipo",
       unknown: "desconhecido",
       updated: "Atualizado",
+      lastUpdated: "Última atualização",
       visible: "Visível",
     },
     navigation: {
@@ -497,7 +501,7 @@ const messages = {
     },
     connect: {
       accountTitle: "Conecte sua conta do Canvas",
-      accountSubtitle: "Cole sua chave da API do Canvas. Ela fica salva neste dispositivo para as próximas sessões.",
+      accountSubtitle: "Cole sua chave da API do Canvas. Ela fica armazenada com segurança neste dispositivo para as próximas sessões.",
       credentialsTitle: "Credenciais",
       urlLabel: "URL do Canvas",
       urlPlaceholder: "URL do Canvas (por exemplo https://school.instructure.com)",
@@ -519,7 +523,7 @@ const messages = {
       saveAndConnect: "Salvar chave e conectar",
       savingConfig: "Salvando...",
       saveConfig: "Salvar configuração",
-      clearCredentials: "Limpar credenciais salvas",
+      clearCredentials: "Remover conta deste dispositivo",
       saveError: "Não foi possível salvar a configuração",
     },
     welcome: {
