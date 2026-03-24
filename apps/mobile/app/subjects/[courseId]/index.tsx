@@ -7,10 +7,12 @@ import {
   LockKeyhole,
 } from "lucide-react-native";
 import {
+  appendSubjectRouteContext,
   createCourseGroup,
   formatGroupJoinLevel,
   getSubjectColorPalette,
   t,
+  type SubjectRouteContext,
 } from "@canvas/shared";
 import {
   AppScreen,
@@ -48,20 +50,20 @@ function getModuleHref(courseId: number, item: {
   page_url?: string;
   type?: string;
   url?: string;
-}) {
+}, context?: SubjectRouteContext) {
   if (item.type === "Assignment" && item.content_id) {
-    return `/subjects/${courseId}/assignments/${item.content_id}`;
+    return appendSubjectRouteContext(`/subjects/${courseId}/assignments/${item.content_id}`, context);
   }
   if (item.type === "Page" && item.page_url) {
-    return `/subjects/${courseId}/pages/${encodeURIComponent(item.page_url)}`;
+    return appendSubjectRouteContext(`/subjects/${courseId}/pages/${encodeURIComponent(item.page_url)}`, context);
   }
   if (item.type === "Quiz" && item.content_id) {
-    return `/subjects/${courseId}/quizzes/${item.content_id}`;
+    return appendSubjectRouteContext(`/subjects/${courseId}/quizzes/${item.content_id}`, context);
   }
   if (item.type === "File" && item.content_id) {
-    return `/subjects/${courseId}/files/${item.content_id}`;
+    return appendSubjectRouteContext(`/subjects/${courseId}/files/${item.content_id}`, context);
   }
-  return item.html_url ?? item.url ?? null;
+  return appendSubjectRouteContext(item.html_url ?? item.url ?? "", context) || null;
 }
 
 function getGradeTrendPoints(assignments: Array<{
@@ -117,7 +119,7 @@ export default function SubjectScreen() {
     return {
       foreground: isDark ? "#f8fafc" : "#0f172a",
       mutedForeground: isDark ? "rgba(241,245,249,0.58)" : "rgba(15,23,42,0.48)",
-      card: isDark ? "#0f172a" : "#ffffff",
+      card: isDark ? "#000000" : "#ffffff",
       muted: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.05)",
       border: isDark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
       primary: isDark ? "#f8fafc" : "#0f172a",
@@ -146,6 +148,15 @@ export default function SubjectScreen() {
   const showColdLoading = isLoading && !course && !data && !error;
   const showBlockingError = !!error && !course && !data;
   const showInlineRefresh = !!course && !!data && (isFetching || isLoading);
+  const activeContext = useMemo<SubjectRouteContext>(() => {
+    if (activeTab === "people") {
+      return activePeopleView === "groups"
+        ? { peopleView: "groups", tab: "people" }
+        : { tab: "people" };
+    }
+
+    return { tab: activeTab };
+  }, [activePeopleView, activeTab]);
 
   return (
     <RequireCanvasConfig>
@@ -192,7 +203,7 @@ export default function SubjectScreen() {
                             </View>
                             <View style={styles.moduleItems}>
                               {module.items?.slice(0, 12).map((item) => {
-                                const itemHref = getModuleHref(courseId, item);
+                                const itemHref = getModuleHref(courseId, item, activeContext);
                                 const isSubHeader = item.type === "SubHeader";
                                 
                                 if (isSubHeader) {
@@ -259,7 +270,7 @@ export default function SubjectScreen() {
                           return (
                             <Pressable
                               key={assignment.id}
-                              onPress={() => router.push(`/subjects/${courseId}/assignments/${assignment.id}`)}
+                              onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/assignments/${assignment.id}`, activeContext))}
                               style={[styles.assignmentCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
                             >
                               <View style={styles.assignmentContent}>
@@ -352,7 +363,7 @@ export default function SubjectScreen() {
                         return (
                           <Pressable
                             key={assignment.id}
-                            onPress={() => router.push(`/subjects/${courseId}/assignments/${assignment.id}`)}
+                            onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/assignments/${assignment.id}`, { tab: "grades" }))}
                             style={[styles.gradeAssignmentCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
                           >
                             <View style={styles.gradeAssignmentContent}>
@@ -410,7 +421,7 @@ export default function SubjectScreen() {
                         data.people.map((person) => (
                           <Pressable
                             key={person.id}
-                            onPress={() => router.push(`/subjects/${courseId}/people/${person.id}`)}
+                            onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/people/${person.id}`, { tab: "people" }))}
                             style={[styles.personCard, { borderColor: colors.border, backgroundColor: colors.card }]}
                           >
                             <UserAvatar
@@ -457,7 +468,7 @@ export default function SubjectScreen() {
                             </View>
                             <View style={styles.groupAction}>
                               {group.canOpen ? (
-                                <Pressable onPress={() => router.push(`/subjects/${courseId}/groups/${group.id}`)} style={styles.groupLink}>
+                                <Pressable onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/groups/${group.id}`, { peopleView: "groups", tab: "people" }))} style={styles.groupLink}>
                                   <Text style={[styles.groupLinkText, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.enterGroup")}</Text>
                                   <ArrowRight size={14} color={colors.mutedForeground} />
                                 </Pressable>
@@ -525,7 +536,7 @@ export default function SubjectScreen() {
                     data.files.map((file) => (
                       <Pressable
                         key={file.id}
-                        onPress={() => router.push(`/subjects/${courseId}/files/${file.id}`)}
+                        onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/files/${file.id}`, { tab: "files" }))}
                         style={[styles.fileCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
                       >
                         <View style={styles.fileContent}>

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Mail } from "lucide-react";
-import { t, type AppLocale } from "@canvas/shared";
+import { buildSubjectHref, getSubjectRouteContext, t, type AppLocale } from "@canvas/shared";
 import { PersonAvatarViewer } from "@/app/subjects/[courseId]/people/[personId]/person-avatar-viewer";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { HistoryBackButton } from "@/components/history-back-button";
@@ -73,13 +73,18 @@ function getStatusBadgeClass(value?: string) {
 
 export default async function SubjectPersonPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ courseId: string; personId: string }>;
+  searchParams: Promise<{ peopleView?: string; tab?: string }>;
 }) {
   const { courseId, personId } = await params;
+  const { peopleView, tab } = await searchParams;
   const parsedCourseId = Number(courseId);
   const parsedPersonId = Number(personId);
   const { resolvedLocale } = await getRequestLocale();
+  const originContext = getSubjectRouteContext(tab, peopleView);
+  const subjectHref = buildSubjectHref(parsedCourseId, originContext ?? { tab: "people" });
 
   if (!Number.isFinite(parsedCourseId) || !Number.isFinite(parsedPersonId)) {
     notFound();
@@ -114,7 +119,7 @@ export default async function SubjectPersonPage({
     >
       <div className="w-full">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <HistoryBackButton fallbackHref={`/subjects/${parsedCourseId}?tab=people`} />
+          <HistoryBackButton fallbackHref={subjectHref} />
         </div>
 
         <div className="mb-6 overflow-hidden rounded-2xl border border-black/15 bg-gradient-to-br from-white via-white to-black/[0.03]">
@@ -125,7 +130,7 @@ export default async function SubjectPersonPage({
                 <div className="min-w-0">
                   <h1 className="truncate text-2xl font-semibold">{person.name}</h1>
                   <Link
-                    href={`/subjects/${parsedCourseId}?tab=people`}
+                    href={subjectHref}
                     className="text-sm text-black/55 transition hover:text-black hover:underline"
                   >
                     {formatSubjectName(course.name)}

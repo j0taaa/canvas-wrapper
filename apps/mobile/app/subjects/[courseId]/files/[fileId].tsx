@@ -3,9 +3,11 @@ import { Image, Linking, Platform, Pressable, RefreshControl, StyleSheet, Text, 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as FileSystem from "expo-file-system/legacy";
 import * as IntentLauncher from "expo-intent-launcher";
-import { ChevronLeft, Download, FileImage, FileText, Presentation } from "lucide-react-native";
+import { Download, FileImage, FileText, Presentation } from "lucide-react-native";
 import {
+  buildSubjectHref,
   formatSubjectName,
+  getSubjectRouteContext,
   getSubjectContentNavigation,
   getSubjectColorPalette,
   type CanvasClientConfig,
@@ -146,9 +148,11 @@ async function ensureLocalFileUri(file: CanvasCourseFile, config: CanvasClientCo
 
 export default function FileDetailScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ courseId: string; fileId: string }>();
+  const params = useLocalSearchParams<{ courseId: string; fileId: string; peopleView?: string; tab?: string }>();
   const courseId = Number(params.courseId);
   const fileId = Number(params.fileId);
+  const originContext = useMemo(() => getSubjectRouteContext(params.tab, params.peopleView), [params.peopleView, params.tab]);
+  const subjectHref = useMemo(() => buildSubjectHref(courseId, originContext ?? { tab: "files" }), [courseId, originContext]);
   const { config } = useCanvasSession();
   const { resolvedLocale, resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
   const [fileActionLoading, setFileActionLoading] = useState(false);
@@ -159,7 +163,7 @@ export default function FileDetailScreen() {
     return {
       foreground: isDark ? "#f8fafc" : "#0f172a",
       mutedForeground: isDark ? "rgba(241,245,249,0.58)" : "rgba(15,23,42,0.48)",
-      card: isDark ? "#0f172a" : "#ffffff",
+      card: isDark ? "#000000" : "#ffffff",
       muted: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.05)",
       border: isDark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
       primary: isDark ? "#f8fafc" : "#0f172a",
@@ -204,8 +208,8 @@ export default function FileDetailScreen() {
     return getSubjectContentNavigation(courseId, courseContent, courseFiles ?? [], {
       identifier: fileId,
       kind: "file",
-    });
-  }, [courseContent, courseFiles, courseId, fileId]);
+    }, originContext);
+  }, [courseContent, courseFiles, courseId, fileId, originContext]);
 
   const handleOpenFile = async () => {
     if (!file || !config) {
@@ -255,48 +259,6 @@ export default function FileDetailScreen() {
             
             {course && file ? (
               <>
-                {/* Navigation Bar */}
-                <View style={styles.navBar}>
-                  <Pressable
-                    accessibilityLabel={t(resolvedLocale, "subjects.backToFiles")}
-                    accessibilityRole="button"
-                    onPress={() => {
-                      triggerSelectionHaptic();
-                      goBackOrPush(router, `/subjects/${courseId}?tab=files`);
-                    }}
-                    style={[styles.backButton, { borderColor: colors.border }]}
-                  >
-                    <ChevronLeft size={20} color={colors.foreground} />
-                  </Pressable>
-                  <View style={styles.actions}>
-                    {course && file ? (
-                      <BookmarkButton
-                        bookmark={{
-                          courseId,
-                          href: `/subjects/${courseId}/files/${fileId}`,
-                          id: `file-${courseId}-${fileId}`,
-                          kind: "file",
-                          subjectName: course.name,
-                          title: file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.untitledFile"),
-                        }}
-                        borderColor={colors.border}
-                        fillColor={colors.foreground}
-                        mutedColor={colors.mutedForeground}
-                        textColor={colors.foreground}
-                      />
-                    ) : null}
-                    <Pressable
-                      onPress={() => {
-                        triggerSelectionHaptic();
-                        void handleOpenFile();
-                      }}
-                      style={[styles.iconButton, { borderColor: colors.border }]}
-                    >
-                      <Download size={18} color={colors.foreground} />
-                    </Pressable>
-                  </View>
-                </View>
-
                 {/* Header Card */}
                 <View style={[styles.headerCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   <View style={[styles.headerTop, { borderBottomColor: colors.border }]}>
@@ -305,10 +267,37 @@ export default function FileDetailScreen() {
                         <FileIcon size={20} color={palette.color} />
                       </View>
                       <View style={styles.headerText}>
-                        <Text style={[styles.fileName, { color: colors.foreground }]} numberOfLines={2}>
-                          {file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.untitledFile")}
-                        </Text>
-                        <Pressable onPress={() => goBackOrPush(router, `/subjects/${courseId}?tab=files`)}>
+                        <View style={styles.titleRow}>
+                          <Text style={[styles.fileName, { color: colors.foreground }]} numberOfLines={2}>
+                            {file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.untitledFile")}
+                          </Text>
+                          <View style={styles.actions}>
+                            <BookmarkButton
+                              bookmark={{
+                                courseId,
+                                href: `/subjects/${courseId}/files/${fileId}`,
+                                id: `file-${courseId}-${fileId}`,
+                                kind: "file",
+                                subjectName: course.name,
+                                title: file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.untitledFile"),
+                              }}
+                              borderColor={colors.border}
+                              fillColor={colors.foreground}
+                              mutedColor={colors.mutedForeground}
+                              textColor={colors.foreground}
+                            />
+                            <Pressable
+                              onPress={() => {
+                                triggerSelectionHaptic();
+                                void handleOpenFile();
+                              }}
+                              style={[styles.iconButton, { borderColor: colors.border }]}
+                            >
+                              <Download size={18} color={colors.foreground} />
+                            </Pressable>
+                          </View>
+                        </View>
+                        <Pressable onPress={() => goBackOrPush(router, subjectHref)}>
                           <Text style={[styles.courseLink, { color: colors.mutedForeground }]}>
                             {formatSubjectName(course.name)}
                           </Text>
@@ -427,20 +416,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 12,
   },
-  navBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  backButton: {
-    alignItems: "center",
-    borderRadius: 10,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
   actions: {
     flexDirection: "row",
     gap: 8,
@@ -480,10 +455,17 @@ const styles = StyleSheet.create({
   headerText: {
     flex: 1,
   },
+  titleRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
   fileName: {
+    flex: 1,
     fontSize: 18,
     fontWeight: "600",
-    marginBottom: 4,
   },
   courseLink: {
     fontSize: 14,

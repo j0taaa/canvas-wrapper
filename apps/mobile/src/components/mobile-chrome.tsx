@@ -28,14 +28,14 @@ function useChromeColors() {
 
   return resolvedTheme === "dark"
     ? {
-        bar: "rgba(2,6,23,0.96)",
+        bar: "rgba(0,0,0,0.96)",
         border: "rgba(255,255,255,0.12)",
-        chip: "#020617",
+        chip: "#000000",
         chipActive: "#f8fafc",
         chipText: "#cbd5e1",
         chipTextActive: "#0f172a",
         libraryBackground: "rgba(255,255,255,0.05)",
-        subjectBar: "rgba(2,6,23,0.96)",
+        subjectBar: "rgba(0,0,0,0.96)",
         tabInactive: "rgba(241,245,249,0.58)",
         tabTextActive: "#0f172a",
         tabTextInactive: "#cbd5e1",
@@ -150,8 +150,12 @@ export function MobileChrome() {
                 <Pressable
                   key={course.id}
                   onPress={() => {
+                    if (currentCourseId === course.id) {
+                      return;
+                    }
+
                     triggerSelectionHaptic();
-                    router.push(`/subjects/${course.id}`);
+                    router.navigate(`/subjects/${course.id}`);
                   }}
                   style={[
                     styles.subjectChip,
@@ -179,7 +183,7 @@ export function MobileChrome() {
             backgroundColor: colors.bar,
             borderColor: colors.border,
             borderTopWidth: showSubjectBar ? 0 : 1,
-            paddingBottom: Math.max(insets.bottom, 10),
+            paddingBottom: Math.max(insets.bottom, 8),
           },
         ]}
       >
@@ -200,8 +204,12 @@ export function MobileChrome() {
             <Pressable
               key={item.key}
               onPress={() => {
+                if (active) {
+                  return;
+                }
+
                 triggerSelectionHaptic();
-                router.push(item.href);
+                router.navigate(item.href);
               }}
               style={({ pressed }) => [
                 styles.tabItem,
@@ -265,16 +273,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 4,
     paddingHorizontal: 8,
-    paddingTop: 8,
+    paddingTop: 6,
   },
   tabItem: {
     alignItems: "center",
     borderRadius: 22,
     flex: 1,
-    gap: 5,
+    gap: 4,
     justifyContent: "center",
     paddingHorizontal: 4,
-    paddingVertical: 9,
+    paddingVertical: 7,
   },
   tabLabel: {
     fontSize: 11,

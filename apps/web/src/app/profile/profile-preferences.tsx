@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, EyeOff, MonitorCog, MoonStar, Palette, Smartphone, SunMedium } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpRight, ChevronDown, EyeOff, Mail, MonitorCog, MoonStar, Palette, ShieldCheck, Smartphone, Sparkles, SunMedium } from "lucide-react";
 import { getLocaleDisplayName, t, type LanguagePreference } from "@canvas/shared";
 import { useLocale } from "@/components/locale-provider";
 import { formatSubjectName, getSubjectColorHex, getSubjectColorStyle, orderSubjectsByPreference } from "@/lib/utils";
@@ -493,38 +493,60 @@ export function ProfilePreferences({ courses }: ProfilePreferencesProps) {
         {t(resolvedLocale, "settings.overviewDescription")}
       </div>
       <SubjectPreferenceList courses={courses} />
-      <div className="rounded-2xl border border-border/70 bg-muted/35 p-4 text-sm text-muted-foreground">
-        <p className="font-medium text-foreground">{t(resolvedLocale, "common.madeBy")}</p>
-        <p className="mt-2">
-          <a
-            href="/privacy"
-            className="text-foreground underline underline-offset-4 transition hover:opacity-75"
-          >
-            {t(resolvedLocale, "common.privacyPolicy")}
-          </a>
-        </p>
-        <p className="mt-2">
-          {t(resolvedLocale, "settings.suggestions")}
-          {" "}
-          <a
-            href="mailto:gabrieljotalizardo@gmail.com"
-            className="text-foreground underline underline-offset-4 transition hover:opacity-75"
-          >
-            gabrieljotalizardo@gmail.com
-          </a>
-        </p>
-        <p className="mt-2">
-          {t(resolvedLocale, "settings.linkedIn")}
-          {" "}
-          <a
-            href="https://www.linkedin.com/in/gabriel-jota-lizardo-4587a427b/"
-            target="_blank"
-            rel="noreferrer"
-            className="text-foreground underline underline-offset-4 transition hover:opacity-75"
-          >
-            Gabriel Jota Lizardo
-          </a>
-        </p>
+      <div className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-[linear-gradient(180deg,rgba(255,247,237,0.78)_0%,rgba(255,255,255,0.94)_44%,rgba(240,249,255,0.9)_100%)] p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] dark:bg-[linear-gradient(180deg,rgba(41,20,0,0.34)_0%,rgba(0,0,0,0.94)_52%,rgba(8,47,73,0.36)_100%)]">
+        <div className="pointer-events-none absolute -right-8 top-0 h-24 w-24 rounded-full bg-amber-300/25 blur-3xl dark:bg-amber-200/10" />
+        <div className="pointer-events-none absolute -bottom-8 left-0 h-28 w-28 rounded-full bg-sky-300/20 blur-3xl dark:bg-sky-300/10" />
+        <div className="relative">
+          <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/72 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-foreground/75 uppercase backdrop-blur dark:border-white/12 dark:bg-white/8 dark:text-foreground/82">
+            <Sparkles className="h-3.5 w-3.5" />
+            Janvas
+          </span>
+          <p className="mt-4 text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">{t(resolvedLocale, "common.madeBy")}</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground">Gabriel Jota Lizardo</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <a
+              href="/privacy"
+              className="group rounded-[1.35rem] border border-black/8 bg-white/70 p-4 transition hover:-translate-y-0.5 hover:border-black/12 hover:bg-white/86 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-white/16 dark:hover:bg-white/[0.07]"
+            >
+              <div className="flex items-center justify-between">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-300/14 dark:text-amber-100">
+                  <ShieldCheck className="h-4 w-4" />
+                </span>
+                <ArrowUpRight className="h-4 w-4 text-muted-foreground transition group-hover:text-foreground" />
+              </div>
+              <p className="mt-4 text-sm font-semibold text-foreground">{t(resolvedLocale, "common.privacyPolicy")}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Janvas</p>
+            </a>
+            <a
+              href="mailto:gabrieljotalizardo@gmail.com"
+              className="group rounded-[1.35rem] border border-black/8 bg-white/70 p-4 transition hover:-translate-y-0.5 hover:border-black/12 hover:bg-white/86 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-white/16 dark:hover:bg-white/[0.07]"
+            >
+              <div className="flex items-center justify-between">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 dark:bg-sky-300/14 dark:text-sky-100">
+                  <Mail className="h-4 w-4" />
+                </span>
+                <ArrowUpRight className="h-4 w-4 text-muted-foreground transition group-hover:text-foreground" />
+              </div>
+              <p className="mt-4 text-sm font-semibold text-foreground">{t(resolvedLocale, "settings.suggestions")}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">gabrieljotalizardo@gmail.com</p>
+            </a>
+            <a
+              href="https://www.linkedin.com/in/gabriel-jota-lizardo-4587a427b/"
+              target="_blank"
+              rel="noreferrer"
+              className="group rounded-[1.35rem] border border-black/8 bg-white/70 p-4 transition hover:-translate-y-0.5 hover:border-black/12 hover:bg-white/86 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-white/16 dark:hover:bg-white/[0.07]"
+            >
+              <div className="flex items-center justify-between">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-300/14 dark:text-emerald-100">
+                  <ArrowUpRight className="h-4 w-4" />
+                </span>
+                <ArrowUpRight className="h-4 w-4 text-muted-foreground transition group-hover:text-foreground" />
+              </div>
+              <p className="mt-4 text-sm font-semibold text-foreground">{t(resolvedLocale, "settings.linkedIn")}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Gabriel Jota Lizardo</p>
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );

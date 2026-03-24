@@ -50,10 +50,10 @@ export default function NewConversationScreen() {
       accentText: isDark ? "#0f172a" : "#ffffff",
       backgroundMuted: isDark ? "rgba(255,255,255,0.04)" : "rgba(15,23,42,0.03)",
       border: isDark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
-      card: isDark ? "#0f172a" : "#ffffff",
+      card: isDark ? "#000000" : "#ffffff",
       danger: isDark ? "#fca5a5" : "#b91c1c",
       foreground: isDark ? "#f8fafc" : "#0f172a",
-      input: isDark ? "#111827" : "#ffffff",
+      input: isDark ? "#000000" : "#ffffff",
       muted: isDark ? "rgba(241,245,249,0.58)" : "rgba(15,23,42,0.48)",
       selected: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.06)",
     };

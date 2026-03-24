@@ -1,4 +1,5 @@
 import type { CanvasCourseContent, CanvasCourseFile } from "./canvas";
+import { appendSubjectRouteContext, type SubjectRouteContext } from "./subject-route-context";
 
 export type SubjectContentKind = "assignment" | "file" | "page" | "quiz";
 
@@ -37,12 +38,13 @@ function getNavigationKey(kind: SubjectContentKind, identifier: number | string)
 function getModuleItemTarget(
   courseId: number,
   item: NonNullable<CanvasCourseContent["modules"][number]["items"]>[number],
+  context?: SubjectRouteContext,
 ): SubjectContentNavigationTarget | null {
   if (item.type === "Page" && item.page_url) {
     const identifier = normalizePageIdentifier(item.page_url);
 
     return {
-      href: `/subjects/${courseId}/pages/${encodeURIComponent(identifier)}`,
+      href: appendSubjectRouteContext(`/subjects/${courseId}/pages/${encodeURIComponent(identifier)}`, context),
       identifier,
       kind: "page",
       title: item.title,
@@ -51,7 +53,7 @@ function getModuleItemTarget(
 
   if (item.type === "File" && item.content_id) {
     return {
-      href: `/subjects/${courseId}/files/${item.content_id}`,
+      href: appendSubjectRouteContext(`/subjects/${courseId}/files/${item.content_id}`, context),
       identifier: item.content_id,
       kind: "file",
       title: item.title,
@@ -60,7 +62,7 @@ function getModuleItemTarget(
 
   if (item.type === "Quiz" && item.content_id) {
     return {
-      href: `/subjects/${courseId}/quizzes/${item.content_id}`,
+      href: appendSubjectRouteContext(`/subjects/${courseId}/quizzes/${item.content_id}`, context),
       identifier: item.content_id,
       kind: "quiz",
       title: item.title,
@@ -69,7 +71,7 @@ function getModuleItemTarget(
 
   if (item.type === "Assignment" && item.content_id) {
     return {
-      href: `/subjects/${courseId}/assignments/${item.content_id}`,
+      href: appendSubjectRouteContext(`/subjects/${courseId}/assignments/${item.content_id}`, context),
       identifier: item.content_id,
       kind: "assignment",
       title: item.title,
@@ -83,6 +85,7 @@ export function buildSubjectContentNavigationTargets(
   courseId: number,
   content: CanvasCourseContent,
   files: CanvasCourseFile[],
+  context?: SubjectRouteContext,
 ) {
   const targets: SubjectContentNavigationTarget[] = [];
   const seen = new Set<string>();
@@ -104,13 +107,13 @@ export function buildSubjectContentNavigationTargets(
 
   for (const module of content.modules) {
     for (const item of module.items ?? []) {
-      appendTarget(getModuleItemTarget(courseId, item));
+      appendTarget(getModuleItemTarget(courseId, item, context));
     }
   }
 
   for (const assignment of content.assignments) {
     appendTarget({
-      href: `/subjects/${courseId}/assignments/${assignment.id}`,
+      href: appendSubjectRouteContext(`/subjects/${courseId}/assignments/${assignment.id}`, context),
       identifier: assignment.id,
       kind: "assignment",
       title: assignment.name,
@@ -119,7 +122,7 @@ export function buildSubjectContentNavigationTargets(
 
   for (const file of files) {
     appendTarget({
-      href: `/subjects/${courseId}/files/${file.id}`,
+      href: appendSubjectRouteContext(`/subjects/${courseId}/files/${file.id}`, context),
       identifier: file.id,
       kind: "file",
       title: file.display_name ?? file.filename,
@@ -134,8 +137,9 @@ export function getSubjectContentNavigation(
   content: CanvasCourseContent,
   files: CanvasCourseFile[],
   current: SubjectContentNavigationCurrent,
+  context?: SubjectRouteContext,
 ) {
-  const targets = buildSubjectContentNavigationTargets(courseId, content, files);
+  const targets = buildSubjectContentNavigationTargets(courseId, content, files, context);
   const currentKey = getNavigationKey(current.kind, current.identifier);
   const currentIndex = targets.findIndex((target) => getNavigationKey(target.kind, target.identifier) === currentKey);
 

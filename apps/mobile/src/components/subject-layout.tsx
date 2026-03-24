@@ -13,7 +13,7 @@ import {
   Sigma,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { formatSubjectName, getSubjectColorPalette, t } from "@canvas/shared";
+import { formatSubjectName, getSubjectColorPalette, getSubjectRouteContext, t } from "@canvas/shared";
 import { PlaceholderBlock } from "./app-ui";
 import { useCourseShell } from "../hooks/use-canvas-queries";
 import { useAppPreferences } from "../providers/app-preferences";
@@ -49,13 +49,18 @@ function getSubjectIcon(courseName?: string | null) {
 }
 
 function getActiveTab(pathname: string, routeTab?: string, peopleView?: string) {
+  const routeContext = getSubjectRouteContext(routeTab, peopleView);
+
+  if (routeContext?.tab && routeContext.tab !== "overview") {
+    return normalizeTab(routeContext.tab);
+  }
+
   if (pathname.includes("/assignments/")) return "assignments" as const;
   if (pathname.includes("/files/")) return "files" as const;
   if (pathname.includes("/forums/")) return "forums" as const;
   if (pathname.includes("/grades/")) return "grades" as const;
   if (pathname.includes("/people/") || pathname.includes("/groups/")) return "people" as const;
   if (pathname.includes("/pages/") || pathname.includes("/quizzes/")) return "modules" as const;
-  if (peopleView === "groups") return "people" as const;
   return normalizeTab(routeTab);
 }
 
@@ -74,7 +79,7 @@ export function SubjectLayoutHeader() {
     const isDark = resolvedTheme === "dark";
     return {
       border: isDark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
-      card: isDark ? "#0f172a" : "#ffffff",
+      card: isDark ? "#000000" : "#ffffff",
       foreground: isDark ? "#f8fafc" : "#0f172a",
       mutedForeground: isDark ? "rgba(241,245,249,0.58)" : "rgba(15,23,42,0.48)",
       primary: isDark ? "#f8fafc" : "#0f172a",

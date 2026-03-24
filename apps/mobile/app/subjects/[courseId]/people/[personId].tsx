@@ -3,8 +3,10 @@ import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, Mail } from "lucide-react-native";
 import {
+  buildSubjectHref,
   getSharedActiveCourses,
   formatSubjectName,
+  getSubjectRouteContext,
   getSubjectColorPalette,
   t,
 } from "@canvas/shared";
@@ -46,9 +48,11 @@ function formatEnrollmentState(locale: "en" | "pt-BR", value?: string) {
 
 export default function PersonDetailScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ courseId: string; personId: string }>();
+  const params = useLocalSearchParams<{ courseId: string; peopleView?: string; personId: string; tab?: string }>();
   const courseId = Number(params.courseId);
   const personId = Number(params.personId);
+  const originContext = useMemo(() => getSubjectRouteContext(params.tab, params.peopleView), [params.peopleView, params.tab]);
+  const subjectHref = useMemo(() => buildSubjectHref(courseId, originContext ?? { tab: "people" }), [courseId, originContext]);
   const { config } = useCanvasSession();
   const { resolvedLocale, resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
 
@@ -57,7 +61,7 @@ export default function PersonDetailScreen() {
     return {
       foreground: isDark ? "#f8fafc" : "#0f172a",
       mutedForeground: isDark ? "rgba(241,245,249,0.58)" : "rgba(15,23,42,0.48)",
-      card: isDark ? "#0f172a" : "#ffffff",
+      card: isDark ? "#000000" : "#ffffff",
       muted: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.05)",
       border: isDark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
       amber: { bg: isDark ? "rgba(245,158,11,0.2)" : "rgba(245,158,11,0.1)", text: isDark ? "#fbbf24" : "#d97706", border: isDark ? "rgba(245,158,11,0.3)" : "rgba(245,158,11,0.2)" },
@@ -131,7 +135,7 @@ export default function PersonDetailScreen() {
                     accessibilityRole="button"
                     onPress={() => {
                       triggerSelectionHaptic();
-                      goBackOrPush(router, `/subjects/${courseId}?tab=people`);
+                      goBackOrPush(router, subjectHref);
                     }}
                     style={[styles.backButton, { borderColor: colors.border }]}
                   >
@@ -157,7 +161,7 @@ export default function PersonDetailScreen() {
                         <Text style={[styles.personName, { color: colors.foreground }]} numberOfLines={1}>
                           {person.name}
                         </Text>
-                        <Pressable onPress={() => goBackOrPush(router, `/subjects/${courseId}?tab=people`)}>
+                        <Pressable onPress={() => goBackOrPush(router, subjectHref)}>
                           <Text style={[styles.courseLink, { color: colors.mutedForeground }]}>
                             {formatSubjectName(course.name)}
                           </Text>

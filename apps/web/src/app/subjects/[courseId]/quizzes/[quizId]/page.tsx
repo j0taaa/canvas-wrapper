@@ -2,10 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { ListChecks } from "lucide-react";
-import { getSubjectContentNavigation, t } from "@canvas/shared";
+import { buildSubjectHref, getSubjectContentNavigation, getSubjectRouteContext, t } from "@canvas/shared";
 import { BookmarkButton } from "@/components/bookmark-button";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
-import { HistoryBackButton } from "@/components/history-back-button";
 import { SubjectContentPagination } from "@/components/subject-content-pagination";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,13 +17,18 @@ const CANVAS_API_KEY_COOKIE = "canvasApiKey";
 
 export default async function QuizPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ courseId: string; quizId: string }>;
+  searchParams: Promise<{ peopleView?: string; tab?: string }>;
 }) {
   const { courseId, quizId } = await params;
+  const { peopleView, tab } = await searchParams;
   const parsedCourseId = Number(courseId);
   const parsedQuizId = Number(quizId);
   const { resolvedLocale } = await getRequestLocale();
+  const originContext = getSubjectRouteContext(tab, peopleView);
+  const subjectHref = buildSubjectHref(parsedCourseId, originContext ?? { tab: "modules" });
 
   if (!Number.isFinite(parsedCourseId) || !Number.isFinite(parsedQuizId)) {
     notFound();
@@ -59,7 +63,7 @@ export default async function QuizPage({
   const navigation = getSubjectContentNavigation(parsedCourseId, courseContent, files, {
     identifier: parsedQuizId,
     kind: "quiz",
-  });
+  }, originContext);
 
   return (
     <DesktopAppShell
@@ -69,23 +73,9 @@ export default async function QuizPage({
       contentClassName="p-4 pb-32 md:p-5 md:pb-6"
     >
       <div className="w-full">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <HistoryBackButton fallbackHref={`/subjects/${parsedCourseId}`} />
-          <BookmarkButton
-            bookmark={{
-              id: `quiz-${parsedCourseId}-${parsedQuizId}`,
-              kind: "quiz",
-              title: quizResult.title ?? t(resolvedLocale, "subjects.untitledQuiz"),
-              href: `/subjects/${parsedCourseId}/quizzes/${parsedQuizId}`,
-              subjectName: course.name,
-              courseId: parsedCourseId,
-            }}
-          />
-        </div>
-
         <div className="mb-6 overflow-hidden rounded-2xl border border-black/15 bg-gradient-to-br from-white via-white to-black/[0.03]">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-5">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="mb-3 flex items-center gap-3">
                 <span
                   className="flex h-10 w-10 items-center justify-center rounded-xl border"
@@ -93,10 +83,22 @@ export default async function QuizPage({
                 >
                   <ListChecks className="h-5 w-5" />
                 </span>
-                <div className="min-w-0">
-                  <h1 className="truncate text-2xl font-semibold">{quizResult.title ?? t(resolvedLocale, "subjects.untitledQuiz")}</h1>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-start justify-between gap-3">
+                    <h1 className="min-w-0 flex-1 truncate text-2xl font-semibold">{quizResult.title ?? t(resolvedLocale, "subjects.untitledQuiz")}</h1>
+                    <BookmarkButton
+                      bookmark={{
+                        id: `quiz-${parsedCourseId}-${parsedQuizId}`,
+                        kind: "quiz",
+                        title: quizResult.title ?? t(resolvedLocale, "subjects.untitledQuiz"),
+                        href: `/subjects/${parsedCourseId}/quizzes/${parsedQuizId}`,
+                        subjectName: course.name,
+                        courseId: parsedCourseId,
+                      }}
+                    />
+                  </div>
                   <Link
-                    href={`/subjects/${parsedCourseId}`}
+                    href={subjectHref}
                     className="text-sm text-black/55 transition hover:text-black hover:underline"
                   >
                     {formatSubjectName(course.name)}

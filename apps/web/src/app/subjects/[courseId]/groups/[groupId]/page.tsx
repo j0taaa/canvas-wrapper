@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { LockKeyhole, UsersRound } from "lucide-react";
-import { t } from "@canvas/shared";
+import { appendSubjectRouteContext, buildSubjectHref, getSubjectRouteContext, t } from "@canvas/shared";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,13 +25,18 @@ function getInitials(name: string) {
 
 export default async function SubjectGroupPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ courseId: string; groupId: string }>;
+  searchParams: Promise<{ peopleView?: string; tab?: string }>;
 }) {
   const { courseId, groupId } = await params;
+  const { peopleView, tab } = await searchParams;
   const parsedCourseId = Number(courseId);
   const parsedGroupId = Number(groupId);
   const { resolvedLocale } = await getRequestLocale();
+  const originContext = getSubjectRouteContext(tab, peopleView);
+  const subjectHref = buildSubjectHref(parsedCourseId, originContext ?? { peopleView: "groups", tab: "people" });
 
   if (!Number.isFinite(parsedCourseId) || !Number.isFinite(parsedGroupId)) {
     notFound();
@@ -81,7 +86,7 @@ export default async function SubjectGroupPage({
     >
       <div className="w-full">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <HistoryBackButton fallbackHref={`/subjects/${parsedCourseId}?tab=people&peopleView=groups`} />
+          <HistoryBackButton fallbackHref={subjectHref} />
         </div>
 
         <div className="mb-6 overflow-hidden rounded-2xl border border-black/15 bg-gradient-to-br from-white via-white to-black/[0.03]">
@@ -96,7 +101,9 @@ export default async function SubjectGroupPage({
                 </span>
                 <div className="min-w-0">
                   <h1 className="truncate text-2xl font-semibold">{group?.name ?? t(resolvedLocale, "subjects.group")}</h1>
-                  <p className="text-sm text-black/55">{formatSubjectName(course.name)}</p>
+                  <Link href={subjectHref} className="text-sm text-black/55 transition hover:text-black hover:underline">
+                    {formatSubjectName(course.name)}
+                  </Link>
                 </div>
               </div>
             </div>
@@ -131,7 +138,7 @@ export default async function SubjectGroupPage({
               members.map((person) => (
                 <Link
                   key={person.id}
-                  href={`/subjects/${parsedCourseId}/people/${person.id}`}
+                  href={appendSubjectRouteContext(`/subjects/${parsedCourseId}/people/${person.id}`, { peopleView: "groups", tab: "people" })}
                   className="rounded-xl border border-black/10 bg-white p-4 transition hover:border-black/30 hover:bg-black/[0.03]"
                 >
                   <div className="flex items-center gap-3">

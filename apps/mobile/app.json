@@ -55,7 +55,7 @@
           "backgroundColor": "#111827",
           "image": "./assets/icon.png",
           "dark": {
-            "backgroundColor": "#020617",
+            "backgroundColor": "#000000",
             "image": "./assets/icon.png"
           },
           "imageWidth": 180

@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
-import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, RefreshControl, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowDown,
   ArrowUp,
+  ArrowUpRight,
   Bell,
   CalendarDays,
   ChevronDown,
@@ -16,7 +17,9 @@ import {
   MoonStar,
   Palette,
   RefreshCcw,
+  ShieldCheck,
   Smartphone,
+  Sparkles,
   SunMedium,
   UserRound,
 } from "lucide-react-native";
@@ -26,6 +29,7 @@ import {
   formatSubjectName,
   getSubjectColorHex,
   getSubjectColorPalette,
+  normalizeSubjectColorHex,
   orderSubjectsByPreference,
   type LanguagePreference,
   type ThemePreference,
@@ -41,6 +45,7 @@ import { RestorableScrollView } from "../../src/components/restorable-scroll-vie
 import { useAppShell } from "../../src/hooks/use-canvas-queries";
 import { syncDeviceIntegrations } from "../../src/lib/device-integration-sync";
 import { formatDateTime } from "../../src/lib/format";
+import { openAppHref } from "../../src/lib/navigation";
 import { useAppPreferences } from "../../src/providers/app-preferences";
 import { useCanvasSession } from "../../src/providers/canvas-session";
 import { DeviceIntegrationProvider, useDeviceIntegrations } from "../../src/providers/device-integrations";
@@ -92,8 +97,8 @@ function ProfileTabContent() {
 
   const colors = useMemo(
     () => ({
-      background: resolvedTheme === "dark" ? "#020617" : "#ffffff",
-      card: resolvedTheme === "dark" ? "#0f172a" : "#ffffff",
+      background: resolvedTheme === "dark" ? "#000000" : "#ffffff",
+      card: resolvedTheme === "dark" ? "#000000" : "#ffffff",
       border: resolvedTheme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
       foreground: resolvedTheme === "dark" ? "#f8fafc" : "#0f172a",
       mutedForeground: resolvedTheme === "dark" ? "rgba(241,245,249,0.58)" : "rgba(15,23,42,0.48)",
@@ -226,6 +231,7 @@ function ProfileTabContent() {
                   colors={colors}
                   languagePreference={languagePreference}
                   resolvedLocale={resolvedLocale}
+                  resolvedTheme={resolvedTheme}
                   subjectPreferences={subjectPreferences}
                   themePreference={themePreference}
                   updateLanguagePreference={updateLanguagePreference}
@@ -245,6 +251,7 @@ function ProfilePreferences({
   colors,
   languagePreference,
   resolvedLocale,
+  resolvedTheme,
   subjectPreferences,
   themePreference,
   updateLanguagePreference,
@@ -264,6 +271,7 @@ function ProfilePreferences({
   };
   languagePreference: LanguagePreference;
   resolvedLocale: "en" | "pt-BR";
+  resolvedTheme: "light" | "dark";
   subjectPreferences: {
     hiddenCourseIds: number[];
     orderedCourseIds: number[];
@@ -742,24 +750,67 @@ function ProfilePreferences({
       />
 
       {/* Footer */}
-      <View style={[styles.descriptionCard, styles.footerCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-        <Text style={[styles.footerTitle, { color: colors.foreground }]}>{t(resolvedLocale, "common.madeBy")}</Text>
-        <Pressable
-          onPress={() => {
-            triggerSelectionHaptic();
-            router.push("/privacy");
-          }}
-        >
-          <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-            <Text style={[styles.footerLink, { color: colors.foreground }]}>{t(resolvedLocale, "common.privacyPolicy")}</Text>
-          </Text>
-        </Pressable>
-        <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-          {t(resolvedLocale, "settings.suggestions")} <Text style={[styles.footerLink, { color: colors.foreground }]}>gabrieljotalizardo@gmail.com</Text>
-        </Text>
-        <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-          {t(resolvedLocale, "settings.linkedIn")} <Text style={[styles.footerLink, { color: colors.foreground }]}>Gabriel Jota Lizardo</Text>
-        </Text>
+      <View style={[styles.signatureCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+        <View style={[styles.signatureGlowPrimary, { backgroundColor: resolvedTheme === "dark" ? "rgba(251,191,36,0.12)" : "rgba(251,191,36,0.18)" }]} />
+        <View style={[styles.signatureGlowSecondary, { backgroundColor: resolvedTheme === "dark" ? "rgba(56,189,248,0.08)" : "rgba(56,189,248,0.14)" }]} />
+        <View style={styles.signatureContent}>
+          <View style={[styles.signatureBadge, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+            <Sparkles size={14} color={colors.foreground} />
+            <Text style={[styles.signatureBadgeText, { color: colors.foreground }]}>Janvas</Text>
+          </View>
+          <Text style={[styles.signatureEyebrow, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.madeBy")}</Text>
+          <Text style={[styles.signatureName, { color: colors.foreground }]}>Gabriel Jota Lizardo</Text>
+          <View style={styles.signatureActions}>
+            <Pressable
+              onPress={() => {
+                triggerSelectionHaptic();
+                void openAppHref(router, "/privacy");
+              }}
+              style={[styles.signatureActionCard, { borderColor: colors.border, backgroundColor: colors.muted }]}
+            >
+              <View style={styles.signatureActionHeader}>
+                <View style={[styles.signatureActionIcon, { backgroundColor: resolvedTheme === "dark" ? "rgba(251,191,36,0.12)" : "rgba(251,191,36,0.18)" }]}>
+                  <ShieldCheck size={16} color={colors.foreground} />
+                </View>
+                <ArrowUpRight size={14} color={colors.mutedForeground} />
+              </View>
+              <Text style={[styles.signatureActionTitle, { color: colors.foreground }]}>{t(resolvedLocale, "common.privacyPolicy")}</Text>
+              <Text style={[styles.signatureActionValue, { color: colors.mutedForeground }]}>Janvas</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                triggerSelectionHaptic();
+                void openAppHref(router, "mailto:gabrieljotalizardo@gmail.com");
+              }}
+              style={[styles.signatureActionCard, { borderColor: colors.border, backgroundColor: colors.muted }]}
+            >
+              <View style={styles.signatureActionHeader}>
+                <View style={[styles.signatureActionIcon, { backgroundColor: resolvedTheme === "dark" ? "rgba(56,189,248,0.12)" : "rgba(56,189,248,0.18)" }]}>
+                  <Mail size={16} color={colors.foreground} />
+                </View>
+                <ArrowUpRight size={14} color={colors.mutedForeground} />
+              </View>
+              <Text style={[styles.signatureActionTitle, { color: colors.foreground }]}>{t(resolvedLocale, "settings.suggestions")}</Text>
+              <Text style={[styles.signatureActionValue, { color: colors.mutedForeground }]} numberOfLines={1}>gabrieljotalizardo@gmail.com</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                triggerSelectionHaptic();
+                void openAppHref(router, "https://www.linkedin.com/in/gabriel-jota-lizardo-4587a427b/");
+              }}
+              style={[styles.signatureActionCard, { borderColor: colors.border, backgroundColor: colors.muted }]}
+            >
+              <View style={styles.signatureActionHeader}>
+                <View style={[styles.signatureActionIcon, { backgroundColor: resolvedTheme === "dark" ? "rgba(52,211,153,0.12)" : "rgba(52,211,153,0.18)" }]}>
+                  <ArrowUpRight size={16} color={colors.foreground} />
+                </View>
+                <ArrowUpRight size={14} color={colors.mutedForeground} />
+              </View>
+              <Text style={[styles.signatureActionTitle, { color: colors.foreground }]}>{t(resolvedLocale, "settings.linkedIn")}</Text>
+              <Text style={[styles.signatureActionValue, { color: colors.mutedForeground }]} numberOfLines={1}>Gabriel Jota Lizardo</Text>
+            </Pressable>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -796,6 +847,26 @@ function SubjectPreferenceList({
 }) {
   const { resolvedLocale } = useAppPreferences();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [draftColors, setDraftColors] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    const nextDraftColors = Object.fromEntries(
+      courses.map((course) => [course.id, subjectPreferences.colors[course.id] ?? getSubjectColorHex(course.name)]),
+    );
+
+    setDraftColors(nextDraftColors);
+  }, [courses, subjectPreferences.colors]);
+
+  const setCourseHidden = (courseId: number, hidden: boolean) => {
+    const nextHiddenIds = hidden
+      ? Array.from(new Set([...subjectPreferences.hiddenCourseIds, courseId]))
+      : subjectPreferences.hiddenCourseIds.filter((candidateId) => candidateId !== courseId);
+
+    void onUpdatePreferences({
+      ...subjectPreferences,
+      hiddenCourseIds: nextHiddenIds,
+    });
+  };
 
   const moveCourse = (courseId: number, direction: -1 | 1) => {
     triggerHaptic();
@@ -812,6 +883,24 @@ function SubjectPreferenceList({
     void onUpdatePreferences({
       ...subjectPreferences,
       orderedCourseIds: nextOrderedIds,
+    });
+  };
+
+  const applyCourseColor = (courseId: number) => {
+    const normalizedColor = normalizeSubjectColorHex(draftColors[courseId]);
+
+    if (!normalizedColor) {
+      return;
+    }
+
+    triggerHaptic();
+
+    void onUpdatePreferences({
+      ...subjectPreferences,
+      colors: {
+        ...subjectPreferences.colors,
+        [courseId]: normalizedColor,
+      },
     });
   };
 
@@ -863,7 +952,20 @@ function SubjectPreferenceList({
             const isHidden = subjectPreferences.hiddenCourseIds.includes(course.id);
             const preferredColor = subjectPreferences.colors[course.id];
             const palette = getSubjectColorPalette(course.name, preferredColor);
-            const inputColor = preferredColor ?? getSubjectColorHex(course.name);
+            const draftColor = draftColors[course.id] ?? getSubjectColorHex(course.name);
+            const normalizedDraftColor = normalizeSubjectColorHex(draftColor);
+            const effectiveColor = normalizedDraftColor ?? preferredColor ?? getSubjectColorHex(course.name);
+            const swatchColors = Array.from(
+              new Set([
+                getSubjectColorHex(course.name),
+                "#3b82f6",
+                "#14b8a6",
+                "#22c55e",
+                "#f59e0b",
+                "#ef4444",
+                "#a855f7",
+              ]),
+            );
 
             return (
               <View
@@ -900,6 +1002,18 @@ function SubjectPreferenceList({
                       </Pressable>
                     </View>
                     <View style={styles.visibilityControl}>
+                      <Switch
+                        value={!isHidden}
+                        onValueChange={(visible) => {
+                          triggerHaptic();
+                          setCourseHidden(course.id, !visible);
+                        }}
+                        trackColor={{
+                          false: colors.cardMuted,
+                          true: palette.borderColor,
+                        }}
+                        thumbColor={!isHidden ? colors.card : colors.foreground}
+                      />
                       <Text style={[styles.visibilityText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.visible")}</Text>
                     </View>
                   </View>
@@ -910,7 +1024,94 @@ function SubjectPreferenceList({
                     <Palette size={16} color={colors.mutedForeground} />
                     <Text style={[styles.colorLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.color")}</Text>
                     <View style={[styles.colorInputContainer, { borderColor: colors.border }]}>
-                      <View style={[styles.colorPreview, { backgroundColor: inputColor }]} />
+                      <View style={[styles.colorPreview, { backgroundColor: effectiveColor }]} />
+                    </View>
+                  </View>
+                  <View style={styles.colorEditor}>
+                    <View style={styles.colorInputRow}>
+                      <TextInput
+                        value={draftColor}
+                        onChangeText={(value) => {
+                          setDraftColors((current) => ({
+                            ...current,
+                            [course.id]: value,
+                          }));
+                        }}
+                        placeholder="#3b82f6"
+                        placeholderTextColor={colors.mutedForeground}
+                        autoCapitalize="characters"
+                        autoCorrect={false}
+                        maxLength={7}
+                        style={[
+                          styles.colorTextInput,
+                          {
+                            backgroundColor: colors.card,
+                            borderColor: normalizedDraftColor ? colors.border : "#dc2626",
+                            color: colors.foreground,
+                          },
+                        ]}
+                      />
+                      <Pressable
+                        onPress={() => applyCourseColor(course.id)}
+                        disabled={!normalizedDraftColor}
+                        style={[
+                          styles.colorApplyButton,
+                          {
+                            backgroundColor: normalizedDraftColor ? colors.primary : colors.card,
+                            borderColor: normalizedDraftColor ? colors.primary : colors.border,
+                            opacity: normalizedDraftColor ? 1 : 0.55,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.colorApplyButtonText,
+                            { color: normalizedDraftColor ? colors.primaryText : colors.mutedForeground },
+                          ]}
+                        >
+                          {t(resolvedLocale, "common.apply")}
+                        </Text>
+                      </Pressable>
+                    </View>
+                    <Text
+                      style={[
+                        styles.colorHelperText,
+                        { color: normalizedDraftColor ? colors.mutedForeground : "#dc2626" },
+                      ]}
+                    >
+                      {normalizedDraftColor
+                        ? t(resolvedLocale, "settings.subjectColorHint")
+                        : t(resolvedLocale, "settings.subjectColorInvalid")}
+                    </Text>
+                    <View style={styles.swatchRow}>
+                      {swatchColors.map((swatchColor) => (
+                        <Pressable
+                          key={`${course.id}-${swatchColor}`}
+                          onPress={() => {
+                            triggerHaptic();
+                            setDraftColors((current) => ({
+                              ...current,
+                              [course.id]: swatchColor,
+                            }));
+                            void onUpdatePreferences({
+                              ...subjectPreferences,
+                              colors: {
+                                ...subjectPreferences.colors,
+                                [course.id]: swatchColor,
+                              },
+                            });
+                          }}
+                          style={[
+                            styles.swatchButton,
+                            {
+                              backgroundColor: swatchColor,
+                              borderColor: effectiveColor.toLowerCase() === swatchColor.toLowerCase()
+                                ? colors.foreground
+                                : colors.border,
+                            },
+                          ]}
+                        />
+                      ))}
                     </View>
                   </View>
                   {preferredColor && (
@@ -919,6 +1120,10 @@ function SubjectPreferenceList({
                         triggerHaptic();
                         const nextColors = { ...subjectPreferences.colors };
                         delete nextColors[course.id];
+                        setDraftColors((current) => ({
+                          ...current,
+                          [course.id]: getSubjectColorHex(course.name),
+                        }));
                         void onUpdatePreferences({ ...subjectPreferences, colors: nextColors });
                       }}
                     >
@@ -1118,9 +1323,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
-  footerCard: {
-    marginBottom: 12,
-  },
   descriptionText: {
     fontSize: 14,
     lineHeight: 20,
@@ -1223,11 +1425,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   colorSection: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
     gap: 12,
     marginTop: 16,
+  },
+  colorEditor: {
+    gap: 12,
   },
   colorPickerRow: {
     flexDirection: "row",
@@ -1248,6 +1450,44 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 4,
   },
+  colorInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  colorTextInput: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  colorApplyButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  colorApplyButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  colorHelperText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  swatchRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  swatchButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    borderWidth: 2,
+  },
   resetColorText: {
     fontSize: 12,
   },
@@ -1263,16 +1503,89 @@ const styles = StyleSheet.create({
   hiddenBadgeText: {
     fontSize: 11,
   },
-  footerTitle: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 8,
+  signatureCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    marginBottom: 12,
+    overflow: "hidden",
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    position: "relative",
   },
-  footerText: {
-    fontSize: 14,
-    marginTop: 8,
+  signatureGlowPrimary: {
+    borderRadius: 999,
+    height: 120,
+    position: "absolute",
+    right: -32,
+    top: -24,
+    width: 120,
   },
-  footerLink: {
-    textDecorationLine: "underline",
+  signatureGlowSecondary: {
+    borderRadius: 999,
+    bottom: -34,
+    height: 140,
+    left: -24,
+    position: "absolute",
+    width: 140,
+  },
+  signatureContent: {
+    gap: 14,
+  },
+  signatureBadge: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  signatureBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+  },
+  signatureEyebrow: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  signatureName: {
+    fontSize: 24,
+    fontWeight: "700",
+    letterSpacing: -0.4,
+  },
+  signatureActions: {
+    gap: 10,
+  },
+  signatureActionCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  signatureActionHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  signatureActionIcon: {
+    alignItems: "center",
+    borderRadius: 14,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  signatureActionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  signatureActionValue: {
+    fontSize: 12,
+    lineHeight: 18,
   },
 });

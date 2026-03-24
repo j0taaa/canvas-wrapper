@@ -18,8 +18,8 @@ export default function PrivacyPolicyScreen() {
   );
   const colors = useMemo(
     () => ({
-      background: resolvedTheme === "dark" ? "#020617" : "#ffffff",
-      card: resolvedTheme === "dark" ? "#0f172a" : "#ffffff",
+      background: resolvedTheme === "dark" ? "#000000" : "#ffffff",
+      card: resolvedTheme === "dark" ? "#000000" : "#ffffff",
       border: resolvedTheme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
       foreground: resolvedTheme === "dark" ? "#f8fafc" : "#0f172a",
       mutedForeground: resolvedTheme === "dark" ? "rgba(241,245,249,0.68)" : "rgba(15,23,42,0.58)",

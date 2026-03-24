@@ -37,7 +37,7 @@ export default function BookmarksTab() {
   const colors = {
     foreground: resolvedTheme === "dark" ? "#f8fafc" : "#0f172a",
     mutedForeground: resolvedTheme === "dark" ? "rgba(241,245,249,0.58)" : "rgba(15,23,42,0.48)",
-    card: resolvedTheme === "dark" ? "#0f172a" : "#ffffff",
+    card: resolvedTheme === "dark" ? "#000000" : "#ffffff",
     border: resolvedTheme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
     muted: resolvedTheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.04)",
   };
@@ -51,6 +51,7 @@ export default function BookmarksTab() {
     <RequireCanvasConfig>
       <AppScreen title={t(resolvedLocale, "bookmarks.title")} subtitle={t(resolvedLocale, "bookmarks.subtitle")}>
         <RestorableScrollView
+          contentContainerStyle={styles.content}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -133,6 +134,9 @@ export default function BookmarksTab() {
 }
 
 const styles = StyleSheet.create({
+  content: {
+    paddingTop: 6,
+  },
   item: {
     alignItems: "center",
     borderRadius: 18,

@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { ArrowRight, BookOpen, CircleDot, LockKeyhole } from "lucide-react";
-import { t } from "@canvas/shared";
+import { appendSubjectRouteContext, t, type SubjectRouteContext } from "@canvas/shared";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { GroupCreateForm } from "@/app/subjects/[courseId]/group-create-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -122,24 +122,28 @@ function buildTrendPath(points: Array<{ x: number; y: number }>) {
     .join(" ");
 }
 
-function getModuleItemHref(courseId: number, item: { type?: string; page_url?: string; html_url?: string; content_id?: number }) {
+function getModuleItemHref(
+  courseId: number,
+  item: { type?: string; page_url?: string; html_url?: string; content_id?: number },
+  context?: SubjectRouteContext,
+) {
   if (item.type === "Page" && item.page_url) {
-    return `/subjects/${courseId}/pages/${encodeURIComponent(item.page_url)}`;
+    return appendSubjectRouteContext(`/subjects/${courseId}/pages/${encodeURIComponent(item.page_url)}`, context);
   }
 
   if (item.type === "File" && item.content_id) {
-    return `/subjects/${courseId}/files/${item.content_id}`;
+    return appendSubjectRouteContext(`/subjects/${courseId}/files/${item.content_id}`, context);
   }
 
   if (item.type === "Quiz" && item.content_id) {
-    return `/subjects/${courseId}/quizzes/${item.content_id}`;
+    return appendSubjectRouteContext(`/subjects/${courseId}/quizzes/${item.content_id}`, context);
   }
 
   if (item.type === "Assignment" && item.content_id) {
-    return `/subjects/${courseId}/assignments/${item.content_id}`;
+    return appendSubjectRouteContext(`/subjects/${courseId}/assignments/${item.content_id}`, context);
   }
 
-  return item.html_url;
+  return appendSubjectRouteContext(item.html_url ?? "", context) || undefined;
 }
 
 export default async function SubjectPage({
@@ -190,6 +194,10 @@ export default async function SubjectPage({
   }
 
   const subjectStyle = getSubjectColorStyle(course.name);
+  const activeContext: SubjectRouteContext =
+    activeTab === "people" && activePeopleView === "groups"
+      ? { peopleView: "groups", tab: "people" }
+      : { tab: activeTab };
   const gradeData = gradeDataResult.status === "fulfilled" ? gradeDataResult.value : null;
   const people = peopleResult.status === "fulfilled" ? peopleResult.value : [];
   const groups = groupsResult.status === "fulfilled" ? groupsResult.value : [];
@@ -299,7 +307,7 @@ export default async function SubjectPage({
                     </div>
                     <div className="space-y-2">
                       {module.items?.slice(0, 12).map((item) => {
-                        const itemHref = getModuleItemHref(parsedCourseId, item);
+                        const itemHref = getModuleItemHref(parsedCourseId, item, activeContext);
 
                         if (item.type === "SubHeader") {
                           return (
@@ -380,7 +388,7 @@ export default async function SubjectPage({
                 )}
                 {courseContent.assignments.map((assignment) => {
                   const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
-                  const assignmentHref = `/subjects/${parsedCourseId}/assignments/${assignment.id}`;
+                  const assignmentHref = appendSubjectRouteContext(`/subjects/${parsedCourseId}/assignments/${assignment.id}`, activeContext);
                   const assignmentContent = (
                     <div
                       className="rounded-xl border border-black/10 bg-white p-4 transition hover:border-black/30 hover:bg-black/[0.03]"
@@ -496,7 +504,7 @@ export default async function SubjectPage({
                 {gradeData?.assignments.length ? (
                   gradeData.assignments.map((assignment) => {
                     const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
-                    const assignmentHref = `/subjects/${parsedCourseId}/assignments/${assignment.id}`;
+                    const assignmentHref = appendSubjectRouteContext(`/subjects/${parsedCourseId}/assignments/${assignment.id}`, { tab: "grades" });
                     const content = (
                       <div
                         className="rounded-xl border border-black/10 bg-white p-4 transition hover:border-black/30 hover:bg-black/[0.03]"
@@ -577,7 +585,7 @@ export default async function SubjectPage({
                 {activePeopleView === "people" && people.map((person) => (
                   <Link
                     key={person.id}
-                    href={`/subjects/${parsedCourseId}/people/${person.id}`}
+                    href={appendSubjectRouteContext(`/subjects/${parsedCourseId}/people/${person.id}`, { tab: "people" })}
                     className="rounded-xl border border-black/10 bg-white p-4 transition hover:border-black/30 hover:bg-black/[0.03]"
                   >
                     <div className="flex items-center gap-3">
@@ -614,7 +622,7 @@ export default async function SubjectPage({
                           </div>
                           {group.canOpen ? (
                             <Link
-                              href={`/subjects/${parsedCourseId}/groups/${group.id}`}
+                              href={appendSubjectRouteContext(`/subjects/${parsedCourseId}/groups/${group.id}`, { peopleView: "groups", tab: "people" })}
                               className="mt-2 inline-flex items-center gap-1 text-xs text-black/65 underline-offset-2 transition hover:text-black hover:underline"
                             >
                               <span>{t(resolvedLocale, "subjects.enterGroup")}</span>
@@ -640,7 +648,7 @@ export default async function SubjectPage({
                             group.users.map((person) => (
                               <Link
                                 key={person.id}
-                                href={`/subjects/${parsedCourseId}/people/${person.id}`}
+                                href={appendSubjectRouteContext(`/subjects/${parsedCourseId}/people/${person.id}`, { peopleView: "groups", tab: "people" })}
                                 className="flex items-center gap-3 rounded-lg border border-black/8 bg-white/85 px-3 py-2 transition hover:border-black/20 hover:bg-black/[0.03]"
                               >
                                 <Avatar className="border border-black/15">
@@ -707,7 +715,7 @@ export default async function SubjectPage({
           <div className="space-y-3 px-1">
               {files.length === 0 && <p className="text-sm text-black/70">{filesUnavailable ? t(resolvedLocale, "subjects.filesUnavailable") : t(resolvedLocale, "subjects.noFiles")}</p>}
               {files.map((file) => {
-                const fileHref = `/subjects/${parsedCourseId}/files/${file.id}`;
+                const fileHref = appendSubjectRouteContext(`/subjects/${parsedCourseId}/files/${file.id}`, { tab: "files" });
                 const content = (
                   <div
                     className="rounded-xl border border-black/10 bg-white p-4 transition hover:border-black/30 hover:bg-black/[0.03]"

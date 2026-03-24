@@ -21,14 +21,28 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { resolvedTheme } = useAppPreferences();
-  const backgroundColor = resolvedTheme === "dark" ? "#020617" : "#ffffff";
+  const backgroundColor = resolvedTheme === "dark" ? "#000000" : "#ffffff";
 
   return (
     <View style={{ flex: 1, backgroundColor }}>
       <View style={{ flex: 1 }}>
-        <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
+        <StatusBar
+          style={resolvedTheme === "dark" ? "light" : "dark"}
+          backgroundColor={backgroundColor}
+          translucent={false}
+        />
         <CanvasBootstrapPrefetcher />
-        <Stack screenOptions={{ animation: "none", freezeOnBlur: true, headerShown: false }} />
+        <Stack
+          screenOptions={{
+            animation: "simple_push",
+            animationDuration: 180,
+            contentStyle: { backgroundColor },
+            freezeOnBlur: true,
+            fullScreenGestureEnabled: true,
+            gestureEnabled: true,
+            headerShown: false,
+          }}
+        />
       </View>
       <MobileChrome />
     </View>

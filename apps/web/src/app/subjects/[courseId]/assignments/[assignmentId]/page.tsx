@@ -2,10 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { CalendarClock, ClipboardCheck, LockKeyhole, Send, Trophy } from "lucide-react";
-import { getSubjectContentNavigation, t, type AppLocale } from "@canvas/shared";
+import { buildSubjectHref, getSubjectContentNavigation, getSubjectRouteContext, t, type AppLocale } from "@canvas/shared";
 import { BookmarkButton } from "@/components/bookmark-button";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
-import { HistoryBackButton } from "@/components/history-back-button";
 import { SubjectContentPagination } from "@/components/subject-content-pagination";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,13 +78,18 @@ function formatSubmissionTypes(locale: AppLocale, submissionTypes: string[]) {
 
 export default async function AssignmentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ courseId: string; assignmentId: string }>;
+  searchParams: Promise<{ peopleView?: string; tab?: string }>;
 }) {
   const { courseId, assignmentId } = await params;
+  const { peopleView, tab } = await searchParams;
   const parsedCourseId = Number(courseId);
   const parsedAssignmentId = Number(assignmentId);
   const { resolvedLocale } = await getRequestLocale();
+  const originContext = getSubjectRouteContext(tab, peopleView);
+  const subjectHref = buildSubjectHref(parsedCourseId, originContext ?? { tab: "assignments" });
 
   if (!Number.isFinite(parsedCourseId) || !Number.isFinite(parsedAssignmentId)) {
     notFound();
@@ -126,7 +130,7 @@ export default async function AssignmentPage({
   const navigation = getSubjectContentNavigation(parsedCourseId, courseContent, files, {
     identifier: parsedAssignmentId,
     kind: "assignment",
-  });
+  }, originContext);
 
   return (
     <DesktopAppShell
@@ -136,23 +140,9 @@ export default async function AssignmentPage({
       contentClassName="p-4 pb-32 md:p-5 md:pb-6"
     >
       <div className="w-full">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <HistoryBackButton fallbackHref={`/subjects/${parsedCourseId}`} />
-          <BookmarkButton
-            bookmark={{
-              id: `assignment-${parsedCourseId}-${parsedAssignmentId}`,
-              kind: "assignment",
-              title: assignment.name,
-              href: `/subjects/${parsedCourseId}/assignments/${parsedAssignmentId}`,
-              subjectName: course.name,
-              courseId: parsedCourseId,
-            }}
-          />
-        </div>
-
         <div className="mb-6 overflow-hidden rounded-2xl border border-black/15 bg-gradient-to-br from-white via-white to-black/[0.03]">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-5">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="mb-3 flex items-center gap-3">
                 <span
                   className="flex h-10 w-10 items-center justify-center rounded-xl border"
@@ -160,12 +150,24 @@ export default async function AssignmentPage({
                 >
                   <ClipboardCheck className="h-5 w-5" />
                 </span>
-                <div className="min-w-0">
-                  <h1 className={`truncate text-2xl font-semibold ${isCompleted ? "text-black/60 line-through" : ""}`}>
-                    {assignment.name}
-                  </h1>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-start justify-between gap-3">
+                    <h1 className={`min-w-0 flex-1 truncate text-2xl font-semibold ${isCompleted ? "text-black/60 line-through" : ""}`}>
+                      {assignment.name}
+                    </h1>
+                    <BookmarkButton
+                      bookmark={{
+                        id: `assignment-${parsedCourseId}-${parsedAssignmentId}`,
+                        kind: "assignment",
+                        title: assignment.name,
+                        href: `/subjects/${parsedCourseId}/assignments/${parsedAssignmentId}`,
+                        subjectName: course.name,
+                        courseId: parsedCourseId,
+                      }}
+                    />
+                  </div>
                   <Link
-                    href={`/subjects/${parsedCourseId}`}
+                    href={subjectHref}
                     className="text-sm text-black/55 transition hover:text-black hover:underline"
                   >
                     {formatSubjectName(course.name)}

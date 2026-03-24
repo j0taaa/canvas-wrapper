@@ -2,10 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Download, FileImage, FileText, Presentation } from "lucide-react";
-import { getSubjectContentNavigation, t } from "@canvas/shared";
+import { buildSubjectHref, getSubjectContentNavigation, getSubjectRouteContext, t } from "@canvas/shared";
 import { BookmarkButton } from "@/components/bookmark-button";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
-import { HistoryBackButton } from "@/components/history-back-button";
 import { SubjectContentPagination } from "@/components/subject-content-pagination";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,13 +33,18 @@ function isPreviewableFile(contentType?: string, filename?: string) {
 
 export default async function SubjectFilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ courseId: string; fileId: string }>;
+  searchParams: Promise<{ peopleView?: string; tab?: string }>;
 }) {
   const { courseId, fileId } = await params;
+  const { peopleView, tab } = await searchParams;
   const parsedCourseId = Number(courseId);
   const parsedFileId = Number(fileId);
   const { resolvedLocale } = await getRequestLocale();
+  const originContext = getSubjectRouteContext(tab, peopleView);
+  const subjectHref = buildSubjectHref(parsedCourseId, originContext ?? { tab: "files" });
 
   if (!Number.isFinite(parsedCourseId) || !Number.isFinite(parsedFileId)) {
     notFound();
@@ -83,7 +87,7 @@ export default async function SubjectFilePage({
   const navigation = getSubjectContentNavigation(parsedCourseId, courseContent, files, {
     identifier: parsedFileId,
     kind: "file",
-  });
+  }, originContext);
 
   return (
     <DesktopAppShell
@@ -93,32 +97,9 @@ export default async function SubjectFilePage({
       contentClassName="p-4 pb-32 md:p-5 md:pb-6"
     >
       <div className="w-full">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <HistoryBackButton fallbackHref={`/subjects/${parsedCourseId}?tab=files`} />
-          <div className="flex items-center gap-2">
-            <a
-              href={fileSrc}
-              download={file.filename ?? file.display_name ?? `file-${parsedFileId}`}
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-[min(var(--radius-md),12px)] border border-border bg-background text-foreground transition-all outline-none select-none hover:bg-muted/80 hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              aria-label={t(resolvedLocale, "common.download")}
-            >
-              <Download className="h-4 w-4" />
-            </a>
-            <BookmarkButton
-              bookmark={{
-                id: `file-${parsedCourseId}-${parsedFileId}`,
-                kind: "file",
-                title: file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.untitledFile"),
-                href: `/subjects/${parsedCourseId}/files/${parsedFileId}`,
-                subjectName: course.name,
-                courseId: parsedCourseId,
-              }}
-            />
-          </div>
-        </div>
         <div className="mb-6 overflow-hidden rounded-2xl border border-black/15 bg-gradient-to-br from-white via-white to-black/[0.03]">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-5">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="mb-3 flex items-center gap-3">
                 <span
                   className="flex h-10 w-10 items-center justify-center rounded-xl border"
@@ -126,10 +107,32 @@ export default async function SubjectFilePage({
                 >
                   <PreviewIcon className="h-5 w-5" />
                 </span>
-                <div className="min-w-0">
-                  <h1 className="truncate text-2xl font-semibold">{file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.untitledFile")}</h1>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-start justify-between gap-3">
+                    <h1 className="min-w-0 flex-1 truncate text-2xl font-semibold">{file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.untitledFile")}</h1>
+                    <div className="flex items-center gap-2">
+                      <BookmarkButton
+                        bookmark={{
+                          id: `file-${parsedCourseId}-${parsedFileId}`,
+                          kind: "file",
+                          title: file.display_name ?? file.filename ?? t(resolvedLocale, "subjects.untitledFile"),
+                          href: `/subjects/${parsedCourseId}/files/${parsedFileId}`,
+                          subjectName: course.name,
+                          courseId: parsedCourseId,
+                        }}
+                      />
+                      <a
+                        href={fileSrc}
+                        download={file.filename ?? file.display_name ?? `file-${parsedFileId}`}
+                        className="inline-flex size-7 shrink-0 items-center justify-center rounded-[min(var(--radius-md),12px)] border border-border bg-background text-foreground transition-all outline-none select-none hover:bg-muted/80 hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                        aria-label={t(resolvedLocale, "common.download")}
+                      >
+                        <Download className="h-4 w-4" />
+                      </a>
+                    </div>
+                  </div>
                   <Link
-                    href={`/subjects/${parsedCourseId}`}
+                    href={subjectHref}
                     className="text-sm text-black/55 transition hover:text-black hover:underline"
                   >
                     {formatSubjectName(course.name)}

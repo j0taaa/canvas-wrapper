@@ -3,8 +3,11 @@ import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, LockKeyhole, UsersRound } from "lucide-react-native";
 import {
+  appendSubjectRouteContext,
+  buildSubjectHref,
   formatSubjectName,
   formatGroupJoinLevel,
+  getSubjectRouteContext,
   getSubjectColorPalette,
   t,
 } from "@canvas/shared";
@@ -34,9 +37,14 @@ function getInitials(name: string) {
 
 export default function GroupDetailScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ courseId: string; groupId: string }>();
+  const params = useLocalSearchParams<{ courseId: string; groupId: string; peopleView?: string; tab?: string }>();
   const courseId = Number(params.courseId);
   const groupId = Number(params.groupId);
+  const originContext = useMemo(() => getSubjectRouteContext(params.tab, params.peopleView), [params.peopleView, params.tab]);
+  const subjectHref = useMemo(
+    () => buildSubjectHref(courseId, originContext ?? { peopleView: "groups", tab: "people" }),
+    [courseId, originContext],
+  );
   const { resolvedLocale, resolvedTheme, triggerSelectionHaptic } = useAppPreferences();
 
   const colors = useMemo(() => {
@@ -44,7 +52,7 @@ export default function GroupDetailScreen() {
     return {
       foreground: isDark ? "#f8fafc" : "#0f172a",
       mutedForeground: isDark ? "rgba(241,245,249,0.58)" : "rgba(15,23,42,0.48)",
-      card: isDark ? "#0f172a" : "#ffffff",
+      card: isDark ? "#000000" : "#ffffff",
       muted: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.05)",
       border: isDark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
     };
@@ -96,7 +104,7 @@ export default function GroupDetailScreen() {
                     accessibilityRole="button"
                     onPress={() => {
                       triggerSelectionHaptic();
-                      goBackOrPush(router, `/subjects/${courseId}?tab=people&peopleView=groups`);
+                      goBackOrPush(router, subjectHref);
                     }}
                     style={[styles.backButton, { borderColor: colors.border }]}
                   >
@@ -174,7 +182,7 @@ export default function GroupDetailScreen() {
                       members.map((person) => (
                         <Pressable
                           key={person.id}
-                          onPress={() => router.push(`/subjects/${courseId}/people/${person.id}`)}
+                          onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/people/${person.id}`, { peopleView: "groups", tab: "people" }))}
                           style={[styles.memberCard, { borderColor: colors.border, backgroundColor: colors.card }]}
                         >
                           <UserAvatar

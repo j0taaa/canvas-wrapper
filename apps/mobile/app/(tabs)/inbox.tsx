@@ -45,7 +45,7 @@ export default function InboxTab() {
     return {
       foreground: isDark ? "#f8fafc" : "#0f172a",
       mutedForeground: isDark ? "rgba(241,245,249,0.58)" : "rgba(15,23,42,0.48)",
-      card: isDark ? "#0f172a" : "#ffffff",
+      card: isDark ? "#000000" : "#ffffff",
       muted: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.05)",
       border: isDark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
       primary: isDark ? "#f8fafc" : "#0f172a",

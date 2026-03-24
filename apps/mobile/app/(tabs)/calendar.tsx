@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
@@ -37,6 +38,9 @@ const ZONED_DAY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
   weekday: "short",
 });
+
+const CALENDAR_VIEW_STORAGE_KEY = "canvasMobileCalendarView";
+
 type CalendarEntry = {
   id: string;
   title: string;
@@ -69,11 +73,14 @@ function buildCalendarCells(
   const firstOfMonth = getZonedDateParts(new Date(Date.UTC(year, month - 1, 1)));
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const leadingEmptyDays = firstOfMonth.weekdayIndex;
+  const totalVisibleDays = leadingEmptyDays + daysInMonth;
+  const trailingEmptyDays = (7 - (totalVisibleDays % 7)) % 7;
+  const totalCells = totalVisibleDays + trailingEmptyDays;
 
-  return Array.from({ length: leadingEmptyDays + daysInMonth }, (_, index) => {
+  return Array.from({ length: totalCells }, (_, index) => {
     const dayNumber = index - leadingEmptyDays + 1;
 
-    if (dayNumber < 1) {
+    if (dayNumber < 1 || dayNumber > daysInMonth) {
       return null;
     }
 
@@ -112,6 +119,7 @@ export default function CalendarTab() {
   const [currentMonth, setCurrentMonth] = useState(today.getUTCMonth() + 1);
   const [currentYear, setCurrentYear] = useState(today.getUTCFullYear());
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+  const [hasLoadedViewMode, setHasLoadedViewMode] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const weekdayLabels = useMemo(() => getWeekdayLabels(resolvedLocale, "short"), [resolvedLocale]);
   const mobileWeekdayLabels = useMemo(() => getWeekdayLabels(resolvedLocale, "narrow"), [resolvedLocale]);
@@ -123,8 +131,8 @@ export default function CalendarTab() {
 
   const colors = useMemo(
     () => ({
-      background: resolvedTheme === "dark" ? "#020617" : "#ffffff",
-      card: resolvedTheme === "dark" ? "#0f172a" : "#ffffff",
+      background: resolvedTheme === "dark" ? "#000000" : "#ffffff",
+      card: resolvedTheme === "dark" ? "#000000" : "#ffffff",
       border: resolvedTheme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.08)",
       foreground: resolvedTheme === "dark" ? "#f8fafc" : "#0f172a",
       muted: resolvedTheme === "dark" ? "rgba(241,245,249,0.58)" : "rgba(15,23,42,0.48)",
@@ -159,6 +167,37 @@ export default function CalendarTab() {
   const showColdLoading = isLoading && !data && !error;
   const showBlockingError = !!error && !data;
   const showInlineRefresh = !!data && (isFetching || isLoading);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void AsyncStorage.getItem(CALENDAR_VIEW_STORAGE_KEY)
+      .then((storedViewMode) => {
+        if (cancelled) {
+          return;
+        }
+
+        setViewMode(storedViewMode === "list" ? "list" : "calendar");
+        setHasLoadedViewMode(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHasLoadedViewMode(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedViewMode) {
+      return;
+    }
+
+    void AsyncStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, viewMode);
+  }, [hasLoadedViewMode, viewMode]);
 
   useEffect(() => {
     if (!config || !data) {
@@ -523,7 +562,7 @@ const styles = StyleSheet.create({
   },
   container: {
     gap: 16,
-    paddingTop: 0,
+    paddingTop: 6,
   },
   calendarCard: {
     borderRadius: 16,
@@ -533,7 +572,7 @@ const styles = StyleSheet.create({
   calendarCardContent: {
     gap: 16,
     paddingBottom: 16,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingTop: 12,
   },
   calendarCardHeader: {
@@ -594,35 +633,39 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   viewContainer: {
-    marginTop: 16,
+    marginTop: 14,
   },
   calendarWrapper: {
-    marginHorizontal: -12,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
   },
   calendarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    justifyContent: "space-between",
   },
   weekDayHeader: {
-    width: "14.285%",
+    width: "13.4%",
     textAlign: "center",
     fontSize: 11,
     fontWeight: "500",
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   dayCell: {
-    width: "14.285%",
+    width: "13.4%",
     aspectRatio: 1,
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
-    padding: 3,
+    marginBottom: 6,
+    padding: 5,
     justifyContent: "space-between",
   },
   emptyCell: {
-    width: "14.285%",
+    width: "13.4%",
     aspectRatio: 1,
+    marginBottom: 6,
   },
   dayCellHeader: {
     flexDirection: "row",
@@ -630,7 +673,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   dayNumber: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "600",
   },
   dayEntryCount: {
@@ -640,7 +683,7 @@ const styles = StyleSheet.create({
   dotsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 1.5,
+    gap: 2,
   },
   entryDot: {
     width: 4,

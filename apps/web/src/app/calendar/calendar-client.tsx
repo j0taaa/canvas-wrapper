@@ -74,11 +74,14 @@ function buildCalendarCells(entries: CalendarEntry[], month: number, year: numbe
   const firstOfMonth = getZonedDateParts(new Date(Date.UTC(year, month - 1, 1)));
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const leadingEmptyDays = firstOfMonth.weekdayIndex;
+  const totalVisibleDays = leadingEmptyDays + daysInMonth;
+  const trailingEmptyDays = (7 - (totalVisibleDays % 7)) % 7;
+  const totalCells = totalVisibleDays + trailingEmptyDays;
 
-  return Array.from({ length: leadingEmptyDays + daysInMonth }, (_, index) => {
+  return Array.from({ length: totalCells }, (_, index) => {
     const dayNumber = index - leadingEmptyDays + 1;
 
-    if (dayNumber < 1) {
+    if (dayNumber < 1 || dayNumber > daysInMonth) {
       return null;
     }
 

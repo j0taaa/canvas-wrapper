@@ -411,7 +411,10 @@ export function MobileBottomNav({
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-background/95 backdrop-blur md:hidden">
+    <div
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-background/95 backdrop-blur md:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+    >
       {preferences.showMobileSubjectBar && visibleCourses && visibleCourses.length > 0 && (
         <div ref={subjectBarRef} className="overflow-x-auto border-b border-border/70 px-3 py-2">
           <div className="flex min-w-max items-center gap-2">
@@ -439,7 +442,7 @@ export function MobileBottomNav({
           </div>
         </div>
       )}
-      <nav className="grid grid-cols-5 gap-1 px-2 py-2">
+      <nav className="grid grid-cols-5 gap-1 px-2 py-1.5">
         {mobileNavItems.map((item) => {
           const Icon = item.icon;
           const href = getMobileNavHref(item);
@@ -458,8 +461,8 @@ export function MobileBottomNav({
               }}
               className={
                 effectiveActive === item.key
-                  ? "flex flex-col items-center gap-1 rounded-2xl bg-primary px-2 py-2 text-[11px] font-medium text-primary-foreground"
-                  : "flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-medium text-muted-foreground"
+                  ? "flex flex-col items-center gap-1 rounded-2xl bg-primary px-2 py-1.5 text-[11px] font-medium text-primary-foreground"
+                  : "flex flex-col items-center gap-1 rounded-2xl px-2 py-1.5 text-[11px] font-medium text-muted-foreground"
               }
             >
               <Icon className="h-4 w-4" />

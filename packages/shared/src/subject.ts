@@ -79,10 +79,20 @@ export function getSubjectColorHex(name?: string | null) {
     .join("")}`;
 }
 
-export function getSubjectColorPalette(name?: string | null, preferredColor?: string | null) {
-  const normalized = (preferredColor ?? getSubjectColorHex(name)).trim().match(/^#?([0-9a-f]{6})$/i);
+export function normalizeSubjectColorHex(value?: string | null) {
+  const normalized = value?.trim().match(/^#?([0-9a-f]{6})$/i);
 
   if (!normalized) {
+    return null;
+  }
+
+  return `#${normalized[1].toLowerCase()}`;
+}
+
+export function getSubjectColorPalette(name?: string | null, preferredColor?: string | null) {
+  const normalizedColor = normalizeSubjectColorHex(preferredColor ?? getSubjectColorHex(name));
+
+  if (!normalizedColor) {
     return {
       backgroundColor: "#dbeafe",
       borderColor: "#3b82f6",
@@ -90,15 +100,14 @@ export function getSubjectColorPalette(name?: string | null, preferredColor?: st
     };
   }
 
-  const value = normalized[1];
+  const value = normalizedColor.slice(1);
   const red = Number.parseInt(value.slice(0, 2), 16);
   const green = Number.parseInt(value.slice(2, 4), 16);
   const blue = Number.parseInt(value.slice(4, 6), 16);
-  const normalizedHex = `#${value}`;
 
   return {
     backgroundColor: `rgba(${red}, ${green}, ${blue}, 0.16)`,
-    borderColor: normalizedHex,
+    borderColor: normalizedColor,
     color: `rgba(${red}, ${green}, ${blue}, 0.95)`,
   };
 }

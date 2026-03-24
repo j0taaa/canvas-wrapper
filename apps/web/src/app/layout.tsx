@@ -7,6 +7,9 @@ import { getRequestLocale } from "@/lib/request-locale";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { ThemeSync } from "@/components/theme-sync";
 import {
+  DARK_THEME_SURFACE,
+  getThemeSurfaceColor,
+  LIGHT_THEME_SURFACE,
   parseThemePreference,
   THEME_PREFERENCE_COOKIE,
   THEME_PREFERENCE_STORAGE_KEY,
@@ -33,8 +36,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#10141c" },
+    { media: "(prefers-color-scheme: light)", color: LIGHT_THEME_SURFACE },
+    { media: "(prefers-color-scheme: dark)", color: DARK_THEME_SURFACE },
   ],
 };
 
@@ -70,17 +73,30 @@ async function RootLayoutInner({
       var resolved = preference === "system"
         ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
         : preference;
-      var themeColor = resolved === "dark" ? "#10141c" : "#ffffff";
+      var themeColor = resolved === "dark" ? "${DARK_THEME_SURFACE}" : "${LIGHT_THEME_SURFACE}";
 
       root.dataset.themePreference = preference;
       root.classList.toggle("dark", resolved === "dark");
       root.style.colorScheme = resolved;
       root.style.backgroundColor = themeColor;
 
-      var themeMeta = document.querySelector('meta[name="theme-color"]');
-      if (themeMeta) {
-        themeMeta.setAttribute("content", themeColor);
+      var applyBodyTheme = function () {
+        if (!document.body) {
+          return false;
+        }
+
+        document.body.style.colorScheme = resolved;
+        document.body.style.backgroundColor = themeColor;
+        return true;
+      };
+
+      if (!applyBodyTheme()) {
+        document.addEventListener("DOMContentLoaded", applyBodyTheme, { once: true });
       }
+
+      document.querySelectorAll('meta[name="theme-color"]').forEach(function (themeMeta) {
+        themeMeta.setAttribute("content", themeColor);
+      });
     })();
   `;
 
@@ -94,7 +110,7 @@ async function RootLayoutInner({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="antialiased">
+      <body className="antialiased" style={{ backgroundColor: getThemeSurfaceColor(initialThemePreference === "dark" ? "dark" : "light") }}>
         <LocaleProvider initialLanguagePreference={languagePreference} initialResolvedLocale={resolvedLocale}>
           {children}
           <GlobalHaptics />

@@ -139,7 +139,7 @@ function DashboardScreen() {
                       locale={resolvedLocale}
                       onPress={() => {
                         triggerSelectionHaptic();
-                        router.push(`/subjects/${course.id}`);
+                        router.navigate(`/subjects/${course.id}`);
                       }}
                       preferredColor={subjectPreferences.colors[course.id]}
                     />
@@ -161,7 +161,7 @@ function DashboardScreen() {
                         muted
                         onPress={() => {
                           triggerSelectionHaptic();
-                          router.push(`/subjects/${course.id}`);
+                          router.navigate(`/subjects/${course.id}`);
                         }}
                         preferredColor={subjectPreferences.colors[course.id]}
                       />
@@ -387,11 +387,11 @@ function getDashboardColors(theme: "light" | "dark") {
       badgeBlueText: "#bfdbfe",
       badgeRedText: "#fecaca",
       border: "rgba(255,255,255,0.12)",
-      card: "#020617",
+      card: "#000000",
       foreground: "#f8fafc",
       mutedBorder: "rgba(255,255,255,0.08)",
       mutedCard: "rgba(255,255,255,0.03)",
-      screen: "#020617",
+      screen: "#000000",
       softText: "rgba(226,232,240,0.72)",
       subtleText: "rgba(226,232,240,0.62)",
       todoAmberBackground: "rgba(120,53,15,0.24)",
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
   content: {
     gap: 16,
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 20,
   },
   emptyTodoText: {
     fontSize: 12,
