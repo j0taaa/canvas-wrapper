@@ -40,7 +40,9 @@ import {
   LoadingState,
   RequireCanvasConfig,
 } from "../../src/components/app-ui";
+import { SplitPaneScrollLayout } from "../../src/components/split-pane-scroll-layout";
 import { useRefreshControl } from "../../src/hooks/use-refresh-control";
+import { useTabletLayout } from "../../src/hooks/use-tablet-layout";
 import { RestorableScrollView } from "../../src/components/restorable-scroll-view";
 import { useAppShell } from "../../src/hooks/use-canvas-queries";
 import { syncDeviceIntegrations } from "../../src/lib/device-integration-sync";
@@ -94,6 +96,7 @@ function ProfileTabContent() {
     updateLanguagePreference,
   } = useAppPreferences();
   const deviceIntegrations = useDeviceIntegrations();
+  const { isTabletLandscape } = useTabletLayout();
 
   const colors = useMemo(
     () => ({
@@ -139,107 +142,257 @@ function ProfileTabContent() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen title={t(resolvedLocale, "common.profile")} scroll={false}>
-        <RestorableScrollView 
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 72 }]}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.mutedForeground}
+      <AppScreen contentStyle={styles.screenContent} title={t(resolvedLocale, "common.profile")} scroll={false}>
+        {isTabletLandscape && data ? (
+          <View style={[styles.container, styles.splitContainer, { paddingBottom: insets.bottom + 20 }]}>
+            <SplitPaneScrollLayout
+              enabled
+              leading={{
+                content: (
+                  <View style={[styles.accountCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.accountGlow,
+                        { backgroundColor: resolvedTheme === "dark" ? "rgba(251, 191, 36, 0.12)" : "rgba(251, 191, 36, 0.20)" },
+                      ]}
+                    />
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.accountGlowSecondary,
+                        { backgroundColor: resolvedTheme === "dark" ? "rgba(56, 189, 248, 0.12)" : "rgba(14, 165, 233, 0.14)" },
+                      ]}
+                    />
+                    <View style={styles.accountCardBody}>
+                      <View style={styles.accountTopRow}>
+                        <View style={[styles.accountBadge, { borderColor: colors.border, backgroundColor: colors.cardMuted }]}>
+                          <ShieldCheck size={14} color={colors.foreground} />
+                          <Text style={[styles.accountBadgeText, { color: colors.foreground }]}>
+                            {t(resolvedLocale, "common.account")}
+                          </Text>
+                        </View>
+
+                        <Pressable
+                          onPress={() => {
+                            triggerSelectionHaptic();
+                            router.push("/settings");
+                          }}
+                          style={[styles.accountActionButton, { borderColor: colors.border, backgroundColor: colors.cardMuted }]}
+                        >
+                          <Sparkles size={14} color={colors.foreground} />
+                          <Text style={[styles.accountActionText, { color: colors.foreground }]}>
+                            {t(resolvedLocale, "common.changeApiKey")}
+                          </Text>
+                        </Pressable>
+                      </View>
+
+                      <View style={styles.accountHero}>
+                        <View style={[styles.avatarHalo, { borderColor: colors.border, backgroundColor: colors.cardMuted }]}>
+                          <View style={[styles.avatar, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                            <Text style={[styles.avatarText, { color: colors.foreground }]}>
+                              {getInitials(data.profile.name)}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.avatarInfo}>
+                          <Text style={[styles.accountEyebrow, { color: colors.mutedForeground }]}>
+                            Canvas
+                          </Text>
+                          <Text style={[styles.avatarName, { color: colors.foreground }]} numberOfLines={1}>
+                            {data.profile.name}
+                          </Text>
+                          <View style={[styles.accountEmailPill, { borderColor: colors.border, backgroundColor: colors.cardMuted }]}>
+                            <Mail size={14} color={colors.mutedForeground} />
+                            <Text style={[styles.accountEmailText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                              {data.profile.primary_email ?? t(resolvedLocale, "common.noEmailAvailable")}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={styles.infoGrid}>
+                        <View style={[styles.infoCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                          <View style={styles.infoCardHeader}>
+                            <UserRound size={16} color={colors.mutedForeground} />
+                            <Text style={[styles.infoCardLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.name")}</Text>
+                          </View>
+                          <Text style={[styles.infoCardValue, { color: colors.foreground }]} numberOfLines={1}>
+                            {data.profile.name}
+                          </Text>
+                        </View>
+
+                        <View style={[styles.infoCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                          <View style={styles.infoCardHeader}>
+                            <Mail size={16} color={colors.mutedForeground} />
+                            <Text style={[styles.infoCardLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.email")}</Text>
+                          </View>
+                          <Text style={[styles.infoCardValue, { color: colors.foreground }]} numberOfLines={1}>
+                            {data.profile.primary_email ?? t(resolvedLocale, "common.noEmailAvailable")}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                ),
+                contentContainerStyle: styles.splitPaneContent,
+                scroll: false,
+                storageKey: "profile-summary-pane",
+              }}
+              leadingFlex={0.95}
+              leadingStyle={styles.primaryPane}
+              trailing={{
+                content: (
+                  <ProfilePreferences
+                    deviceIntegrations={deviceIntegrations}
+                    courses={orderedCourses}
+                    colors={colors}
+                    languagePreference={languagePreference}
+                    resolvedLocale={resolvedLocale}
+                    resolvedTheme={resolvedTheme}
+                    subjectPreferences={subjectPreferences}
+                    themePreference={themePreference}
+                    updateLanguagePreference={updateLanguagePreference}
+                  />
+                ),
+                contentContainerStyle: [styles.scrollContentTablet, styles.splitPaneContent],
+                refreshControl: (
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={colors.mutedForeground}
+                  />
+                ),
+                storageKey: "profile-preferences-pane",
+              }}
+              trailingFlex={1.05}
+              trailingStyle={styles.secondaryPane}
             />
-          }
-        >
-          <View style={styles.container}>
-            {showColdLoading ? <LoadingState label={t(resolvedLocale, "profile.loadingProfile")} /> : null}
-            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
-
-            {data ? (
-              <View style={styles.cardsContainer}>
-                {/* Account Card */}
-                <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  {/* CardHeader border-b border-border/70 */}
-                    <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t(resolvedLocale, "common.account")}</Text>
-                  </View>
-                  
-                  {/* CardContent pt-6 space-y-5 */}
-                  <View style={styles.cardContent}>
-                    {/* Avatar section - flex items-center gap-4 */}
-                    <View style={styles.avatarSection}>
-                      {/* Avatar h-16 w-16 border border-border/80 */}
-                      <View style={[styles.avatar, { borderColor: colors.border }]}>
-                        <Text style={[styles.avatarText, { color: colors.foreground }]}>
-                          {getInitials(data.profile.name)}
-                        </Text>
-                      </View>
-                      {/* min-w-0 */}
-                      <View style={styles.avatarInfo}>
-                        {/* truncate text-lg font-semibold */}
-                        <Text style={[styles.avatarName, { color: colors.foreground }]} numberOfLines={1}>
-                          {data.profile.name}
-                        </Text>
-                        {/* truncate text-sm text-muted-foreground */}
-                        <Text style={[styles.avatarEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
-                          {data.profile.primary_email}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* grid gap-3 */}
-                    <View style={styles.infoGrid}>
-                      {/* rounded-2xl border border-border/70 bg-muted/35 p-4 */}
-                      <View style={[styles.infoCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                        {/* mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground */}
-                        <View style={styles.infoCardHeader}>
-                          <UserRound size={16} color={colors.mutedForeground} />
-                          <Text style={[styles.infoCardLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.name")}</Text>
-                        </View>
-                        {/* text-sm text-foreground */}
-                        <Text style={[styles.infoCardValue, { color: colors.foreground }]} numberOfLines={1}>
-                          {data.profile.name}
-                        </Text>
-                      </View>
-
-                      <View style={[styles.infoCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                        <View style={styles.infoCardHeader}>
-                          <Mail size={16} color={colors.mutedForeground} />
-                          <Text style={[styles.infoCardLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.email")}</Text>
-                        </View>
-                        <Text style={[styles.infoCardValue, { color: colors.foreground }]} numberOfLines={1}>
-                          {data.profile.primary_email ?? t(resolvedLocale, "common.noEmailAvailable")}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* ProfileActions - text-sm text-black/50 */}
-                    <Pressable
-                      onPress={() => {
-                        triggerSelectionHaptic();
-                        router.push("/settings");
-                      }}
-                    >
-                      <Text style={[styles.changeKeyText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.changeApiKey")}</Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                <ProfilePreferences
-                  deviceIntegrations={deviceIntegrations}
-                  courses={orderedCourses}
-                  colors={colors}
-                  languagePreference={languagePreference}
-                  resolvedLocale={resolvedLocale}
-                  resolvedTheme={resolvedTheme}
-                  subjectPreferences={subjectPreferences}
-                  themePreference={themePreference}
-                  updateLanguagePreference={updateLanguagePreference}
-                />
-              </View>
-            ) : null}
           </View>
-        </RestorableScrollView>
+        ) : (
+          <RestorableScrollView 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: insets.bottom + 72 },
+            ]}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.mutedForeground}
+              />
+            }
+          >
+            <View style={styles.container}>
+              {showColdLoading ? <LoadingState label={t(resolvedLocale, "profile.loadingProfile")} /> : null}
+              {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+
+              {data ? (
+                <View style={styles.cardsContainer}>
+                  <View style={[styles.accountCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View
+                      pointerEvents="none"
+                      style={[
+                          styles.accountGlow,
+                          { backgroundColor: resolvedTheme === "dark" ? "rgba(251, 191, 36, 0.12)" : "rgba(251, 191, 36, 0.20)" },
+                        ]}
+                      />
+                      <View
+                        pointerEvents="none"
+                        style={[
+                          styles.accountGlowSecondary,
+                          { backgroundColor: resolvedTheme === "dark" ? "rgba(56, 189, 248, 0.12)" : "rgba(14, 165, 233, 0.14)" },
+                        ]}
+                      />
+                      <View style={styles.accountCardBody}>
+                        <View style={styles.accountTopRow}>
+                          <View style={[styles.accountBadge, { borderColor: colors.border, backgroundColor: colors.cardMuted }]}>
+                            <ShieldCheck size={14} color={colors.foreground} />
+                            <Text style={[styles.accountBadgeText, { color: colors.foreground }]}>
+                              {t(resolvedLocale, "common.account")}
+                            </Text>
+                          </View>
+
+                          <Pressable
+                            onPress={() => {
+                              triggerSelectionHaptic();
+                              router.push("/settings");
+                            }}
+                            style={[styles.accountActionButton, { borderColor: colors.border, backgroundColor: colors.cardMuted }]}
+                          >
+                            <Sparkles size={14} color={colors.foreground} />
+                            <Text style={[styles.accountActionText, { color: colors.foreground }]}>
+                              {t(resolvedLocale, "common.changeApiKey")}
+                            </Text>
+                          </Pressable>
+                        </View>
+
+                        <View style={styles.accountHero}>
+                          <View style={[styles.avatarHalo, { borderColor: colors.border, backgroundColor: colors.cardMuted }]}>
+                            <View style={[styles.avatar, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                              <Text style={[styles.avatarText, { color: colors.foreground }]}>
+                                {getInitials(data.profile.name)}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.avatarInfo}>
+                            <Text style={[styles.accountEyebrow, { color: colors.mutedForeground }]}>
+                              Canvas
+                            </Text>
+                            <Text style={[styles.avatarName, { color: colors.foreground }]} numberOfLines={1}>
+                              {data.profile.name}
+                            </Text>
+                            <View style={[styles.accountEmailPill, { borderColor: colors.border, backgroundColor: colors.cardMuted }]}>
+                              <Mail size={14} color={colors.mutedForeground} />
+                              <Text style={[styles.accountEmailText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                                {data.profile.primary_email ?? t(resolvedLocale, "common.noEmailAvailable")}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={styles.infoGrid}>
+                          <View style={[styles.infoCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                            <View style={styles.infoCardHeader}>
+                              <UserRound size={16} color={colors.mutedForeground} />
+                              <Text style={[styles.infoCardLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.name")}</Text>
+                            </View>
+                            <Text style={[styles.infoCardValue, { color: colors.foreground }]} numberOfLines={1}>
+                              {data.profile.name}
+                            </Text>
+                          </View>
+
+                          <View style={[styles.infoCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                            <View style={styles.infoCardHeader}>
+                              <Mail size={16} color={colors.mutedForeground} />
+                              <Text style={[styles.infoCardLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "common.email")}</Text>
+                            </View>
+                            <Text style={[styles.infoCardValue, { color: colors.foreground }]} numberOfLines={1}>
+                              {data.profile.primary_email ?? t(resolvedLocale, "common.noEmailAvailable")}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  <ProfilePreferences
+                    deviceIntegrations={deviceIntegrations}
+                    courses={orderedCourses}
+                    colors={colors}
+                    languagePreference={languagePreference}
+                    resolvedLocale={resolvedLocale}
+                    resolvedTheme={resolvedTheme}
+                    subjectPreferences={subjectPreferences}
+                    themePreference={themePreference}
+                    updateLanguagePreference={updateLanguagePreference}
+                  />
+                </View>
+              ) : null}
+            </View>
+          </RestorableScrollView>
+        )}
       </AppScreen>
     </RequireCanvasConfig>
   );
@@ -1147,15 +1300,89 @@ function SubjectPreferenceList({
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    flex: 1,
+    minHeight: 0,
+  },
   scrollContent: {
     flexGrow: 1,
+  },
+  scrollContentTablet: {
+    paddingBottom: 20,
   },
   container: {
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
+  splitContainer: {
+    flex: 1,
+  },
   cardsContainer: {
     gap: 24,
+  },
+  accountCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    overflow: "hidden",
+    position: "relative",
+  },
+  accountGlow: {
+    position: "absolute",
+    top: -48,
+    right: -24,
+    width: 150,
+    height: 150,
+    borderRadius: 999,
+    opacity: 0.95,
+  },
+  accountGlowSecondary: {
+    position: "absolute",
+    bottom: -64,
+    left: -18,
+    width: 170,
+    height: 170,
+    borderRadius: 999,
+    opacity: 0.85,
+  },
+  accountCardBody: {
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    gap: 18,
+  },
+  accountTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  accountBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  accountBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  accountActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  accountActionText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   card: {
     borderRadius: 12,
@@ -1181,6 +1408,20 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 12,
   },
+  accountHero: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  avatarHalo: {
+    width: 88,
+    height: 88,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 8,
+  },
   avatar: {
     width: 64,
     height: 64,
@@ -1197,6 +1438,13 @@ const styles = StyleSheet.create({
   avatarInfo: {
     flex: 1,
   },
+  accountEyebrow: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
   avatarName: {
     fontSize: 18,
     fontWeight: "600",
@@ -1205,12 +1453,25 @@ const styles = StyleSheet.create({
   avatarEmail: {
     fontSize: 14,
   },
+  accountEmailPill: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  accountEmailText: {
+    flex: 1,
+    fontSize: 13,
+  },
   infoGrid: {
     flexDirection: "column",
     gap: 12,
   },
   infoCard: {
-    flex: 1,
     borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 14,
@@ -1235,6 +1496,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textDecorationLine: "underline",
     textDecorationStyle: "solid",
+  },
+  secondaryPane: {
+    alignSelf: "stretch",
+  },
+  splitPaneContent: {
+    paddingBottom: 24,
   },
   preferencesContainer: {
     gap: 24,
@@ -1264,6 +1531,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+  },
+  primaryPane: {
+    alignSelf: "stretch",
   },
   optionButton: {
     flexDirection: "row",

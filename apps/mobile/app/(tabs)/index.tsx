@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,7 +23,9 @@ import {
   type CanvasDashboardData,
 } from "@canvas/shared";
 import { EmptyState, ErrorState, LoadingState, RequireCanvasConfig } from "../../src/components/app-ui";
+import { SplitPaneScrollLayout } from "../../src/components/split-pane-scroll-layout";
 import { useRefreshControl } from "../../src/hooks/use-refresh-control";
+import { useTabletLayout } from "../../src/hooks/use-tablet-layout";
 import { RestorableScrollView } from "../../src/components/restorable-scroll-view";
 import { useDashboard } from "../../src/hooks/use-canvas-queries";
 import { syncDeviceIntegrations } from "../../src/lib/device-integration-sync";
@@ -62,6 +64,7 @@ function DashboardScreen() {
   const showColdLoading = isLoading && !data && !error;
   const showBlockingError = !!error && !data;
   const showInlineRefresh = !!data && (isFetching || isLoading);
+  const { isTabletLandscape } = useTabletLayout();
 
   const visibleCourses = useMemo(
     () =>
@@ -88,220 +91,255 @@ function DashboardScreen() {
       ) ?? [],
     [data?.todo, subjectPreferences.hiddenCourseIds],
   );
-  const isCompactMobileSubjectGrid = subjectPreferences.compactMobileDashboardSubjects;
+  const isCompactMobileSubjectGrid = subjectPreferences.compactMobileDashboardSubjects || isTabletLandscape;
+  const shouldUseSplitLayout = isTabletLandscape && !!data;
 
-  return (
-    <View style={[styles.screen, { backgroundColor: colors.screen }]}>
-      <RestorableScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.subtleText}
-          />
-        }
-      >
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t(resolvedLocale, "dashboard.subjects")}</Text>
-            {data && data.pastCourses.length > 0 ? (
-              <Pressable
-                onPress={() => {
-                  triggerSelectionHaptic();
-                  setShowPastCourses((current) => !current);
-                }}
-                style={({ pressed }) => [pressed && styles.pressed]}
-              >
-                <Text style={[styles.sectionAction, { color: colors.subtleText }]}>
-                  {showPastCourses ? t(resolvedLocale, "dashboard.hideOldSubjects") : t(resolvedLocale, "dashboard.showOldSubjects")}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
+  const subjectsSection = (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t(resolvedLocale, "dashboard.subjects")}</Text>
+        {data && data.pastCourses.length > 0 ? (
+          <Pressable
+            onPress={() => {
+              triggerSelectionHaptic();
+              setShowPastCourses((current) => !current);
+            }}
+            style={({ pressed }) => [pressed && styles.pressed]}
+          >
+            <Text style={[styles.sectionAction, { color: colors.subtleText }]}>
+              {showPastCourses ? t(resolvedLocale, "dashboard.hideOldSubjects") : t(resolvedLocale, "dashboard.showOldSubjects")}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
 
-          {showColdLoading ? <LoadingState label={t(resolvedLocale, "dashboard.title")} /> : null}
-          {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+      {showColdLoading ? <LoadingState label={t(resolvedLocale, "dashboard.title")} /> : null}
+      {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
 
-          {data ? (
-            <View style={styles.subjectList}>
-              {visibleCourses.length === 0 ? (
-                <EmptyState label={t(resolvedLocale, "dashboard.noActiveSubjects")} />
-              ) : (
-                <View style={isCompactMobileSubjectGrid ? styles.subjectGrid : styles.subjectList}>
-                  {visibleCourses.map((course) => (
-                    <SubjectCard
-                      key={course.id}
-                      compact={isCompactMobileSubjectGrid}
-                      colors={colors}
-                      course={course}
-                      locale={resolvedLocale}
-                      onPress={() => {
-                        triggerSelectionHaptic();
-                        router.navigate(`/subjects/${course.id}`);
-                      }}
-                      preferredColor={subjectPreferences.colors[course.id]}
-                    />
-                  ))}
-                </View>
-              )}
+      {data ? (
+        <View style={styles.subjectList}>
+          {visibleCourses.length === 0 ? (
+            <EmptyState label={t(resolvedLocale, "dashboard.noActiveSubjects")} />
+          ) : (
+            <View style={isCompactMobileSubjectGrid ? styles.subjectGrid : styles.subjectList}>
+              {visibleCourses.map((course) => (
+                <SubjectCard
+                  key={course.id}
+                  compact={isCompactMobileSubjectGrid}
+                  colors={colors}
+                  course={course}
+                  locale={resolvedLocale}
+                  onPress={() => {
+                    triggerSelectionHaptic();
+                    router.navigate(`/subjects/${course.id}`);
+                  }}
+                  preferredColor={subjectPreferences.colors[course.id]}
+                />
+              ))}
+            </View>
+          )}
 
-              {showPastCourses && visiblePastCourses.length > 0 ? (
-                <View style={styles.pastSection}>
-                  <Text style={[styles.pastTitle, { color: colors.subtleText }]}>{t(resolvedLocale, "dashboard.oldSubjects")}</Text>
-                  <View style={isCompactMobileSubjectGrid ? styles.subjectGrid : styles.subjectList}>
-                    {visiblePastCourses.map((course) => (
-                      <SubjectCard
-                        key={course.id}
-                        compact={isCompactMobileSubjectGrid}
-                        colors={colors}
-                        course={course}
-                        locale={resolvedLocale}
-                        muted
-                        onPress={() => {
-                          triggerSelectionHaptic();
-                          router.navigate(`/subjects/${course.id}`);
-                        }}
-                        preferredColor={subjectPreferences.colors[course.id]}
-                      />
-                    ))}
-                  </View>
-                </View>
-              ) : null}
+          {showPastCourses && visiblePastCourses.length > 0 ? (
+            <View style={styles.pastSection}>
+              <Text style={[styles.pastTitle, { color: colors.subtleText }]}>{t(resolvedLocale, "dashboard.oldSubjects")}</Text>
+              <View style={isCompactMobileSubjectGrid ? styles.subjectGrid : styles.subjectList}>
+                {visiblePastCourses.map((course) => (
+                  <SubjectCard
+                    key={course.id}
+                    compact={isCompactMobileSubjectGrid}
+                    colors={colors}
+                    course={course}
+                    locale={resolvedLocale}
+                    muted
+                    onPress={() => {
+                      triggerSelectionHaptic();
+                      router.navigate(`/subjects/${course.id}`);
+                    }}
+                    preferredColor={subjectPreferences.colors[course.id]}
+                  />
+                ))}
+              </View>
             </View>
           ) : null}
         </View>
+      ) : null}
+    </View>
+  );
 
-        {data ? (
-          <View style={[styles.todoSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.todoHeader}>
-              <View style={styles.todoHeaderText}>
-                <Text style={[styles.todoTitle, { color: colors.foreground }]}>{t(resolvedLocale, "dashboard.todoTitle")}</Text>
-                <Text style={[styles.todoSubtitle, { color: colors.subtleText }]}>{t(resolvedLocale, "dashboard.upcomingActivities")}</Text>
-              </View>
-              <Text style={[styles.todoCount, { color: colors.subtleText }]}>{visibleTodo.length}</Text>
-            </View>
+  const todoSection = data ? (
+    <View style={[styles.todoSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.todoHeader}>
+        <View style={styles.todoHeaderText}>
+          <Text style={[styles.todoTitle, { color: colors.foreground }]}>{t(resolvedLocale, "dashboard.todoTitle")}</Text>
+          <Text style={[styles.todoSubtitle, { color: colors.subtleText }]}>{t(resolvedLocale, "dashboard.upcomingActivities")}</Text>
+        </View>
+        <Text style={[styles.todoCount, { color: colors.subtleText }]}>{visibleTodo.length}</Text>
+      </View>
 
-            {visibleTodo.length === 0 ? (
-              <Text style={[styles.emptyTodoText, { color: colors.subtleText }]}>
-                {t(resolvedLocale, "dashboard.noPendingActivities")}
-              </Text>
-            ) : (
-              <View style={styles.todoList}>
-                {visibleTodo.map((item, index) => {
-                  const activityAccent = getActivityAccent(resolvedLocale, item.assignment?.due_at, colors);
-                  const canOpen = Boolean(item.assignment?.course_id && item.assignment?.id);
-                  const courseColor = getSubjectColorPalette(
-                    item.context_name ?? t(resolvedLocale, "subjects.unknownCourse"),
-                    item.assignment?.course_id ? subjectPreferences.colors[item.assignment.course_id] : undefined,
-                  );
+      {visibleTodo.length === 0 ? (
+        <Text style={[styles.emptyTodoText, { color: colors.subtleText }]}>
+          {t(resolvedLocale, "dashboard.noPendingActivities")}
+        </Text>
+      ) : (
+        <View style={styles.todoList}>
+          {visibleTodo.map((item, index) => {
+            const activityAccent = getActivityAccent(resolvedLocale, item.assignment?.due_at, colors);
+            const canOpen = Boolean(item.assignment?.course_id && item.assignment?.id);
+            const courseColor = getSubjectColorPalette(
+              item.context_name ?? t(resolvedLocale, "subjects.unknownCourse"),
+              item.assignment?.course_id ? subjectPreferences.colors[item.assignment.course_id] : undefined,
+            );
 
-                  return (
-                    <Pressable
-                      key={`${item.type}-${item.assignment?.course_id ?? "none"}-${item.assignment?.id ?? index}`}
-                      disabled={!canOpen}
-                      onPress={() => {
-                        if (!item.assignment?.course_id || !item.assignment.id) {
-                          return;
-                        }
+            return (
+              <Pressable
+                key={`${item.type}-${item.assignment?.course_id ?? "none"}-${item.assignment?.id ?? index}`}
+                disabled={!canOpen}
+                onPress={() => {
+                  if (!item.assignment?.course_id || !item.assignment.id) {
+                    return;
+                  }
 
-                        triggerSelectionHaptic();
-                        router.push(`/subjects/${item.assignment.course_id}/assignments/${item.assignment.id}`);
-                      }}
-                      style={({ pressed }) => [
-                        styles.todoCard,
-                        isCompactMobileSubjectGrid && styles.todoCardCompact,
+                  triggerSelectionHaptic();
+                  router.push(`/subjects/${item.assignment.course_id}/assignments/${item.assignment.id}`);
+                }}
+                style={({ pressed }) => [
+                  styles.todoCard,
+                  isCompactMobileSubjectGrid && styles.todoCardCompact,
+                  {
+                    backgroundColor: activityAccent.backgroundColor,
+                    borderColor: activityAccent.borderColor,
+                  },
+                  pressed && canOpen && styles.pressed,
+                ]}
+              >
+                <View style={styles.todoCardTopRow}>
+                  <Text
+                    style={[
+                      styles.todoItemTitle,
+                      isCompactMobileSubjectGrid && styles.todoItemTitleCompact,
+                      { color: colors.foreground },
+                    ]}
+                  >
+                    {item.assignment?.name ?? t(resolvedLocale, "dashboard.untitledTask")}
+                  </Text>
+                  <View style={styles.todoBadgeRow}>
+                    {item.assignment?.completed ? (
+                      <View style={styles.todoDoneBadge}>
+                        <Text style={styles.todoDoneBadgeText}>{t(resolvedLocale, "calendar.done")}</Text>
+                      </View>
+                    ) : null}
+                    <View
+                      style={[
+                        styles.todoBadge,
+                        isCompactMobileSubjectGrid && styles.todoBadgeCompact,
                         {
-                          backgroundColor: activityAccent.backgroundColor,
-                          borderColor: activityAccent.borderColor,
+                          backgroundColor: colors.card,
+                          borderColor: activityAccent.badgeBorderColor,
                         },
-                        pressed && canOpen && styles.pressed,
                       ]}
                     >
-                      <View style={styles.todoCardTopRow}>
-                        <Text
-                          style={[
-                            styles.todoItemTitle,
-                            isCompactMobileSubjectGrid && styles.todoItemTitleCompact,
-                            { color: colors.foreground },
-                          ]}
-                        >
-                          {item.assignment?.name ?? t(resolvedLocale, "dashboard.untitledTask")}
-                        </Text>
-                        <View style={styles.todoBadgeRow}>
-                          {item.assignment?.completed ? (
-                            <View style={styles.todoDoneBadge}>
-                              <Text style={styles.todoDoneBadgeText}>{t(resolvedLocale, "calendar.done")}</Text>
-                            </View>
-                          ) : null}
-                          <View
-                            style={[
-                              styles.todoBadge,
-                              isCompactMobileSubjectGrid && styles.todoBadgeCompact,
-                              {
-                                backgroundColor: colors.card,
-                                borderColor: activityAccent.badgeBorderColor,
-                              },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.todoBadgeText,
-                                isCompactMobileSubjectGrid && styles.todoBadgeTextCompact,
-                                { color: activityAccent.badgeTextColor },
-                              ]}
-                            >
-                              {activityAccent.label}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-
-                      <View
+                      <Text
                         style={[
-                          styles.todoMetaRow,
-                          isCompactMobileSubjectGrid && styles.todoMetaRowCompact,
+                          styles.todoBadgeText,
+                          isCompactMobileSubjectGrid && styles.todoBadgeTextCompact,
+                          { color: activityAccent.badgeTextColor },
                         ]}
                       >
-                        <View
-                          style={[
-                            styles.todoSubjectRow,
-                            isCompactMobileSubjectGrid && styles.todoSubjectRowCompact,
-                          ]}
-                        >
-                          <View style={[styles.todoSubjectDot, { backgroundColor: courseColor.borderColor }]} />
-                          <Text
-                            style={[
-                              styles.todoMetaText,
-                              isCompactMobileSubjectGrid && styles.todoMetaTextCompact,
-                              { color: colors.subtleText },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {formatSubjectName(item.context_name ?? t(resolvedLocale, "subjects.unknownCourse"))}
-                          </Text>
-                        </View>
-                        {isCompactMobileSubjectGrid ? (
-                          <Text style={[styles.todoDueCompactText, { color: colors.subtleText }]}>
-                            {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, item.assignment?.due_at) })}
-                          </Text>
-                        ) : null}
-                      </View>
+                        {activityAccent.label}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
 
-                      {!isCompactMobileSubjectGrid ? (
-                        <Text style={[styles.todoDueText, { color: colors.subtleText }]}>
-                          {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, item.assignment?.due_at) })}
-                        </Text>
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-        ) : null}
-      </RestorableScrollView>
+                <View
+                  style={[
+                    styles.todoMetaRow,
+                    isCompactMobileSubjectGrid && styles.todoMetaRowCompact,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.todoSubjectRow,
+                      isCompactMobileSubjectGrid && styles.todoSubjectRowCompact,
+                    ]}
+                  >
+                    <View style={[styles.todoSubjectDot, { backgroundColor: courseColor.borderColor }]} />
+                    <Text
+                      style={[
+                        styles.todoMetaText,
+                        isCompactMobileSubjectGrid && styles.todoMetaTextCompact,
+                        { color: colors.subtleText },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {formatSubjectName(item.context_name ?? t(resolvedLocale, "subjects.unknownCourse"))}
+                    </Text>
+                  </View>
+                  {isCompactMobileSubjectGrid ? (
+                    <Text style={[styles.todoDueCompactText, { color: colors.subtleText }]}>
+                      {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, item.assignment?.due_at) })}
+                    </Text>
+                  ) : null}
+                </View>
+
+                {!isCompactMobileSubjectGrid ? (
+                  <Text style={[styles.todoDueText, { color: colors.subtleText }]}>
+                    {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, item.assignment?.due_at) })}
+                  </Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  ) : null;
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.screen }]}>
+      {shouldUseSplitLayout && todoSection ? (
+        <View style={[styles.content, styles.contentTablet, styles.splitContent]}>
+          <SplitPaneScrollLayout
+            enabled
+            leading={{
+              content: subjectsSection,
+              contentContainerStyle: styles.splitPaneContent,
+              refreshControl: (
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={colors.subtleText}
+                />
+              ),
+              storageKey: "dashboard-subjects-pane",
+            }}
+            leadingFlex={1.1}
+            leadingStyle={styles.primaryPane}
+            trailing={{
+              content: todoSection,
+              contentContainerStyle: styles.splitPaneContent,
+              storageKey: "dashboard-todo-pane",
+            }}
+            trailingFlex={0.9}
+            trailingStyle={styles.secondaryPane}
+          />
+        </View>
+      ) : (
+        <RestorableScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.subtleText}
+            />
+          }
+        >
+          {subjectsSection}
+          {todoSection}
+        </RestorableScrollView>
+      )}
     </View>
   );
 }
@@ -581,6 +619,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 20,
   },
+  contentTablet: {
+    paddingBottom: 24,
+  },
+  splitContent: {
+    flex: 1,
+  },
   emptyTodoText: {
     fontSize: 12,
     lineHeight: 18,
@@ -596,8 +640,18 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.84,
   },
+  primaryPane: {
+    alignSelf: "stretch",
+  },
   screen: {
     flex: 1,
+  },
+  secondaryPane: {
+    alignSelf: "stretch",
+  },
+  splitPaneContent: {
+    gap: 16,
+    paddingBottom: 24,
   },
   section: {
     gap: 12,

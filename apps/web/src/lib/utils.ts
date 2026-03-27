@@ -1,6 +1,9 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import {
+  formatDate as formatLocalizedDate,
+  getCanvasSessionLaunchTarget,
+  isCanvasHostedVideoUrl,
   formatDueDate as formatLocalizedDueDate,
   formatDueDateShort as formatLocalizedDueDateShort,
   getSubjectColorPalette,
@@ -22,6 +25,13 @@ export function formatDueDate(localeOrValue?: AppLocale | string, maybeValue?: s
   const value = isLocale(localeOrValue) ? maybeValue : localeOrValue
 
   return formatLocalizedDueDate(locale, value)
+}
+
+export function formatDate(localeOrValue?: AppLocale | string, maybeValue?: string) {
+  const locale = isLocale(localeOrValue) ? localeOrValue : "en"
+  const value = isLocale(localeOrValue) ? maybeValue : localeOrValue
+
+  return formatLocalizedDate(locale, value)
 }
 
 export function formatDueDateShort(localeOrValue?: AppLocale | string, maybeValue?: string) {
@@ -204,8 +214,48 @@ function getVisibleHtmlText(html: string) {
     .trim()
 }
 
-export function rewriteCanvasHtmlLinks(html: string, apiBase?: string, currentCourseId?: number) {
-  return html.replace(/<a\b([^>]*?)href=(["'])(.*?)\2([^>]*)>([\s\S]*?)<\/a>/gi, (match, beforeHref: string, quote: string, href: string, afterHref: string, innerHtml: string) => {
+function buildEmbeddedMediaFallbackHtml(targetHref: string) {
+  return `<div style="margin: 1rem 0; overflow: hidden; border: 1px solid rgba(15,23,42,0.1); border-radius: 22px; background: linear-gradient(180deg, rgba(248,250,252,0.98) 0%, rgba(241,245,249,0.96) 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);">
+  <div style="padding: 1rem 1rem 0.85rem 1rem; border-bottom: 1px solid rgba(15,23,42,0.08);">
+    <div style="display: inline-flex; align-items: center; border-radius: 999px; background: rgba(15,23,42,0.06); padding: 0.35rem 0.65rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">Canvas video</div>
+    <p style="margin: 0.85rem 0 0 0; font-size: 1rem; font-weight: 700; line-height: 1.4; color: rgb(15,23,42);">This video can&apos;t be played inside Janvas.</p>
+    <p style="margin: 0.45rem 0 0 0; font-size: 0.92rem; line-height: 1.55; color: rgba(15,23,42,0.72);">Open the original Canvas page to watch it in the official player.</p>
+  </div>
+  <div style="padding: 0.9rem 1rem 1rem 1rem;">
+    <a href="${targetHref}" target="_blank" rel="noreferrer" data-embed-fallback-link="true" style="display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid rgba(15,23,42,0.14); padding: 0.7rem 1rem; color: rgb(15,23,42); text-decoration: none; font-weight: 700; background: #ffffff;">Open in Canvas</a>
+  </div>
+</div>`
+}
+
+function rewriteCanvasHtmlEmbeddedMediaForWebWithFallback(html: string, apiBase?: string, embeddedMediaFallbackHref?: string) {
+  const rewriteMediaAttribute = () => (
+    match: string,
+    _quote: string,
+    rawUrl: string,
+  ) => {
+    const launchTarget = getCanvasSessionLaunchTarget(rawUrl, apiBase) ?? (isCanvasHostedVideoUrl(rawUrl, apiBase) ? rawUrl : null)
+
+    if (!launchTarget) {
+      return match
+    }
+
+    return buildEmbeddedMediaFallbackHtml(embeddedMediaFallbackHref ?? launchTarget)
+  }
+
+  return html
+    .replace(/<iframe\b[^>]*?src=(["'])(.*?)\1[^>]*?>[\s\S]*?<\/iframe>/gi, rewriteMediaAttribute())
+    .replace(/<embed\b[^>]*?src=(["'])(.*?)\1[^>]*?>/gi, rewriteMediaAttribute())
+    .replace(/<object\b[^>]*?data=(["'])(.*?)\1[^>]*?>[\s\S]*?<\/object>/gi, rewriteMediaAttribute())
+    .replace(/<video\b[^>]*?src=(["'])(.*?)\1[^>]*?>[\s\S]*?<\/video>/gi, rewriteMediaAttribute())
+    .replace(/<source\b[^>]*?src=(["'])(.*?)\1[^>]*?>/gi, rewriteMediaAttribute())
+}
+
+export function rewriteCanvasHtmlLinks(html: string, apiBase?: string, currentCourseId?: number, embeddedMediaFallbackHref?: string) {
+  return rewriteCanvasHtmlEmbeddedMediaForWebWithFallback(html, apiBase, embeddedMediaFallbackHref).replace(/<a\b([^>]*?)href=(["'])(.*?)\2([^>]*)>([\s\S]*?)<\/a>/gi, (match, beforeHref: string, quote: string, href: string, afterHref: string, innerHtml: string) => {
+    if (`${beforeHref}${afterHref}`.includes("data-embed-fallback-link=")) {
+      return match
+    }
+
     const trimmedHref = href.trim()
     const canvasOrigin = apiBase
       ? (() => {

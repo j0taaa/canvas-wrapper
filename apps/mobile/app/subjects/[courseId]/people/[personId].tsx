@@ -22,7 +22,7 @@ import { RestorableScrollView } from "../../../../src/components/restorable-scro
 import { SubjectLayoutHeader } from "../../../../src/components/subject-layout";
 import { UserAvatar } from "../../../../src/components/user-avatar";
 import { usePerson, useCourseShell } from "../../../../src/hooks/use-canvas-queries";
-import { formatDueDateShort } from "../../../../src/lib/format";
+import { formatDate } from "../../../../src/lib/format";
 import { goBackOrPush } from "../../../../src/lib/navigation";
 import { useAppPreferences } from "../../../../src/providers/app-preferences";
 import { useCanvasSession } from "../../../../src/providers/canvas-session";
@@ -150,6 +150,7 @@ export default function PersonDetailScreen() {
                       <UserAvatar
                         backgroundColor={palette.backgroundColor}
                         borderColor={palette.borderColor}
+                        expandable
                         fallback={getInitials(person.name)}
                         name={person.name}
                         size={64}
@@ -215,7 +216,7 @@ export default function PersonDetailScreen() {
                       <View style={[styles.infoItem, { borderColor: colors.border }]}>
                         <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>{t(resolvedLocale, "profile.canvasAccountCreated")}</Text>
                         <Text style={[styles.infoValue, { color: colors.foreground }]}>
-                          {formatDueDateShort(resolvedLocale, person.created_at)}
+                          {formatDate(resolvedLocale, person.created_at)}
                         </Text>
                       </View>
                     )}

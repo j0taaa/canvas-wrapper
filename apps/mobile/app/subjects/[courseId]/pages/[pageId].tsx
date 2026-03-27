@@ -157,14 +157,14 @@ export default function PageDetailScreen() {
                   </View>
                   <View style={styles.cardContent}>
                     {page.body ? (
-                      <RichText currentCourseId={courseId} html={page.body} providerUrl={config?.apiBase} />
+                      <RichText currentCourseId={courseId} fallbackCanvasUrl={page.html_url} html={page.body} providerUrl={config?.apiBase} />
                     ) : showInlineRefresh ? (
                       <>
                         <PlaceholderBlock height={84} />
                         <PlaceholderBlock height={144} />
                       </>
                     ) : (
-                      <RichText currentCourseId={courseId} html={`<p>${t(resolvedLocale, "subjects.noPageContent")}</p>`} providerUrl={config?.apiBase} />
+                      <RichText currentCourseId={courseId} fallbackCanvasUrl={page.html_url} html={`<p>${t(resolvedLocale, "subjects.noPageContent")}</p>`} providerUrl={config?.apiBase} />
                     )}
                   </View>
                 </View>

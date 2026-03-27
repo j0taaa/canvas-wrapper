@@ -36,7 +36,7 @@ const CALENDAR_EVENT_DURATION_MS = 30 * 60 * 1000;
 const LOOKAHEAD_DAYS = 180;
 const LOOKBACK_DAYS = 7;
 const NOTIFICATION_CHANNEL_ID = "activity-reminders";
-const MANAGED_EVENT_MARKER = "[canvas-wrapper-managed]";
+const MANAGED_EVENT_MARKER = "Janvas";
 const FETCH_CONCURRENCY = 4;
 
 let inFlightSync: Promise<DeviceIntegrationSyncResult> | null = null;

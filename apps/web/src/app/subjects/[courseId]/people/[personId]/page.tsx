@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCoursePerson, getSharedActiveCourses, getSubjectShellData } from "@/lib/canvas";
 import { getRequestLocale } from "@/lib/request-locale";
-import { formatDueDateShort, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
+import { formatDate, formatSubjectName, getSubjectColorStyle } from "@/lib/utils";
 
 const CANVAS_API_KEY_COOKIE = "canvasApiKey";
 
@@ -184,7 +184,7 @@ export default async function SubjectPersonPage({
               {person.created_at && (
                 <div className="rounded-xl border border-black/10 bg-white p-4 sm:col-span-2">
                   <p className="text-xs uppercase tracking-wide text-black/45">{t(resolvedLocale, "profile.canvasAccountCreated")}</p>
-                  <p className="mt-2 text-sm font-medium">{formatDueDateShort(resolvedLocale, person.created_at)}</p>
+                  <p className="mt-2 text-sm font-medium">{formatDate(resolvedLocale, person.created_at)}</p>
                 </div>
               )}
             </CardContent>

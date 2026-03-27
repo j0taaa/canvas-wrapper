@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { ArrowUpRight, Sparkles } from "lucide-react";
 import { t } from "@canvas/shared";
 import { useLocale } from "@/components/locale-provider";
 
@@ -27,9 +28,11 @@ export function ProfileActions() {
     <button
       type="button"
       onClick={clearKey}
-      className="text-sm text-black/50 transition hover:text-black/70"
+      className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/72 px-4 py-2 text-sm font-medium text-foreground transition hover:-translate-y-0.5 hover:border-black/15 hover:bg-white/84 dark:border-white/12 dark:bg-white/[0.06] dark:hover:border-white/18 dark:hover:bg-white/[0.1]"
     >
+      <Sparkles className="h-4 w-4" />
       {t(resolvedLocale, "common.changeApiKey")}
+      <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
     </button>
   );
 }

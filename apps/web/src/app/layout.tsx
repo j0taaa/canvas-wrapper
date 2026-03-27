@@ -110,7 +110,11 @@ async function RootLayoutInner({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="antialiased" style={{ backgroundColor: getThemeSurfaceColor(initialThemePreference === "dark" ? "dark" : "light") }}>
+      <body
+        className="antialiased"
+        suppressHydrationWarning
+        style={{ backgroundColor: getThemeSurfaceColor(initialThemePreference === "dark" ? "dark" : "light") }}
+      >
         <LocaleProvider initialLanguagePreference={languagePreference} initialResolvedLocale={resolvedLocale}>
           {children}
           <GlobalHaptics />

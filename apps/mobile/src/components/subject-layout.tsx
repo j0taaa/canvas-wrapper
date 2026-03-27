@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatSubjectName, getSubjectColorPalette, getSubjectRouteContext, t } from "@canvas/shared";
 import { PlaceholderBlock } from "./app-ui";
 import { useCourseShell } from "../hooks/use-canvas-queries";
+import { useTabletLayout } from "../hooks/use-tablet-layout";
 import { useAppPreferences } from "../providers/app-preferences";
 
 const SUBJECT_TABS = ["modules", "assignments", "grades", "people", "forums", "files"] as const;
@@ -33,6 +34,10 @@ function normalizeTab(value?: string): SubjectTab {
   return SUBJECT_TABS.includes(value as SubjectTab) ? (value as SubjectTab) : "modules";
 }
 
+function resolveResponsiveTab(tab: SubjectTab, isTabletLandscape: boolean) {
+  return isTabletLandscape && tab === "assignments" ? "modules" : tab;
+}
+
 function getSubjectIcon(courseName?: string | null) {
   const normalized = (courseName ?? "").toLowerCase();
 
@@ -48,20 +53,20 @@ function getSubjectIcon(courseName?: string | null) {
   return BookOpen;
 }
 
-function getActiveTab(pathname: string, routeTab?: string, peopleView?: string) {
+function getActiveTab(pathname: string, routeTab: string | undefined, peopleView: string | undefined, isTabletLandscape: boolean) {
   const routeContext = getSubjectRouteContext(routeTab, peopleView);
 
   if (routeContext?.tab && routeContext.tab !== "overview") {
-    return normalizeTab(routeContext.tab);
+    return resolveResponsiveTab(normalizeTab(routeContext.tab), isTabletLandscape);
   }
 
-  if (pathname.includes("/assignments/")) return "assignments" as const;
+  if (pathname.includes("/assignments/")) return resolveResponsiveTab("assignments", isTabletLandscape);
   if (pathname.includes("/files/")) return "files" as const;
   if (pathname.includes("/forums/")) return "forums" as const;
   if (pathname.includes("/grades/")) return "grades" as const;
   if (pathname.includes("/people/") || pathname.includes("/groups/")) return "people" as const;
   if (pathname.includes("/pages/") || pathname.includes("/quizzes/")) return "modules" as const;
-  return normalizeTab(routeTab);
+  return resolveResponsiveTab(normalizeTab(routeTab), isTabletLandscape);
 }
 
 export function SubjectLayoutHeader() {
@@ -71,9 +76,14 @@ export function SubjectLayoutHeader() {
   const insets = useSafeAreaInsets();
   const courseId = Number(params.courseId);
   const { resolvedLocale, resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
+  const { isTabletLandscape } = useTabletLayout();
   const { data: shellData } = useCourseShell(courseId);
   const course = shellData?.course;
-  const activeTab = getActiveTab(pathname, params.tab, params.peopleView);
+  const activeTab = getActiveTab(pathname, params.tab, params.peopleView, isTabletLandscape);
+  const visibleTabs = useMemo(
+    () => SUBJECT_TABS.filter((tab) => !(isTabletLandscape && tab === "assignments")),
+    [isTabletLandscape],
+  );
 
   const colors = useMemo<SubjectHeaderColors>(() => {
     const isDark = resolvedTheme === "dark";
@@ -122,7 +132,7 @@ export function SubjectLayoutHeader() {
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
               <View style={styles.tabsRow}>
-                {SUBJECT_TABS.map((tab) => (
+                {visibleTabs.map((tab) => (
                   <Pressable
                     key={tab}
                     onPress={() => {

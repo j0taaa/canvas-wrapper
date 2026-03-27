@@ -1,0 +1,21 @@
+<svg width="1024" height="500" viewBox="0 0 1024 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="512" y1="0" x2="512" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF8EF" />
+      <stop offset="0.55" stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#F7FBFF" />
+    </linearGradient>
+    <filter id="blur" x="0" y="0" width="1024" height="500" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="34" result="effect1_foregroundBlur_0_1" />
+    </filter>
+  </defs>
+
+  <rect width="1024" height="500" fill="url(#bg)" />
+
+  <g filter="url(#blur)">
+    <circle cx="170" cy="110" r="94" fill="#FCD34D" fill-opacity="0.34" />
+    <circle cx="865" cy="382" r="108" fill="#67E8F9" fill-opacity="0.24" />
+  </g>
+</svg>

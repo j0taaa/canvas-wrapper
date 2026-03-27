@@ -16,13 +16,37 @@ import {
 } from "react-native";
 import {
   APP_WELCOME_STORAGE_KEY,
+  getCanvasConnectGuideSections,
+  getCanvasConnectHighlights,
   normalizeCanvasProviderUrl,
   t,
 } from "@canvas/shared";
-import { BookOpen, CalendarDays, Inbox, Sparkles } from "lucide-react-native";
+import {
+  BookOpen,
+  CalendarDays,
+  Eye,
+  EyeOff,
+  Globe,
+  Inbox,
+  KeyRound,
+  Link2,
+  LockKeyhole,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react-native";
 import { useAppPreferences } from "../providers/app-preferences";
 import { useCanvasSession } from "../providers/canvas-session";
 import { RestorableScrollView } from "./restorable-scroll-view";
+
+const connectHighlightIcons = {
+  device: ShieldCheck,
+  direct: Globe,
+  quick: Sparkles,
+} as const;
+const connectGuideIcons = {
+  apiKey: KeyRound,
+  url: Link2,
+} as const;
 
 function useAppColors() {
   const { resolvedTheme } = useAppPreferences();
@@ -616,85 +640,77 @@ export function CanvasConfigForm({
   const [apiKey, setApiKey] = useState(() => config?.apiKey ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showApiKey, setShowApiKey] = useState(false);
   const normalizedApiBase = useMemo(() => normalizeCanvasProviderUrl(apiBase), [apiBase]);
   const isConnectMode = mode === "connect";
   const connectButtonLabel = saving ? t(resolvedLocale, "connect.connecting") : t(resolvedLocale, "connect.saveAndConnect");
   const settingsButtonLabel = saving ? t(resolvedLocale, "connect.savingConfig") : t(resolvedLocale, "connect.saveConfig");
-  const apiKeySteps = [
-    t(resolvedLocale, "connect.keyStep1"),
-    t(resolvedLocale, "connect.keyStep2"),
-    t(resolvedLocale, "connect.keyStep3"),
-    t(resolvedLocale, "connect.keyStep4"),
-    t(resolvedLocale, "connect.keyStep5"),
-  ];
-  const urlSteps = [
-    t(resolvedLocale, "connect.urlStep1"),
-    t(resolvedLocale, "connect.urlStep2"),
-    t(resolvedLocale, "connect.urlStep3"),
-    t(resolvedLocale, "connect.urlStep4"),
-  ];
-
-  return (
-    <SectionCard
-      title={isConnectMode ? t(resolvedLocale, "connect.accountTitle") : t(resolvedLocale, "connect.credentialsTitle")}
-      subtitle={isConnectMode ? t(resolvedLocale, "connect.accountSubtitle") : undefined}
-    >
+  const connectHighlights = getCanvasConnectHighlights(resolvedLocale);
+  const connectGuideSections = getCanvasConnectGuideSections(resolvedLocale);
+  const formContent = (
+    <>
       {isConnectMode ? (
-        <View style={[styles.instructionsCard, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}>
-          <View style={styles.instructionsSection}>
-            <Text style={[styles.instructionsTitle, { color: colors.foreground }]}>{t(resolvedLocale, "connect.howToGetKeyTitle")}</Text>
-            {apiKeySteps.map((step) => (
-              <Text key={step} style={[styles.instructionsStep, { color: colors.helper }]}>
-                {step}
-              </Text>
-            ))}
-          </View>
-
-          <View style={styles.instructionsSection}>
-            <Text style={[styles.instructionsTitle, { color: colors.foreground }]}>{t(resolvedLocale, "connect.whatUrlTitle")}</Text>
-            {urlSteps.map((step) => (
-              <Text key={step} style={[styles.instructionsStep, { color: colors.helper }]}>
-                {step}
-              </Text>
-            ))}
-          </View>
-
-          <Pressable
-            onPress={() => {
-              void Linking.openURL("https://developerdocs.instructure.com/services/canvas/oauth2/file.oauth");
-            }}
-            style={({ pressed }) => [styles.instructionsLinkButton, pressed && styles.rowPressed]}
-          >
-            <Text style={[styles.instructionsLink, { color: colors.foreground }]}>{t(resolvedLocale, "connect.docsLink")}</Text>
-          </Pressable>
+        <View style={[styles.connectFormEyebrow, { backgroundColor: colors.backgroundMuted, borderColor: colors.border }]}>
+          <LockKeyhole color={colors.foreground} size={14} />
+          <Text style={[styles.connectFormEyebrowText, { color: colors.foreground }]}>
+            {t(resolvedLocale, "connect.credentialsTitle")}
+          </Text>
         </View>
       ) : null}
 
-      <Text style={[styles.fieldLabel, { color: colors.foreground }]}>{t(resolvedLocale, "connect.urlLabel")}</Text>
-      <TextInput
-        autoCapitalize="none"
-        autoCorrect={false}
-        onChangeText={setApiBase}
-        placeholder={t(resolvedLocale, "connect.urlPlaceholder")}
-        placeholderTextColor={colors.helper}
-        style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
-        value={apiBase}
-      />
+      <View style={styles.connectFieldGroup}>
+        <Text style={[styles.fieldLabel, { color: colors.foreground }]}>{t(resolvedLocale, "connect.urlLabel")}</Text>
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={setApiBase}
+          placeholder={t(resolvedLocale, "connect.urlPlaceholder")}
+          placeholderTextColor={colors.helper}
+          style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
+          value={apiBase}
+        />
+        <View style={[styles.connectEndpointCard, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}>
+          <Text style={[styles.connectEndpointLabel, { color: colors.helper }]}>
+            {t(resolvedLocale, "connect.apiEndpointLabel")}
+          </Text>
+          <Text style={[styles.connectEndpointValue, { color: colors.foreground }]}>{normalizedApiBase}</Text>
+        </View>
+      </View>
 
-      <Text style={[styles.fieldLabel, { color: colors.foreground }]}>{t(resolvedLocale, "connect.apiKeyLabel")}</Text>
-      <TextInput
-        autoCapitalize="none"
-        autoCorrect={false}
-        onChangeText={setApiKey}
-        placeholder={t(resolvedLocale, "connect.apiKeyPlaceholder")}
-        placeholderTextColor={colors.helper}
-        secureTextEntry
-        style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
-        value={apiKey}
-      />
+      <View style={styles.connectFieldGroup}>
+        <Text style={[styles.fieldLabel, { color: colors.foreground }]}>{t(resolvedLocale, "connect.apiKeyLabel")}</Text>
+        <View style={[styles.inputRow, { backgroundColor: colors.input, borderColor: colors.border }]}>
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            onChangeText={setApiKey}
+            placeholder={t(resolvedLocale, "connect.apiKeyPlaceholder")}
+            placeholderTextColor={colors.helper}
+            secureTextEntry={!showApiKey}
+            style={[styles.inputField, { color: colors.foreground }]}
+            value={apiKey}
+          />
+          <Pressable
+            onPress={() => setShowApiKey((current) => !current)}
+            style={({ pressed }) => [
+              styles.inputToggle,
+              { backgroundColor: colors.cardMuted, borderColor: colors.border },
+              pressed && styles.rowPressed,
+            ]}
+          >
+            {showApiKey ? <EyeOff color={colors.foreground} size={14} /> : <Eye color={colors.foreground} size={14} />}
+            <Text style={[styles.inputToggleText, { color: colors.foreground }]}>
+              {showApiKey ? t(resolvedLocale, "common.hide") : t(resolvedLocale, "common.show")}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
 
-      <Text style={[styles.helperText, { color: colors.helper }]}>{normalizedApiBase}</Text>
-      {error ? <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text> : null}
+      {error ? (
+        <View style={[styles.connectErrorCard, { backgroundColor: colors.cardMuted, borderColor: colors.error }]}>
+          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+        </View>
+      ) : null}
 
       <PrimaryButton
         disabled={saving || apiKey.trim().length === 0}
@@ -714,18 +730,142 @@ export function CanvasConfigForm({
       />
 
       {showClear ? <SecondaryButton label={t(resolvedLocale, "connect.clearCredentials")} onPress={() => void clearConfig()} /> : null}
+    </>
+  );
 
-      <Pressable
-        onPress={() => {
-          router.push("/privacy");
-        }}
-        style={({ pressed }) => [styles.instructionsLinkButton, pressed && styles.rowPressed]}
+  if (!isConnectMode) {
+    return (
+      <SectionCard title={t(resolvedLocale, "connect.credentialsTitle")}>
+        {formContent}
+
+        <Pressable
+          onPress={() => {
+            router.push("/privacy");
+          }}
+          style={({ pressed }) => [styles.instructionsLinkButton, pressed && styles.rowPressed]}
+        >
+          <Text style={[styles.instructionsLink, { color: colors.foreground }]}>
+            {t(resolvedLocale, "common.privacyPolicy")}
+          </Text>
+        </Pressable>
+      </SectionCard>
+    );
+  }
+
+  return (
+    <View style={styles.connectFlow}>
+      <View style={[styles.connectHero, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.connectHeroGlow, styles.connectHeroGlowPrimary]} />
+        <View style={[styles.connectHeroGlow, styles.connectHeroGlowSecondary]} />
+
+        <View style={styles.connectHeroContent}>
+          <View style={[styles.connectHeroPill, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}>
+            <ShieldCheck color={colors.foreground} size={14} />
+            <Text style={[styles.connectHeroPillText, { color: colors.foreground }]}>
+              {t(resolvedLocale, "connect.setupEyebrow")}
+            </Text>
+          </View>
+
+          <Text style={[styles.connectHeroTitle, { color: colors.foreground }]}>
+            {t(resolvedLocale, "connect.accountTitle")}
+          </Text>
+          <Text style={[styles.connectHeroSubtitle, { color: colors.subtitle }]}>
+            {t(resolvedLocale, "connect.accountSubtitle")}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.connectHighlights}>
+        {connectHighlights.map((highlight) => {
+          const Icon = connectHighlightIcons[highlight.id];
+          const accent = highlight.id === "device"
+            ? { backgroundColor: "rgba(251,191,36,0.16)", color: colors.foreground }
+            : highlight.id === "direct"
+              ? { backgroundColor: "rgba(45,212,191,0.14)", color: colors.foreground }
+              : { backgroundColor: "rgba(52,211,153,0.14)", color: colors.foreground };
+
+          return (
+            <View
+              key={highlight.id}
+              style={[styles.connectHighlightCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
+              <View style={[styles.connectHighlightIcon, { backgroundColor: accent.backgroundColor }]}>
+                <Icon color={accent.color} size={16} />
+              </View>
+              <Text style={[styles.connectHighlightTitle, { color: colors.foreground }]}>{highlight.title}</Text>
+              <Text style={[styles.connectHighlightDescription, { color: colors.subtitle }]}>
+                {highlight.description}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      <SectionCard
+        title={t(resolvedLocale, "connect.saveAndConnect")}
+        subtitle={t(resolvedLocale, "connect.accountSubtitle")}
       >
-        <Text style={[styles.instructionsLink, { color: colors.foreground }]}>
-          {t(resolvedLocale, "common.privacyPolicy")}
-        </Text>
-      </Pressable>
-    </SectionCard>
+        {formContent}
+      </SectionCard>
+
+      <View style={styles.connectGuideSections}>
+        {connectGuideSections.map((section) => {
+          const Icon = connectGuideIcons[section.id];
+
+          return (
+            <View
+              key={section.id}
+              style={[styles.connectGuideCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
+              <View style={styles.connectGuideHeader}>
+                <View style={[styles.connectGuideIcon, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}>
+                  <Icon color={colors.foreground} size={16} />
+                </View>
+                <Text style={[styles.connectGuideTitle, { color: colors.foreground }]}>{section.title}</Text>
+              </View>
+
+              <View style={styles.connectGuideList}>
+                {section.steps.map((step) => (
+                  <Text key={step} style={[styles.connectGuideStep, { color: colors.helper }]}>
+                    {step}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={styles.connectLinksRow}>
+        <Pressable
+          onPress={() => {
+            void Linking.openURL("https://developerdocs.instructure.com/services/canvas/oauth2/file.oauth");
+          }}
+          style={({ pressed }) => [
+            styles.connectLinkButton,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            pressed && styles.rowPressed,
+          ]}
+        >
+          <Text style={[styles.connectLinkText, { color: colors.foreground }]}>{t(resolvedLocale, "connect.docsLink")}</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => {
+            router.push("/privacy");
+          }}
+          style={({ pressed }) => [
+            styles.connectLinkButton,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            pressed && styles.rowPressed,
+          ]}
+        >
+          <Text style={[styles.connectLinkText, { color: colors.foreground }]}>
+            {t(resolvedLocale, "common.privacyPolicy")}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -769,6 +909,180 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     paddingBottom: 12,
+  },
+  connectEndpointCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  connectEndpointLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  connectEndpointValue: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  connectErrorCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  connectFieldGroup: {
+    gap: 8,
+  },
+  connectFlow: {
+    gap: 16,
+  },
+  connectFormEyebrow: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  connectFormEyebrowText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+  },
+  connectGuideCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 14,
+    padding: 16,
+  },
+  connectGuideHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  connectGuideIcon: {
+    alignItems: "center",
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  connectGuideList: {
+    gap: 7,
+  },
+  connectGuideSections: {
+    gap: 12,
+  },
+  connectGuideStep: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  connectGuideTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  connectHero: {
+    borderRadius: 30,
+    borderWidth: 1,
+    overflow: "hidden",
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    position: "relative",
+  },
+  connectHeroContent: {
+    gap: 12,
+    position: "relative",
+  },
+  connectHeroGlow: {
+    borderRadius: 999,
+    position: "absolute",
+  },
+  connectHeroGlowPrimary: {
+    backgroundColor: "rgba(251,191,36,0.18)",
+    height: 168,
+    left: -32,
+    top: -38,
+    width: 168,
+  },
+  connectHeroGlowSecondary: {
+    backgroundColor: "rgba(45,212,191,0.14)",
+    height: 136,
+    right: -18,
+    top: 24,
+    width: 136,
+  },
+  connectHeroPill: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  connectHeroPillText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  connectHeroSubtitle: {
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  connectHeroTitle: {
+    fontSize: 30,
+    fontWeight: "800",
+    letterSpacing: -1,
+    lineHeight: 34,
+  },
+  connectHighlightCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 8,
+    padding: 16,
+  },
+  connectHighlightDescription: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  connectHighlightIcon: {
+    alignItems: "center",
+    borderRadius: 16,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  connectHighlightTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  connectHighlights: {
+    gap: 12,
+  },
+  connectLinkButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  connectLinkText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  connectLinksRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
   },
   errorText: {
     color: "#b91c1c",
@@ -837,6 +1151,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  inputField: {
+    flex: 1,
+    fontSize: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  inputRow: {
+    alignItems: "center",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    overflow: "hidden",
+    paddingRight: 10,
+  },
+  inputToggle: {
+    alignItems: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  inputToggleText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
   placeholderBlock: {
     borderRadius: 18,

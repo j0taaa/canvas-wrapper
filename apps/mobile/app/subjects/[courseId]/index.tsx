@@ -23,7 +23,10 @@ import {
   RequireCanvasConfig,
   SectionCard,
 } from "../../../src/components/app-ui";
+import { SplitPaneScrollLayout } from "../../../src/components/split-pane-scroll-layout";
+import { TwoPaneLayout } from "../../../src/components/two-pane-layout";
 import { useRefreshControl } from "../../../src/hooks/use-refresh-control";
+import { useTabletLayout } from "../../../src/hooks/use-tablet-layout";
 import { RestorableScrollView } from "../../../src/components/restorable-scroll-view";
 import { SubjectLayoutHeader } from "../../../src/components/subject-layout";
 import { UserAvatar } from "../../../src/components/user-avatar";
@@ -38,6 +41,10 @@ type PeopleSubtab = "people" | "groups";
 
 function normalizeTab(value?: string): SubjectTab {
   return SUBJECT_TABS.includes(value as SubjectTab) ? (value as SubjectTab) : "modules";
+}
+
+function resolveResponsiveTab(tab: SubjectTab, isTabletLandscape: boolean) {
+  return isTabletLandscape && tab === "assignments" ? "modules" : tab;
 }
 
 function normalizePeopleSubtab(value?: string): PeopleSubtab {
@@ -106,13 +113,14 @@ export default function SubjectScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ courseId: string; peopleView?: string; tab?: string }>();
   const courseId = Number(params.courseId);
-  const activeTab = normalizeTab(params.tab);
-  const activePeopleView = normalizePeopleSubtab(params.peopleView);
   const { resolvedLocale, resolvedTheme, subjectPreferences } = useAppPreferences();
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupStatus, setGroupStatus] = useState<string | null>(null);
+  const { isTabletLandscape } = useTabletLayout();
+  const activeTab = resolveResponsiveTab(normalizeTab(params.tab), isTabletLandscape);
+  const activePeopleView = normalizePeopleSubtab(params.peopleView);
 
   const colors = useMemo(() => {
     const isDark = resolvedTheme === "dark";
@@ -148,6 +156,8 @@ export default function SubjectScreen() {
   const showColdLoading = isLoading && !course && !data && !error;
   const showBlockingError = !!error && !course && !data;
   const showInlineRefresh = !!course && !!data && (isFetching || isLoading);
+  const shouldUseSplitScrollLayout =
+    isTabletLandscape && !!course && !!data && (activeTab === "modules" || activeTab === "assignments" || activeTab === "grades");
   const activeContext = useMemo<SubjectRouteContext>(() => {
     if (activeTab === "people") {
       return activePeopleView === "groups"
@@ -161,232 +171,779 @@ export default function SubjectScreen() {
   return (
     <RequireCanvasConfig>
       <AppScreen contentStyle={styles.screenContent} scroll={false}>
-        <RestorableScrollView 
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.mutedForeground}
-            />
-          }
-        >
-          <SubjectLayoutHeader />
-          {showColdLoading ? <LoadingState label={t(resolvedLocale, "subjects.loadingSubject")} /> : null}
-          {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
-          
-          {course && data ? (
-            <View style={styles.container}>
-              {/* Modules/Assignments Tab */}
-              {(activeTab === "modules" || activeTab === "assignments") && (
-                <View style={styles.twoColumnGrid}>
-                  {/* Modules Section */}
-                  {(activeTab !== "assignments") && (
-                    <View style={styles.sectionStack}>
-                      {data.content.modules.length === 0 ? (
-                        <EmptyState label={t(resolvedLocale, "subjects.noModules")} />
-                      ) : (
-                        data.content.modules.map((module) => (
-                          <View key={module.id} style={[styles.moduleCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                            <View style={styles.moduleHeader}>
-                              <View style={styles.moduleTitleSection}>
-                                <Text style={[styles.moduleName, { color: colors.foreground }]} numberOfLines={1}>
-                                  {module.name}
-                                </Text>
-                                <Text style={[styles.moduleSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.courseMaterials")}</Text>
-                              </View>
-                              <View style={[styles.itemCountBadge, { borderColor: colors.badgeBorder }]}>
-                                <Text style={[styles.itemCountText, { color: colors.mutedForeground }]}>
-                                  {t(resolvedLocale, "subjects.itemsCount", { count: module.items_count ?? module.items?.length ?? 0 })}
-                                </Text>
-                              </View>
+        {shouldUseSplitScrollLayout ? (
+          <View style={styles.splitScreenShell}>
+            <SubjectLayoutHeader />
+            {showColdLoading ? <LoadingState label={t(resolvedLocale, "subjects.loadingSubject")} /> : null}
+
+            {course && data ? (
+              <View style={[styles.container, styles.splitScreenBody]}>
+                {/* Modules/Assignments Tab */}
+                {(activeTab === "modules" || activeTab === "assignments") && (
+                  isTabletLandscape ? (
+                    <SplitPaneScrollLayout
+                      enabled
+                      leading={{
+                        content: (
+                          <View style={[styles.sectionStack, styles.paneCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                            <View style={[styles.paneHeader, { borderBottomColor: colors.border }]}>
+                              <Text style={[styles.paneTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.modules")}</Text>
+                              <Text style={[styles.paneSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.lessonsAndMaterials")}</Text>
                             </View>
-                            <View style={styles.moduleItems}>
-                              {module.items?.slice(0, 12).map((item) => {
-                                const itemHref = getModuleHref(courseId, item, activeContext);
-                                const isSubHeader = item.type === "SubHeader";
-                                
-                                if (isSubHeader) {
-                                  return (
-                                    <View
-                                      key={item.id}
-                                      style={[styles.subHeaderItem, { borderColor: colors.border, backgroundColor: colors.muted }]}
-                                    >
-                                      <View style={styles.subHeaderContent}>
-                                        <View style={[styles.itemDot, { backgroundColor: palette.borderColor }]} />
-                                        <Text style={[styles.subHeaderTitle, { color: colors.foreground }]} numberOfLines={1}>
-                                          {item.title ?? t(resolvedLocale, "subjects.section")}
+                            <View style={styles.paneContent}>
+                              {data.content.modules.length === 0 ? (
+                                <EmptyState label={t(resolvedLocale, "subjects.noModules")} />
+                              ) : (
+                                data.content.modules.map((module) => (
+                                  <View key={module.id} style={[styles.moduleCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                                    <View style={styles.moduleHeader}>
+                                      <View style={styles.moduleTitleSection}>
+                                        <Text style={[styles.moduleName, { color: colors.foreground }]} numberOfLines={1}>
+                                          {module.name}
+                                        </Text>
+                                        <Text style={[styles.moduleSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.courseMaterials")}</Text>
+                                      </View>
+                                      <View style={[styles.itemCountBadge, { borderColor: colors.badgeBorder }]}>
+                                        <Text style={[styles.itemCountText, { color: colors.mutedForeground }]}>
+                                          {t(resolvedLocale, "subjects.itemsCount", { count: module.items_count ?? module.items?.length ?? 0 })}
                                         </Text>
                                       </View>
                                     </View>
+                                    <View style={styles.moduleItems}>
+                                      {module.items?.slice(0, 12).map((item) => {
+                                        const itemHref = getModuleHref(courseId, item, activeContext);
+                                        const isSubHeader = item.type === "SubHeader";
+
+                                        if (isSubHeader) {
+                                          return (
+                                            <View
+                                              key={item.id}
+                                              style={[styles.subHeaderItem, { borderColor: colors.border, backgroundColor: colors.muted }]}
+                                            >
+                                              <View style={styles.subHeaderContent}>
+                                                <View style={[styles.itemDot, { backgroundColor: palette.borderColor }]} />
+                                                <Text style={[styles.subHeaderTitle, { color: colors.foreground }]} numberOfLines={1}>
+                                                  {item.title ?? t(resolvedLocale, "subjects.section")}
+                                                </Text>
+                                              </View>
+                                            </View>
+                                          );
+                                        }
+
+                                        return (
+                                          <Pressable
+                                            key={item.id}
+                                            onPress={() => itemHref && void openAppHref(router, itemHref)}
+                                            disabled={!itemHref}
+                                            style={({ pressed }) => [
+                                              styles.moduleItem,
+                                              { borderColor: colors.border, backgroundColor: pressed ? colors.muted : colors.card },
+                                            ]}
+                                          >
+                                            <View style={styles.moduleItemContent}>
+                                              <View style={[styles.itemDot, { backgroundColor: palette.borderColor }]} />
+                                              <View style={styles.itemTextSection}>
+                                                <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>
+                                                  {item.title ?? t(resolvedLocale, "subjects.untitledItem")}
+                                                </Text>
+                                                <Text style={[styles.itemType, { color: colors.mutedForeground }]}>
+                                                  {item.type ?? t(resolvedLocale, "subjects.content")}
+                                                </Text>
+                                              </View>
+                                            </View>
+                                            {item.completion_requirement?.completed && (
+                                              <View style={[styles.doneBadge, { borderColor: colors.successText + "40", backgroundColor: colors.successBg }]}>
+                                                <Text style={[styles.doneBadgeText, { color: colors.successText }]}>{t(resolvedLocale, "calendar.done")}</Text>
+                                              </View>
+                                            )}
+                                          </Pressable>
+                                        );
+                                      })}
+                                    </View>
+                                  </View>
+                                ))
+                              )}
+                            </View>
+                          </View>
+                        ),
+                        contentContainerStyle: styles.splitPaneContent,
+                        refreshControl: (
+                          <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={colors.mutedForeground}
+                          />
+                        ),
+                        storageKey: "subject-modules-pane",
+                      }}
+                      leadingFlex={1.1}
+                      leadingStyle={styles.primaryPane}
+                      trailing={{
+                        content: (
+                          <View style={[styles.sectionStack, styles.paneCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                            <View style={[styles.paneHeader, { borderBottomColor: colors.border }]}>
+                              <Text style={[styles.paneTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.assignments")}</Text>
+                              <Text style={[styles.paneSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.upcomingAndRecentWork")}</Text>
+                            </View>
+                            <View style={styles.paneContent}>
+                              {data.content.assignments.length === 0 ? (
+                                <EmptyState label={t(resolvedLocale, "subjects.noAssignments")} />
+                              ) : (
+                                data.content.assignments.map((assignment) => {
+                                  const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
+
+                                  return (
+                                    <Pressable
+                                      key={assignment.id}
+                                      onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/assignments/${assignment.id}`, activeContext))}
+                                      style={[styles.assignmentCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
+                                    >
+                                      <View style={styles.assignmentContent}>
+                                        <View style={styles.assignmentHeader}>
+                                          <View style={styles.assignmentTitleSection}>
+                                            <CircleDot size={16} color={colors.mutedForeground} />
+                                            <Text style={[styles.assignmentName, { color: isCompleted ? colors.mutedForeground : colors.foreground }, isCompleted && styles.completedText]} numberOfLines={1}>
+                                              {assignment.name}
+                                            </Text>
+                                          </View>
+                                          {isCompleted && (
+                                            <View style={[styles.doneBadge, { borderColor: colors.successText + "40", backgroundColor: colors.successBg }]}>
+                                              <Text style={[styles.doneBadgeText, { color: colors.successText }]}>{t(resolvedLocale, "calendar.done")}</Text>
+                                            </View>
+                                          )}
+                                        </View>
+                                        <Text style={[styles.assignmentDue, { color: colors.mutedForeground }]}>
+                                          {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
+                                        </Text>
+                                        <Text style={[styles.assignmentPoints, { color: colors.mutedForeground }]}>
+                                          {assignment.points_possible != null ? t(resolvedLocale, "subjects.points", { count: assignment.points_possible }) : t(resolvedLocale, "subjects.noPointsListed")}
+                                        </Text>
+                                      </View>
+                                    </Pressable>
                                   );
-                                }
+                                })
+                              )}
+                            </View>
+                          </View>
+                        ),
+                        contentContainerStyle: styles.splitPaneContent,
+                        storageKey: "subject-assignments-pane",
+                      }}
+                      trailingFlex={0.9}
+                      trailingStyle={styles.secondaryPane}
+                    />
+                  ) : null
+                )}
+
+                {/* Grades Tab */}
+                {activeTab === "grades" && data && (
+                  <View style={styles.gradesContainer}>
+                    <SplitPaneScrollLayout
+                      enabled
+                      leading={{
+                        content: (
+                          <View style={styles.gradesGrid}>
+                            <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                              <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.gradePercent")}</Text>
+                              <Text style={[styles.metricValue, { color: colors.foreground }]}>
+                                {gradePercentage != null ? `${formatMetricNumber(gradePercentage)}%` : "--"}
+                              </Text>
+                              <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.overallPercentage")}</Text>
+                            </View>
+                            <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                              <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.absolute")}</Text>
+                              <Text style={[styles.metricValue, { color: colors.foreground }]}>
+                                {formatMetricNumber(absolutePoints)}
+                              </Text>
+                              <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.totalPointsEarned")}</Text>
+                            </View>
+                            <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                              <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.trend")}</Text>
+                              <View style={styles.trendChart}>
+                                {gradeTrendPoints.length > 1 ? (
+                                  <View style={styles.chartContainer}>
+                                    <View style={styles.chartLine} />
+                                    <View style={styles.chartLineMiddle} />
+                                    <View style={styles.chartLineBottom} />
+                                    <View style={[styles.trendLine, { backgroundColor: palette.borderColor }]} />
+                                    {gradeTrendPoints.map((point, index) => (
+                                      <View
+                                        key={index}
+                                        style={[
+                                          styles.trendPoint,
+                                          {
+                                            left: point.x,
+                                            bottom: point.y,
+                                            backgroundColor: index === gradeTrendPoints.length - 1 ? palette.color : palette.borderColor,
+                                            width: index === gradeTrendPoints.length - 1 ? 8 : 6,
+                                            height: index === gradeTrendPoints.length - 1 ? 8 : 6,
+                                          },
+                                        ]}
+                                      />
+                                    ))}
+                                  </View>
+                                ) : (
+                                  <Text style={[styles.noTrendText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.notEnoughGradedActivities")}</Text>
+                                )}
+                              </View>
+                            </View>
+                          </View>
+                        ),
+                        contentContainerStyle: styles.splitPaneContent,
+                        refreshControl: (
+                          <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={colors.mutedForeground}
+                          />
+                        ),
+                        scroll: false,
+                        storageKey: "subject-grades-summary-pane",
+                      }}
+                      leadingFlex={0.85}
+                      leadingStyle={styles.primaryPane}
+                      trailing={{
+                        content: (
+                          <SectionCard density="compact" title={t(resolvedLocale, "subjects.assignmentGrades")} subtitle={t(resolvedLocale, "subjects.scoresAndSubmissionStatus")}>
+                            {data.grades.assignments.length === 0 ? (
+                              <EmptyState label={t(resolvedLocale, "subjects.noGradeData")} />
+                            ) : (
+                              data.grades.assignments.map((assignment) => {
+                                const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
+
+                                return (
+                                  <Pressable
+                                    key={assignment.id}
+                                    onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/assignments/${assignment.id}`, { tab: "grades" }))}
+                                    style={[styles.gradeAssignmentCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
+                                  >
+                                    <View style={styles.gradeAssignmentContent}>
+                                      <Text style={[styles.gradeAssignmentName, { color: isCompleted ? colors.mutedForeground : colors.foreground }, isCompleted && styles.completedText]} numberOfLines={1}>
+                                        {assignment.name}
+                                      </Text>
+                                      <Text style={[styles.gradeAssignmentDue, { color: colors.mutedForeground }]}>
+                                        {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
+                                      </Text>
+                                    </View>
+                                    <View style={styles.gradeAssignmentScore}>
+                                      <Text style={[styles.scoreValue, { color: colors.foreground }]}>
+                                        {assignment.submission?.grade ?? (assignment.submission?.score != null ? String(assignment.submission.score) : "--")}
+                                      </Text>
+                                      <Text style={[styles.scoreTotal, { color: colors.mutedForeground }]}>
+                                        {assignment.points_possible != null ? `of ${assignment.points_possible}` : t(resolvedLocale, "subjects.noPointsListed")}
+                                      </Text>
+                                    </View>
+                                  </Pressable>
+                                );
+                              })
+                            )}
+                          </SectionCard>
+                        ),
+                        contentContainerStyle: styles.splitPaneContent,
+                        storageKey: "subject-grades-list-pane",
+                      }}
+                      trailingFlex={1.15}
+                      trailingStyle={styles.secondaryPane}
+                    />
+                  </View>
+                )}
+              </View>
+            ) : null}
+          </View>
+        ) : (
+          <RestorableScrollView
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.mutedForeground}
+              />
+            }
+          >
+            <SubjectLayoutHeader />
+            {showColdLoading ? <LoadingState label={t(resolvedLocale, "subjects.loadingSubject")} /> : null}
+            {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+
+            {course && data ? (
+              <View style={styles.container}>
+              {/* Modules/Assignments Tab */}
+              {(activeTab === "modules" || activeTab === "assignments") && (
+                isTabletLandscape ? (
+                  <SplitPaneScrollLayout
+                    enabled
+                    leading={{
+                      content: (
+                        <View style={[styles.sectionStack, styles.paneCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                          <View style={[styles.paneHeader, { borderBottomColor: colors.border }]}>
+                            <Text style={[styles.paneTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.modules")}</Text>
+                            <Text style={[styles.paneSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.lessonsAndMaterials")}</Text>
+                          </View>
+                          <View style={styles.paneContent}>
+                            {data.content.modules.length === 0 ? (
+                              <EmptyState label={t(resolvedLocale, "subjects.noModules")} />
+                            ) : (
+                              data.content.modules.map((module) => (
+                                <View key={module.id} style={[styles.moduleCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                                  <View style={styles.moduleHeader}>
+                                    <View style={styles.moduleTitleSection}>
+                                      <Text style={[styles.moduleName, { color: colors.foreground }]} numberOfLines={1}>
+                                        {module.name}
+                                      </Text>
+                                      <Text style={[styles.moduleSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.courseMaterials")}</Text>
+                                    </View>
+                                    <View style={[styles.itemCountBadge, { borderColor: colors.badgeBorder }]}>
+                                      <Text style={[styles.itemCountText, { color: colors.mutedForeground }]}>
+                                        {t(resolvedLocale, "subjects.itemsCount", { count: module.items_count ?? module.items?.length ?? 0 })}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  <View style={styles.moduleItems}>
+                                    {module.items?.slice(0, 12).map((item) => {
+                                      const itemHref = getModuleHref(courseId, item, activeContext);
+                                      const isSubHeader = item.type === "SubHeader";
+                                      
+                                      if (isSubHeader) {
+                                        return (
+                                          <View
+                                            key={item.id}
+                                            style={[styles.subHeaderItem, { borderColor: colors.border, backgroundColor: colors.muted }]}
+                                          >
+                                            <View style={styles.subHeaderContent}>
+                                              <View style={[styles.itemDot, { backgroundColor: palette.borderColor }]} />
+                                              <Text style={[styles.subHeaderTitle, { color: colors.foreground }]} numberOfLines={1}>
+                                                {item.title ?? t(resolvedLocale, "subjects.section")}
+                                              </Text>
+                                            </View>
+                                          </View>
+                                        );
+                                      }
+                                      
+                                      return (
+                                        <Pressable
+                                          key={item.id}
+                                          onPress={() => itemHref && void openAppHref(router, itemHref)}
+                                          disabled={!itemHref}
+                                          style={({ pressed }) => [
+                                            styles.moduleItem,
+                                            { borderColor: colors.border, backgroundColor: pressed ? colors.muted : colors.card },
+                                          ]}
+                                        >
+                                          <View style={styles.moduleItemContent}>
+                                            <View style={[styles.itemDot, { backgroundColor: palette.borderColor }]} />
+                                            <View style={styles.itemTextSection}>
+                                              <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>
+                                                {item.title ?? t(resolvedLocale, "subjects.untitledItem")}
+                                              </Text>
+                                              <Text style={[styles.itemType, { color: colors.mutedForeground }]}>
+                                                {item.type ?? t(resolvedLocale, "subjects.content")}
+                                              </Text>
+                                            </View>
+                                          </View>
+                                          {item.completion_requirement?.completed && (
+                                            <View style={[styles.doneBadge, { borderColor: colors.successText + "40", backgroundColor: colors.successBg }]}>
+                                              <Text style={[styles.doneBadgeText, { color: colors.successText }]}>{t(resolvedLocale, "calendar.done")}</Text>
+                                            </View>
+                                          )}
+                                        </Pressable>
+                                      );
+                                    })}
+                                  </View>
+                                </View>
+                              ))
+                            )}
+                          </View>
+                        </View>
+                      ),
+                      contentContainerStyle: styles.splitPaneContent,
+                      refreshControl: (
+                        <RefreshControl
+                          refreshing={refreshing}
+                          onRefresh={onRefresh}
+                          tintColor={colors.mutedForeground}
+                        />
+                      ),
+                      storageKey: "subject-modules-pane",
+                    }}
+                    leadingFlex={1.1}
+                    leadingStyle={styles.primaryPane}
+                    trailing={{
+                      content: (
+                        <View style={[styles.sectionStack, styles.paneCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                          <View style={[styles.paneHeader, { borderBottomColor: colors.border }]}>
+                            <Text style={[styles.paneTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.assignments")}</Text>
+                            <Text style={[styles.paneSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.upcomingAndRecentWork")}</Text>
+                          </View>
+                          <View style={styles.paneContent}>
+                            {data.content.assignments.length === 0 ? (
+                              <EmptyState label={t(resolvedLocale, "subjects.noAssignments")} />
+                            ) : (
+                              data.content.assignments.map((assignment) => {
+                                const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
                                 
                                 return (
                                   <Pressable
-                                    key={item.id}
-                                    onPress={() => itemHref && void openAppHref(router, itemHref)}
-                                    disabled={!itemHref}
-                                    style={({ pressed }) => [
-                                      styles.moduleItem,
-                                      { borderColor: colors.border, backgroundColor: pressed ? colors.muted : colors.card },
-                                    ]}
+                                    key={assignment.id}
+                                    onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/assignments/${assignment.id}`, activeContext))}
+                                    style={[styles.assignmentCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
                                   >
-                                    <View style={styles.moduleItemContent}>
-                                      <View style={[styles.itemDot, { backgroundColor: palette.borderColor }]} />
-                                      <View style={styles.itemTextSection}>
-                                        <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>
-                                          {item.title ?? t(resolvedLocale, "subjects.untitledItem")}
-                                        </Text>
-                                        <Text style={[styles.itemType, { color: colors.mutedForeground }]}>
-                                          {item.type ?? t(resolvedLocale, "subjects.content")}
-                                        </Text>
+                                    <View style={styles.assignmentContent}>
+                                      <View style={styles.assignmentHeader}>
+                                        <View style={styles.assignmentTitleSection}>
+                                          <CircleDot size={16} color={colors.mutedForeground} />
+                                          <Text style={[styles.assignmentName, { color: isCompleted ? colors.mutedForeground : colors.foreground }, isCompleted && styles.completedText]} numberOfLines={1}>
+                                            {assignment.name}
+                                          </Text>
+                                        </View>
+                                        {isCompleted && (
+                                          <View style={[styles.doneBadge, { borderColor: colors.successText + "40", backgroundColor: colors.successBg }]}>
+                                            <Text style={[styles.doneBadgeText, { color: colors.successText }]}>{t(resolvedLocale, "calendar.done")}</Text>
+                                          </View>
+                                        )}
                                       </View>
+                                      <Text style={[styles.assignmentDue, { color: colors.mutedForeground }]}>
+                                        {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
+                                      </Text>
+                                      <Text style={[styles.assignmentPoints, { color: colors.mutedForeground }]}>
+                                        {assignment.points_possible != null ? t(resolvedLocale, "subjects.points", { count: assignment.points_possible }) : t(resolvedLocale, "subjects.noPointsListed")}
+                                      </Text>
                                     </View>
-                                    {item.completion_requirement?.completed && (
+                                  </Pressable>
+                                );
+                              })
+                            )}
+                          </View>
+                        </View>
+                      ),
+                      contentContainerStyle: styles.splitPaneContent,
+                      storageKey: "subject-assignments-pane",
+                    }}
+                    trailingFlex={0.9}
+                    trailingStyle={styles.secondaryPane}
+                  />
+                ) : (
+                  <View style={styles.twoColumnGrid}>
+                    {activeTab !== "assignments" ? (
+                      <View style={styles.sectionStack}>
+                        {data.content.modules.length === 0 ? (
+                          <EmptyState label={t(resolvedLocale, "subjects.noModules")} />
+                        ) : (
+                          data.content.modules.map((module) => (
+                            <View key={module.id} style={[styles.moduleCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                              <View style={styles.moduleHeader}>
+                                <View style={styles.moduleTitleSection}>
+                                  <Text style={[styles.moduleName, { color: colors.foreground }]} numberOfLines={1}>
+                                    {module.name}
+                                  </Text>
+                                  <Text style={[styles.moduleSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.courseMaterials")}</Text>
+                                </View>
+                                <View style={[styles.itemCountBadge, { borderColor: colors.badgeBorder }]}>
+                                  <Text style={[styles.itemCountText, { color: colors.mutedForeground }]}>
+                                    {t(resolvedLocale, "subjects.itemsCount", { count: module.items_count ?? module.items?.length ?? 0 })}
+                                  </Text>
+                                </View>
+                              </View>
+                              <View style={styles.moduleItems}>
+                                {module.items?.slice(0, 12).map((item) => {
+                                  const itemHref = getModuleHref(courseId, item, activeContext);
+                                  const isSubHeader = item.type === "SubHeader";
+                                  
+                                  if (isSubHeader) {
+                                    return (
+                                      <View
+                                        key={item.id}
+                                        style={[styles.subHeaderItem, { borderColor: colors.border, backgroundColor: colors.muted }]}
+                                      >
+                                        <View style={styles.subHeaderContent}>
+                                          <View style={[styles.itemDot, { backgroundColor: palette.borderColor }]} />
+                                          <Text style={[styles.subHeaderTitle, { color: colors.foreground }]} numberOfLines={1}>
+                                            {item.title ?? t(resolvedLocale, "subjects.section")}
+                                          </Text>
+                                        </View>
+                                      </View>
+                                    );
+                                  }
+                                  
+                                  return (
+                                    <Pressable
+                                      key={item.id}
+                                      onPress={() => itemHref && void openAppHref(router, itemHref)}
+                                      disabled={!itemHref}
+                                      style={({ pressed }) => [
+                                        styles.moduleItem,
+                                        { borderColor: colors.border, backgroundColor: pressed ? colors.muted : colors.card },
+                                      ]}
+                                    >
+                                      <View style={styles.moduleItemContent}>
+                                        <View style={[styles.itemDot, { backgroundColor: palette.borderColor }]} />
+                                        <View style={styles.itemTextSection}>
+                                          <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>
+                                            {item.title ?? t(resolvedLocale, "subjects.untitledItem")}
+                                          </Text>
+                                          <Text style={[styles.itemType, { color: colors.mutedForeground }]}>
+                                            {item.type ?? t(resolvedLocale, "subjects.content")}
+                                          </Text>
+                                        </View>
+                                      </View>
+                                      {item.completion_requirement?.completed && (
+                                        <View style={[styles.doneBadge, { borderColor: colors.successText + "40", backgroundColor: colors.successBg }]}>
+                                          <Text style={[styles.doneBadgeText, { color: colors.successText }]}>{t(resolvedLocale, "calendar.done")}</Text>
+                                        </View>
+                                      )}
+                                    </Pressable>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          ))
+                        )}
+                      </View>
+                    ) : null}
+                    {activeTab !== "modules" ? (
+                      <View style={styles.sectionStack}>
+                        {data.content.assignments.length === 0 ? (
+                          <EmptyState label={t(resolvedLocale, "subjects.noAssignments")} />
+                        ) : (
+                          data.content.assignments.map((assignment) => {
+                            const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
+                            
+                            return (
+                              <Pressable
+                                key={assignment.id}
+                                onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/assignments/${assignment.id}`, activeContext))}
+                                style={[styles.assignmentCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
+                              >
+                                <View style={styles.assignmentContent}>
+                                  <View style={styles.assignmentHeader}>
+                                    <View style={styles.assignmentTitleSection}>
+                                      <CircleDot size={16} color={colors.mutedForeground} />
+                                      <Text style={[styles.assignmentName, { color: isCompleted ? colors.mutedForeground : colors.foreground }, isCompleted && styles.completedText]} numberOfLines={1}>
+                                        {assignment.name}
+                                      </Text>
+                                    </View>
+                                    {isCompleted && (
                                       <View style={[styles.doneBadge, { borderColor: colors.successText + "40", backgroundColor: colors.successBg }]}>
                                         <Text style={[styles.doneBadgeText, { color: colors.successText }]}>{t(resolvedLocale, "calendar.done")}</Text>
                                       </View>
                                     )}
-                                  </Pressable>
-                                );
-                              })}
-                            </View>
-                          </View>
-                        ))
-                      )}
-                    </View>
-                  )}
-
-                  {/* Assignments Section */}
-                  {(activeTab !== "modules") && (
-                    <View style={styles.sectionStack}>
-                      {data.content.assignments.length === 0 ? (
-                        <EmptyState label={t(resolvedLocale, "subjects.noAssignments")} />
-                      ) : (
-                        data.content.assignments.map((assignment) => {
-                          const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
-                          
-                          return (
-                            <Pressable
-                              key={assignment.id}
-                              onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/assignments/${assignment.id}`, activeContext))}
-                              style={[styles.assignmentCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
-                            >
-                              <View style={styles.assignmentContent}>
-                                <View style={styles.assignmentHeader}>
-                                  <View style={styles.assignmentTitleSection}>
-                                    <CircleDot size={16} color={colors.mutedForeground} />
-                                    <Text style={[styles.assignmentName, { color: isCompleted ? colors.mutedForeground : colors.foreground }, isCompleted && styles.completedText]} numberOfLines={1}>
-                                      {assignment.name}
-                                    </Text>
                                   </View>
-                                  {isCompleted && (
-                                    <View style={[styles.doneBadge, { borderColor: colors.successText + "40", backgroundColor: colors.successBg }]}>
-                                      <Text style={[styles.doneBadgeText, { color: colors.successText }]}>{t(resolvedLocale, "calendar.done")}</Text>
-                                    </View>
-                                  )}
+                                  <Text style={[styles.assignmentDue, { color: colors.mutedForeground }]}>
+                                    {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
+                                  </Text>
+                                  <Text style={[styles.assignmentPoints, { color: colors.mutedForeground }]}>
+                                    {assignment.points_possible != null ? t(resolvedLocale, "subjects.points", { count: assignment.points_possible }) : t(resolvedLocale, "subjects.noPointsListed")}
+                                  </Text>
                                 </View>
-                                <Text style={[styles.assignmentDue, { color: colors.mutedForeground }]}>
-                                  {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
-                                </Text>
-                                <Text style={[styles.assignmentPoints, { color: colors.mutedForeground }]}>
-                                  {assignment.points_possible != null ? t(resolvedLocale, "subjects.points", { count: assignment.points_possible }) : t(resolvedLocale, "subjects.noPointsListed")}
-                                </Text>
-                              </View>
-                            </Pressable>
-                          );
-                        })
-                      )}
-                    </View>
-                  )}
-                </View>
+                              </Pressable>
+                            );
+                          })
+                        )}
+                      </View>
+                    ) : null}
+                  </View>
+                )
               )}
 
               {/* Grades Tab */}
               {activeTab === "grades" && data && (
                 <View style={styles.gradesContainer}>
-                  <View style={styles.gradesGrid}>
-                    <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                      <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.gradePercent")}</Text>
-                      <Text style={[styles.metricValue, { color: colors.foreground }]}>
-                        {gradePercentage != null ? `${formatMetricNumber(gradePercentage)}%` : "--"}
-                      </Text>
-                      <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.overallPercentage")}</Text>
-                    </View>
-                    <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                      <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.absolute")}</Text>
-                      <Text style={[styles.metricValue, { color: colors.foreground }]}>
-                        {formatMetricNumber(absolutePoints)}
-                      </Text>
-                      <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.totalPointsEarned")}</Text>
-                    </View>
-                    <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                      <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.trend")}</Text>
-                      <View style={styles.trendChart}>
-                        {gradeTrendPoints.length > 1 ? (
-                          <View style={styles.chartContainer}>
-                            <View style={styles.chartLine} />
-                            <View style={styles.chartLineMiddle} />
-                            <View style={styles.chartLineBottom} />
-                            <View style={[styles.trendLine, { backgroundColor: palette.borderColor }]} />
-                            {gradeTrendPoints.map((point, index) => (
-                              <View
-                                key={index}
-                                style={[
-                                  styles.trendPoint,
-                                  {
-                                    left: point.x,
-                                    bottom: point.y,
-                                    backgroundColor: index === gradeTrendPoints.length - 1 ? palette.color : palette.borderColor,
-                                    width: index === gradeTrendPoints.length - 1 ? 8 : 6,
-                                    height: index === gradeTrendPoints.length - 1 ? 8 : 6,
-                                  },
-                                ]}
-                              />
-                            ))}
+                  {isTabletLandscape ? (
+                    <SplitPaneScrollLayout
+                      enabled
+                      leading={{
+                        content: (
+                          <View style={styles.gradesGrid}>
+                            <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                              <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.gradePercent")}</Text>
+                              <Text style={[styles.metricValue, { color: colors.foreground }]}>
+                                {gradePercentage != null ? `${formatMetricNumber(gradePercentage)}%` : "--"}
+                              </Text>
+                              <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.overallPercentage")}</Text>
+                            </View>
+                            <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                              <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.absolute")}</Text>
+                              <Text style={[styles.metricValue, { color: colors.foreground }]}>
+                                {formatMetricNumber(absolutePoints)}
+                              </Text>
+                              <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.totalPointsEarned")}</Text>
+                            </View>
+                            <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                              <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.trend")}</Text>
+                              <View style={styles.trendChart}>
+                                {gradeTrendPoints.length > 1 ? (
+                                  <View style={styles.chartContainer}>
+                                    <View style={styles.chartLine} />
+                                    <View style={styles.chartLineMiddle} />
+                                    <View style={styles.chartLineBottom} />
+                                    <View style={[styles.trendLine, { backgroundColor: palette.borderColor }]} />
+                                    {gradeTrendPoints.map((point, index) => (
+                                      <View
+                                        key={index}
+                                        style={[
+                                          styles.trendPoint,
+                                          {
+                                            left: point.x,
+                                            bottom: point.y,
+                                            backgroundColor: index === gradeTrendPoints.length - 1 ? palette.color : palette.borderColor,
+                                            width: index === gradeTrendPoints.length - 1 ? 8 : 6,
+                                            height: index === gradeTrendPoints.length - 1 ? 8 : 6,
+                                          },
+                                        ]}
+                                      />
+                                    ))}
+                                  </View>
+                                ) : (
+                                  <Text style={[styles.noTrendText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.notEnoughGradedActivities")}</Text>
+                                )}
+                              </View>
+                            </View>
                           </View>
-                        ) : (
-                          <Text style={[styles.noTrendText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.notEnoughGradedActivities")}</Text>
-                        )}
+                        ),
+                        contentContainerStyle: styles.splitPaneContent,
+                        refreshControl: (
+                          <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={colors.mutedForeground}
+                          />
+                        ),
+                        scroll: false,
+                        storageKey: "subject-grades-summary-pane",
+                      }}
+                      leadingFlex={0.85}
+                      leadingStyle={styles.primaryPane}
+                      trailing={{
+                        content: (
+                          <SectionCard density="compact" title={t(resolvedLocale, "subjects.assignmentGrades")} subtitle={t(resolvedLocale, "subjects.scoresAndSubmissionStatus")}>
+                            {data.grades.assignments.length === 0 ? (
+                              <EmptyState label={t(resolvedLocale, "subjects.noGradeData")} />
+                            ) : (
+                              data.grades.assignments.map((assignment) => {
+                                const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
+                                
+                                return (
+                                  <Pressable
+                                    key={assignment.id}
+                                    onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/assignments/${assignment.id}`, { tab: "grades" }))}
+                                    style={[styles.gradeAssignmentCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
+                                  >
+                                    <View style={styles.gradeAssignmentContent}>
+                                      <Text style={[styles.gradeAssignmentName, { color: isCompleted ? colors.mutedForeground : colors.foreground }, isCompleted && styles.completedText]} numberOfLines={1}>
+                                        {assignment.name}
+                                      </Text>
+                                      <Text style={[styles.gradeAssignmentDue, { color: colors.mutedForeground }]}>
+                                        {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
+                                      </Text>
+                                    </View>
+                                    <View style={styles.gradeAssignmentScore}>
+                                      <Text style={[styles.scoreValue, { color: colors.foreground }]}>
+                                        {assignment.submission?.grade ?? (assignment.submission?.score != null ? String(assignment.submission.score) : "--")}
+                                      </Text>
+                                      <Text style={[styles.scoreTotal, { color: colors.mutedForeground }]}>
+                                        {assignment.points_possible != null ? `of ${assignment.points_possible}` : t(resolvedLocale, "subjects.noPointsListed")}
+                                      </Text>
+                                    </View>
+                                  </Pressable>
+                                );
+                              })
+                            )}
+                          </SectionCard>
+                        ),
+                        contentContainerStyle: styles.splitPaneContent,
+                        storageKey: "subject-grades-list-pane",
+                      }}
+                      trailingFlex={1.15}
+                      trailingStyle={styles.secondaryPane}
+                    />
+                  ) : (
+                    <TwoPaneLayout
+                      enabled={false}
+                      leading={
+                        <View style={styles.gradesGrid}>
+                        <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                          <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.gradePercent")}</Text>
+                          <Text style={[styles.metricValue, { color: colors.foreground }]}>
+                            {gradePercentage != null ? `${formatMetricNumber(gradePercentage)}%` : "--"}
+                          </Text>
+                          <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.overallPercentage")}</Text>
+                        </View>
+                        <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                          <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.absolute")}</Text>
+                          <Text style={[styles.metricValue, { color: colors.foreground }]}>
+                            {formatMetricNumber(absolutePoints)}
+                          </Text>
+                          <Text style={[styles.metricSubtitle, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.totalPointsEarned")}</Text>
+                        </View>
+                        <View style={[styles.gradeMetricCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                          <Text style={[styles.metricTitle, { color: colors.foreground }]}>{t(resolvedLocale, "subjects.trend")}</Text>
+                          <View style={styles.trendChart}>
+                            {gradeTrendPoints.length > 1 ? (
+                              <View style={styles.chartContainer}>
+                                <View style={styles.chartLine} />
+                                <View style={styles.chartLineMiddle} />
+                                <View style={styles.chartLineBottom} />
+                                <View style={[styles.trendLine, { backgroundColor: palette.borderColor }]} />
+                                {gradeTrendPoints.map((point, index) => (
+                                  <View
+                                    key={index}
+                                    style={[
+                                      styles.trendPoint,
+                                      {
+                                        left: point.x,
+                                        bottom: point.y,
+                                        backgroundColor: index === gradeTrendPoints.length - 1 ? palette.color : palette.borderColor,
+                                        width: index === gradeTrendPoints.length - 1 ? 8 : 6,
+                                        height: index === gradeTrendPoints.length - 1 ? 8 : 6,
+                                      },
+                                    ]}
+                                  />
+                                ))}
+                              </View>
+                            ) : (
+                              <Text style={[styles.noTrendText, { color: colors.mutedForeground }]}>{t(resolvedLocale, "subjects.notEnoughGradedActivities")}</Text>
+                            )}
+                          </View>
+                        </View>
                       </View>
-                    </View>
-                  </View>
-
-                  <SectionCard density="compact" title={t(resolvedLocale, "subjects.assignmentGrades")} subtitle={t(resolvedLocale, "subjects.scoresAndSubmissionStatus")}>
-                    {data.grades.assignments.length === 0 ? (
-                      <EmptyState label={t(resolvedLocale, "subjects.noGradeData")} />
-                    ) : (
-                      data.grades.assignments.map((assignment) => {
-                        const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
-                        
-                        return (
-                          <Pressable
-                            key={assignment.id}
-                            onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/assignments/${assignment.id}`, { tab: "grades" }))}
-                            style={[styles.gradeAssignmentCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
-                          >
-                            <View style={styles.gradeAssignmentContent}>
-                              <Text style={[styles.gradeAssignmentName, { color: isCompleted ? colors.mutedForeground : colors.foreground }, isCompleted && styles.completedText]} numberOfLines={1}>
-                                {assignment.name}
-                              </Text>
-                              <Text style={[styles.gradeAssignmentDue, { color: colors.mutedForeground }]}>
-                                {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
-                              </Text>
-                            </View>
-                            <View style={styles.gradeAssignmentScore}>
-                              <Text style={[styles.scoreValue, { color: colors.foreground }]}>
-                                {assignment.submission?.grade ?? (assignment.submission?.score != null ? String(assignment.submission.score) : "--")}
-                              </Text>
-                              <Text style={[styles.scoreTotal, { color: colors.mutedForeground }]}>
-                                {assignment.points_possible != null ? `of ${assignment.points_possible}` : t(resolvedLocale, "subjects.noPointsListed")}
-                              </Text>
-                            </View>
-                          </Pressable>
-                        );
-                      })
-                    )}
-                  </SectionCard>
+                      }
+                      trailing={
+                        <SectionCard density="compact" title={t(resolvedLocale, "subjects.assignmentGrades")} subtitle={t(resolvedLocale, "subjects.scoresAndSubmissionStatus")}>
+                          {data.grades.assignments.length === 0 ? (
+                            <EmptyState label={t(resolvedLocale, "subjects.noGradeData")} />
+                          ) : (
+                            data.grades.assignments.map((assignment) => {
+                              const isCompleted = assignment.submission?.excused || ["submitted", "graded", "pending_review", "complete"].includes(assignment.submission?.workflow_state ?? "");
+                              
+                              return (
+                                <Pressable
+                                  key={assignment.id}
+                                  onPress={() => router.push(appendSubjectRouteContext(`/subjects/${courseId}/assignments/${assignment.id}`, { tab: "grades" }))}
+                                  style={[styles.gradeAssignmentCard, { borderColor: colors.border, backgroundColor: colors.card, borderLeftColor: palette.borderColor }]}
+                                >
+                                  <View style={styles.gradeAssignmentContent}>
+                                    <Text style={[styles.gradeAssignmentName, { color: isCompleted ? colors.mutedForeground : colors.foreground }, isCompleted && styles.completedText]} numberOfLines={1}>
+                                      {assignment.name}
+                                    </Text>
+                                    <Text style={[styles.gradeAssignmentDue, { color: colors.mutedForeground }]}>
+                                      {t(resolvedLocale, "common.dueLabel", { value: formatDueDateShort(resolvedLocale, assignment.due_at) })}
+                                    </Text>
+                                  </View>
+                                  <View style={styles.gradeAssignmentScore}>
+                                    <Text style={[styles.scoreValue, { color: colors.foreground }]}>
+                                      {assignment.submission?.grade ?? (assignment.submission?.score != null ? String(assignment.submission.score) : "--")}
+                                    </Text>
+                                    <Text style={[styles.scoreTotal, { color: colors.mutedForeground }]}>
+                                      {assignment.points_possible != null ? `of ${assignment.points_possible}` : t(resolvedLocale, "subjects.noPointsListed")}
+                                    </Text>
+                                  </View>
+                                </Pressable>
+                              );
+                            })
+                          )}
+                        </SectionCard>
+                      }
+                    />
+                  )}
                 </View>
               )}
 
@@ -561,8 +1118,9 @@ export default function SubjectScreen() {
                 </View>
               )}
             </View>
-          ) : null}
-        </RestorableScrollView>
+            ) : null}
+          </RestorableScrollView>
+        )}
       </AppScreen>
     </RequireCanvasConfig>
   );
@@ -570,7 +1128,17 @@ export default function SubjectScreen() {
 
 const styles = StyleSheet.create({
   screenContent: {
+    flex: 1,
+    minHeight: 0,
     padding: 0,
+  },
+  splitScreenShell: {
+    flex: 1,
+    minHeight: 0,
+  },
+  splitScreenBody: {
+    flex: 1,
+    minHeight: 0,
   },
   container: {
     paddingHorizontal: 8,
@@ -582,6 +1150,37 @@ const styles = StyleSheet.create({
   },
   twoColumnGrid: {
     gap: 16,
+  },
+  paneCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  paneHeader: {
+    borderBottomWidth: 1,
+    gap: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  paneTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  paneSubtitle: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  paneContent: {
+    padding: 12,
+  },
+  primaryPane: {
+    alignSelf: "stretch",
+  },
+  secondaryPane: {
+    alignSelf: "stretch",
+  },
+  splitPaneContent: {
+    paddingBottom: 24,
   },
   moduleCard: {
     borderRadius: 12,

@@ -22,20 +22,22 @@ export function RestorableScrollView({
   onScroll,
   onScrollEndDrag,
   scrollEventThrottle = 16,
+  storageKey,
   ...props
-}: ScrollViewProps) {
+}: ScrollViewProps & { storageKey?: string }) {
   const route = useRoute();
   const scrollRef = useRef<ScrollView>(null);
-  const lastOffsetRef = useRef(routeScrollOffsets.get(route.key) ?? 0);
+  const routeStorageKey = storageKey ? `${route.key}:${storageKey}` : route.key;
+  const lastOffsetRef = useRef(routeScrollOffsets.get(routeStorageKey) ?? 0);
   const pendingRestoreRef = useRef(false);
 
   const saveOffset = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const nextOffset = event.nativeEvent.contentOffset.y;
       lastOffsetRef.current = nextOffset;
-      routeScrollOffsets.set(route.key, nextOffset);
+      routeScrollOffsets.set(routeStorageKey, nextOffset);
     },
-    [route.key],
+    [routeStorageKey],
   );
 
   const restoreOffset = useCallback(() => {
@@ -44,14 +46,14 @@ export function RestorableScrollView({
     }
 
     pendingRestoreRef.current = false;
-    const savedOffset = routeScrollOffsets.get(route.key) ?? 0;
+    const savedOffset = routeScrollOffsets.get(routeStorageKey) ?? 0;
 
     if (savedOffset <= 0) {
       return;
     }
 
     scrollRef.current?.scrollTo({ animated: false, y: savedOffset });
-  }, [route.key]);
+  }, [routeStorageKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,16 +67,16 @@ export function RestorableScrollView({
       return () => {
         pendingRestoreRef.current = false;
         cancelAnimationFrame(frame);
-        routeScrollOffsets.set(route.key, lastOffsetRef.current);
+        routeScrollOffsets.set(routeStorageKey, lastOffsetRef.current);
       };
-    }, [restoreOffset, route.key]),
+    }, [restoreOffset, routeStorageKey]),
   );
 
   useEffect(
     () => () => {
-      routeScrollOffsets.set(route.key, lastOffsetRef.current);
+      routeScrollOffsets.set(routeStorageKey, lastOffsetRef.current);
     },
-    [route.key],
+    [routeStorageKey],
   );
 
   return (

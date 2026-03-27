@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -125,21 +126,29 @@ export function DesktopSidebar({
           </div>
         </Link>
       )}
-      <h1 className="mb-6 text-xl font-bold">{t(resolvedLocale, "common.canvas")}</h1>
+      <div className="mb-6 flex items-center gap-3">
+        <Image src="/canvas-icon.svg" alt="" width={28} height={28} className="shrink-0 rounded-lg" aria-hidden="true" />
+        <h1 className="text-xl font-bold">{t(resolvedLocale, "common.canvas")}</h1>
+      </div>
       <nav className="space-y-2 text-sm">
-        {navItems.map((item) => (
-          <Link
-            key={item.key}
-            href={item.href}
-            className={
-              active === item.key
-                ? "block rounded-md bg-primary px-3 py-2 text-primary-foreground"
-                : "block rounded-md border border-border bg-card/70 px-3 py-2 text-foreground/80 transition hover:border-foreground/15 hover:bg-muted/85 hover:text-foreground"
-            }
-          >
-            {t(resolvedLocale, `navigation.${item.key}`)}
-          </Link>
-        ))}
+        {navItems.map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <Link
+              key={item.key}
+              href={item.href}
+              className={
+                active === item.key
+                  ? "flex items-center gap-3 rounded-md bg-primary px-3 py-2 text-primary-foreground"
+                  : "flex items-center gap-3 rounded-md border border-border bg-card/70 px-3 py-2 text-foreground/80 transition hover:border-foreground/15 hover:bg-muted/85 hover:text-foreground"
+              }
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span>{t(resolvedLocale, `navigation.${item.key}`)}</span>
+            </Link>
+          );
+        })}
         {visibleCourses && visibleCourses.length > 0 && (
           <div className="mt-6 border-t border-border/80 pt-4">
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">

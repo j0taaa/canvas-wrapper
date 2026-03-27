@@ -1,9 +1,9 @@
 const appJson = require("./app.json");
 
 const androidPackage =
-  process.env.EXPO_ANDROID_PACKAGE || "com.j0taaa.janvas";
+  process.env.EXPO_ANDROID_PACKAGE || "com.j0taaa.canvaswrapper";
 const androidVersionCode = Number.parseInt(
-  process.env.EXPO_ANDROID_VERSION_CODE || "1",
+  process.env.EXPO_ANDROID_VERSION_CODE || "2",
   10,
 );
 const iosBundleIdentifier =

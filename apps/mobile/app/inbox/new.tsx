@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowLeft, MailPlus, Search, SendHorizontal, UsersRound, X } from "lucide-react-native";
+import { ArrowLeft, MailPlus, Search, UsersRound, X } from "lucide-react-native";
 import { formatSubjectName, getSubjectColorPalette } from "@canvas/shared";
 import { createConversation } from "@canvas/shared";
 import {
@@ -13,7 +13,9 @@ import {
   RequireCanvasConfig,
   SectionCard,
 } from "../../src/components/app-ui";
+import { SplitPaneScrollLayout } from "../../src/components/split-pane-scroll-layout";
 import { useRefreshControl } from "../../src/hooks/use-refresh-control";
+import { useTabletLayout } from "../../src/hooks/use-tablet-layout";
 import { RestorableScrollView } from "../../src/components/restorable-scroll-view";
 import { useAppShell, useCoursePeople } from "../../src/hooks/use-canvas-queries";
 import { goBackOrPush } from "../../src/lib/navigation";
@@ -42,6 +44,7 @@ export default function NewConversationScreen() {
   const [sendIndividualMessages, setSendIndividualMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [submitError, setSubmitError] = useState<string>("");
+  const { isTabletLandscape } = useTabletLayout();
 
   const colors = useMemo(() => {
     const isDark = resolvedTheme === "dark";
@@ -63,14 +66,12 @@ export default function NewConversationScreen() {
     data: shellData,
     error: shellError,
     isLoading: shellLoading,
-    isFetching: shellFetching,
     refetch: shellRefetch,
   } = useAppShell();
   const {
     data: peopleData,
     error: peopleError,
     isLoading: peopleLoading,
-    isFetching: peopleFetching,
     refetch: peopleRefetch,
   } = useCoursePeople(selectedCourseId ?? 0, selectedCourseId !== null);
   const { onRefresh, refreshing } = useRefreshControl(async () => {
@@ -136,7 +137,299 @@ export default function NewConversationScreen() {
   const showShellError = !!shellError && !shellData;
   const showPeopleError = !!peopleError && !peopleData;
 
-  const handleSend = () => {
+  const selectionPane = shellData ? (
+    <>
+      <SectionCard title="Send to">
+        <View style={[styles.searchField, { borderColor: colors.border, backgroundColor: colors.input }]}>
+          <Search size={16} color={colors.muted} />
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            onChangeText={setCourseSearch}
+            placeholder="Search subjects"
+            placeholderTextColor={colors.muted}
+            style={[styles.searchInput, { color: colors.foreground }]}
+            value={courseSearch}
+          />
+        </View>
+
+        <ScrollView
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+          style={styles.selectorViewport}
+          contentContainerStyle={styles.selectorScrollContent}
+        >
+          <View style={styles.courseGrid}>
+            {filteredCourses.map((course) => {
+              const palette = getSubjectColorPalette(course.name, subjectPreferences.colors[course.id]);
+              const selected = course.id === selectedCourseId;
+
+              return (
+                <Pressable
+                  key={course.id}
+                  onPress={() => {
+                    triggerSelectionHaptic();
+                    setSelectedCourseId(course.id);
+                    setSelectedRecipientIds([]);
+                    setRecipientSearch("");
+                    setSubmitError("");
+                  }}
+                  style={[
+                    styles.courseCard,
+                    isTabletLandscape && styles.courseCardTablet,
+                    {
+                      backgroundColor: selected ? colors.selected : colors.card,
+                      borderColor: selected ? colors.foreground : colors.border,
+                    },
+                  ]}
+                >
+                  <View style={styles.courseCardRow}>
+                    <View style={[styles.courseDot, { backgroundColor: palette.borderColor }]} />
+                    <View style={styles.courseCardText}>
+                      <Text style={[styles.courseName, { color: colors.foreground }]} numberOfLines={2}>
+                        {formatSubjectName(course.name)}
+                      </Text>
+                      <Text style={[styles.courseCode, { color: colors.muted }]} numberOfLines={2}>
+                        {course.course_code ?? course.name}
+                      </Text>
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
+
+        {filteredCourses.length === 0 ? (
+          <Text style={[styles.helperText, { color: colors.muted }]}>No subjects matched your search.</Text>
+        ) : null}
+      </SectionCard>
+
+      <SectionCard title="Recipients">
+        <View style={[styles.searchField, { borderColor: colors.border, backgroundColor: colors.input }]}>
+          <Search size={16} color={colors.muted} />
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!!selectedCourseId && !peopleLoading}
+            onChangeText={setRecipientSearch}
+            placeholder={selectedCourse ? "Search people in this subject" : "Choose a subject first"}
+            placeholderTextColor={colors.muted}
+            style={[styles.searchInput, { color: colors.foreground }]}
+            value={recipientSearch}
+          />
+        </View>
+
+        {selectedRecipients.length > 0 ? (
+          <View style={styles.selectedRecipients}>
+            {selectedRecipients.map((person) => (
+              <Pressable
+                key={person.id}
+                onPress={() => {
+                  triggerSelectionHaptic();
+                  setSelectedRecipientIds((current) => current.filter((recipientId) => recipientId !== person.id));
+                }}
+                style={[styles.recipientChip, { borderColor: colors.border, backgroundColor: colors.card }]}
+              >
+                <View style={[styles.recipientAvatar, { borderColor: colors.border, backgroundColor: colors.backgroundMuted }]}>
+                  <Text style={[styles.recipientAvatarText, { color: colors.muted }]}>{getInitials(person.name)}</Text>
+                </View>
+                <Text style={[styles.recipientChipText, { color: colors.foreground }]} numberOfLines={1}>
+                  {person.name}
+                </Text>
+                <X size={14} color={colors.muted} />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        {showPeopleError ? <ErrorState error={peopleError.message} onRetry={peopleRefetch} /> : null}
+
+        <ScrollView
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+          style={styles.selectorViewport}
+          contentContainerStyle={styles.selectorScrollContent}
+        >
+          <View style={styles.peopleList}>
+            {selectedCourseId && !peopleData && peopleLoading ? (
+              <>
+                <PlaceholderBlock height={76} />
+                <PlaceholderBlock height={76} />
+              </>
+            ) : null}
+
+            {!showPeopleError &&
+              filteredPeople.map((person) => {
+                const selected = selectedRecipientIds.includes(person.id);
+
+                return (
+                  <Pressable
+                    key={person.id}
+                    onPress={() => {
+                      triggerSelectionHaptic();
+                      setSelectedRecipientIds((current) =>
+                        current.includes(person.id)
+                          ? current.filter((recipientId) => recipientId !== person.id)
+                          : [...current, person.id],
+                      );
+                    }}
+                    style={[
+                      styles.personRow,
+                      {
+                        backgroundColor: selected ? colors.selected : colors.card,
+                        borderColor: selected ? colors.foreground : colors.border,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.personAvatar, { borderColor: colors.border, backgroundColor: colors.backgroundMuted }]}>
+                      <Text style={[styles.personAvatarText, { color: colors.muted }]}>{getInitials(person.name)}</Text>
+                    </View>
+                    <View style={styles.personText}>
+                      <Text style={[styles.personName, { color: colors.foreground }]} numberOfLines={1}>
+                        {person.name}
+                      </Text>
+                      <Text style={[styles.personMeta, { color: colors.muted }]} numberOfLines={1}>
+                        {person.short_name ?? person.sortable_name ?? "Canvas user"}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.personSelection,
+                        {
+                          backgroundColor: selected ? colors.accent : "transparent",
+                          borderColor: selected ? colors.accent : colors.border,
+                        },
+                      ]}
+                    />
+                  </Pressable>
+                );
+              })}
+
+            {!peopleLoading && selectedCourseId && filteredPeople.length === 0 && !showPeopleError ? (
+              <Text style={[styles.helperText, { color: colors.muted }]}>
+                {availablePeople.length === 0 ? "No people are available for this subject." : "No recipients matched your search."}
+              </Text>
+            ) : null}
+          </View>
+        </ScrollView>
+      </SectionCard>
+
+      <SectionCard title="Delivery">
+        <View style={styles.deliveryRow}>
+          <Pressable
+            onPress={() => {
+              triggerSelectionHaptic();
+              setSendIndividualMessages(false);
+            }}
+            style={[
+              styles.deliveryChip,
+              {
+                backgroundColor: !sendIndividualMessages ? colors.accent : colors.card,
+                borderColor: !sendIndividualMessages ? colors.accent : colors.border,
+              },
+            ]}
+          >
+            <Text style={[styles.deliveryChipText, { color: !sendIndividualMessages ? colors.accentText : colors.muted }]}>
+              Shared thread
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              triggerSelectionHaptic();
+              setSendIndividualMessages(true);
+            }}
+            style={[
+              styles.deliveryChip,
+              {
+                backgroundColor: sendIndividualMessages ? colors.accent : colors.card,
+                borderColor: sendIndividualMessages ? colors.accent : colors.border,
+              },
+            ]}
+          >
+            <Text style={[styles.deliveryChipText, { color: sendIndividualMessages ? colors.accentText : colors.muted }]}>
+              Separate private messages
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.deliveryHelperRow}>
+          <UsersRound size={16} color={colors.muted} />
+          <Text style={[styles.helperText, { color: colors.muted }]}>
+            {sendIndividualMessages
+              ? "Canvas sends one private copy to each selected person."
+              : "Everyone receives the same shared conversation thread."}
+          </Text>
+        </View>
+      </SectionCard>
+    </>
+  ) : null;
+
+  const composerPane = shellData ? (
+    <>
+      <SectionCard title="Message">
+        <View style={styles.messageSection}>
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Subject</Text>
+            <TextInput
+              maxLength={255}
+              onChangeText={setSubject}
+              placeholder="Message subject"
+              placeholderTextColor={colors.muted}
+              style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
+              value={subject}
+            />
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Message</Text>
+            <TextInput
+              multiline
+              onChangeText={setBody}
+              placeholder="Write your message"
+              placeholderTextColor={colors.muted}
+              style={[styles.multilineInput, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
+              textAlignVertical="top"
+              value={body}
+            />
+          </View>
+        </View>
+      </SectionCard>
+
+      <SectionCard title="Current selection">
+        <View style={styles.summaryBlock}>
+          <View style={styles.summaryRow}>
+            <MailPlus size={16} color={colors.muted} />
+            <Text style={[styles.summaryText, { color: colors.foreground }]}>
+              {selectedCourse ? formatSubjectName(selectedCourse.name) : "No subject selected"}
+            </Text>
+          </View>
+          <Text style={[styles.helperText, { color: colors.muted }]}>
+            {selectedCourse?.course_code ?? "Choose a subject to target the message."}
+          </Text>
+          <Text style={[styles.helperText, { color: colors.muted }]}>
+            {selectedRecipientIds.length === 0
+              ? "No recipients selected yet."
+              : `${selectedRecipientIds.length} recipient${selectedRecipientIds.length === 1 ? "" : "s"} selected`}
+          </Text>
+        </View>
+      </SectionCard>
+
+      {submitError ? (
+        <View style={[styles.errorCard, { borderColor: colors.danger, backgroundColor: `${colors.danger}14` }]}>
+          <Text style={[styles.errorCardText, { color: colors.danger }]}>{submitError}</Text>
+        </View>
+      ) : null}
+
+      <PrimaryButton
+        disabled={!canSend || sending}
+        label={sending ? "Sending..." : "Send message"}
+        onPress={handleSend}
+      />
+    </>
+  ) : null;
+
+  function handleSend() {
     if (!selectedCourseId || !canSend) {
       setSubmitError("Choose a subject, select at least one recipient, add a title, and write a message first.");
       return;
@@ -169,332 +462,95 @@ export default function NewConversationScreen() {
       .finally(() => {
         setSending(false);
       });
-  };
+  }
 
   return (
     <RequireCanvasConfig>
-      <AppScreen scroll={false}>
-        <RestorableScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          {!shellData && shellLoading ? <LoadingState label="Loading compose screen..." /> : null}
-          {showShellError ? <ErrorState error={shellError.message} onRetry={shellRefetch} /> : null}
-
-          {shellData ? (
-            <View style={styles.container}>
-              <View style={[styles.pageHeader, { borderBottomColor: colors.border }]}>
-                <Pressable
-                  onPress={() => {
-                    triggerSelectionHaptic();
-                    goBackOrPush(router, "/inbox");
-                  }}
-                  style={[styles.backButton, { borderColor: colors.border, backgroundColor: colors.card }]}
-                >
-                  <ArrowLeft size={16} color={colors.foreground} />
-                </Pressable>
-                <View style={styles.pageHeaderText}>
-                  <Text style={[styles.pageTitle, { color: colors.foreground }]}>New message</Text>
-                  <Text style={[styles.pageSubtitle, { color: colors.muted }]}>
-                    Start a Canvas conversation without leaving the app.
-                  </Text>
-                </View>
+      <AppScreen contentStyle={styles.screenContent} scroll={false}>
+        {isTabletLandscape && shellData ? (
+          <View style={[styles.container, styles.splitContainer]}>
+            <View style={[styles.pageHeader, { borderBottomColor: colors.border }]}>
+              <Pressable
+                onPress={() => {
+                  triggerSelectionHaptic();
+                  goBackOrPush(router, "/inbox");
+                }}
+                style={[styles.backButton, { borderColor: colors.border, backgroundColor: colors.card }]}
+              >
+                <ArrowLeft size={16} color={colors.foreground} />
+              </Pressable>
+              <View style={styles.pageHeaderText}>
+                <Text style={[styles.pageTitle, { color: colors.foreground }]}>New message</Text>
+                <Text style={[styles.pageSubtitle, { color: colors.muted }]}>
+                  Start a Canvas conversation without leaving the app.
+                </Text>
               </View>
-
-              <SectionCard title="Send to">
-                <View style={[styles.searchField, { borderColor: colors.border, backgroundColor: colors.input }]}>
-                  <Search size={16} color={colors.muted} />
-                  <TextInput
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onChangeText={setCourseSearch}
-                    placeholder="Search subjects"
-                    placeholderTextColor={colors.muted}
-                    style={[styles.searchInput, { color: colors.foreground }]}
-                    value={courseSearch}
-                  />
-                </View>
-
-                <ScrollView
-                  nestedScrollEnabled
-                  showsVerticalScrollIndicator={false}
-                  style={styles.selectorViewport}
-                  contentContainerStyle={styles.selectorScrollContent}
-                >
-                  <View style={styles.courseGrid}>
-                    {filteredCourses.map((course) => {
-                      const palette = getSubjectColorPalette(course.name, subjectPreferences.colors[course.id]);
-                      const selected = course.id === selectedCourseId;
-
-                      return (
-                        <Pressable
-                          key={course.id}
-                          onPress={() => {
-                            triggerSelectionHaptic();
-                            setSelectedCourseId(course.id);
-                            setSelectedRecipientIds([]);
-                            setRecipientSearch("");
-                            setSubmitError("");
-                          }}
-                          style={[
-                            styles.courseCard,
-                            {
-                              backgroundColor: selected ? colors.selected : colors.card,
-                              borderColor: selected ? colors.foreground : colors.border,
-                            },
-                          ]}
-                        >
-                          <View style={styles.courseCardRow}>
-                            <View style={[styles.courseDot, { backgroundColor: palette.borderColor }]} />
-                            <View style={styles.courseCardText}>
-                              <Text style={[styles.courseName, { color: colors.foreground }]} numberOfLines={2}>
-                                {formatSubjectName(course.name)}
-                              </Text>
-                              <Text style={[styles.courseCode, { color: colors.muted }]} numberOfLines={2}>
-                                {course.course_code ?? course.name}
-                              </Text>
-                            </View>
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-
-                {filteredCourses.length === 0 ? (
-                  <Text style={[styles.helperText, { color: colors.muted }]}>No subjects matched your search.</Text>
-                ) : null}
-              </SectionCard>
-
-              <SectionCard title="Recipients">
-                <View style={[styles.searchField, { borderColor: colors.border, backgroundColor: colors.input }]}>
-                  <Search size={16} color={colors.muted} />
-                  <TextInput
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    editable={!!selectedCourseId && !peopleLoading}
-                    onChangeText={setRecipientSearch}
-                    placeholder={selectedCourse ? "Search people in this subject" : "Choose a subject first"}
-                    placeholderTextColor={colors.muted}
-                    style={[styles.searchInput, { color: colors.foreground }]}
-                    value={recipientSearch}
-                  />
-                </View>
-
-                {selectedRecipients.length > 0 ? (
-                  <View style={styles.selectedRecipients}>
-                    {selectedRecipients.map((person) => (
-                      <Pressable
-                        key={person.id}
-                        onPress={() => {
-                          triggerSelectionHaptic();
-                          setSelectedRecipientIds((current) => current.filter((recipientId) => recipientId !== person.id));
-                        }}
-                        style={[styles.recipientChip, { borderColor: colors.border, backgroundColor: colors.card }]}
-                      >
-                        <View style={[styles.recipientAvatar, { borderColor: colors.border, backgroundColor: colors.backgroundMuted }]}>
-                          <Text style={[styles.recipientAvatarText, { color: colors.muted }]}>{getInitials(person.name)}</Text>
-                        </View>
-                        <Text style={[styles.recipientChipText, { color: colors.foreground }]} numberOfLines={1}>
-                          {person.name}
-                        </Text>
-                        <X size={14} color={colors.muted} />
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : null}
-
-                {showPeopleError ? <ErrorState error={peopleError.message} onRetry={peopleRefetch} /> : null}
-
-                <ScrollView
-                  nestedScrollEnabled
-                  showsVerticalScrollIndicator={false}
-                  style={styles.selectorViewport}
-                  contentContainerStyle={styles.selectorScrollContent}
-                >
-                  <View style={styles.peopleList}>
-                    {selectedCourseId && !peopleData && peopleLoading ? (
-                      <>
-                        <PlaceholderBlock height={76} />
-                        <PlaceholderBlock height={76} />
-                      </>
-                    ) : null}
-
-                    {!showPeopleError &&
-                      filteredPeople.map((person) => {
-                        const selected = selectedRecipientIds.includes(person.id);
-
-                        return (
-                          <Pressable
-                            key={person.id}
-                            onPress={() => {
-                              triggerSelectionHaptic();
-                              setSelectedRecipientIds((current) =>
-                                current.includes(person.id)
-                                  ? current.filter((recipientId) => recipientId !== person.id)
-                                  : [...current, person.id],
-                              );
-                            }}
-                            style={[
-                              styles.personRow,
-                              {
-                                backgroundColor: selected ? colors.selected : colors.card,
-                                borderColor: selected ? colors.foreground : colors.border,
-                              },
-                            ]}
-                          >
-                            <View style={[styles.personAvatar, { borderColor: colors.border, backgroundColor: colors.backgroundMuted }]}>
-                              <Text style={[styles.personAvatarText, { color: colors.muted }]}>{getInitials(person.name)}</Text>
-                            </View>
-                            <View style={styles.personText}>
-                              <Text style={[styles.personName, { color: colors.foreground }]} numberOfLines={1}>
-                                {person.name}
-                              </Text>
-                              <Text style={[styles.personMeta, { color: colors.muted }]} numberOfLines={1}>
-                                {person.short_name ?? person.sortable_name ?? "Canvas user"}
-                              </Text>
-                            </View>
-                            <View
-                              style={[
-                                styles.personSelection,
-                                {
-                                  backgroundColor: selected ? colors.accent : "transparent",
-                                  borderColor: selected ? colors.accent : colors.border,
-                                },
-                              ]}
-                            />
-                          </Pressable>
-                        );
-                      })}
-
-                    {!peopleLoading && selectedCourseId && filteredPeople.length === 0 && !showPeopleError ? (
-                      <Text style={[styles.helperText, { color: colors.muted }]}>
-                        {availablePeople.length === 0 ? "No people are available for this subject." : "No recipients matched your search."}
-                      </Text>
-                    ) : null}
-                  </View>
-                </ScrollView>
-              </SectionCard>
-
-              <SectionCard title="Delivery">
-                <View style={styles.deliveryRow}>
-                  <Pressable
-                    onPress={() => {
-                      triggerSelectionHaptic();
-                      setSendIndividualMessages(false);
-                    }}
-                    style={[
-                      styles.deliveryChip,
-                      {
-                        backgroundColor: !sendIndividualMessages ? colors.accent : colors.card,
-                        borderColor: !sendIndividualMessages ? colors.accent : colors.border,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.deliveryChipText, { color: !sendIndividualMessages ? colors.accentText : colors.muted }]}>
-                      Shared thread
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      triggerSelectionHaptic();
-                      setSendIndividualMessages(true);
-                    }}
-                    style={[
-                      styles.deliveryChip,
-                      {
-                        backgroundColor: sendIndividualMessages ? colors.accent : colors.card,
-                        borderColor: sendIndividualMessages ? colors.accent : colors.border,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.deliveryChipText, { color: sendIndividualMessages ? colors.accentText : colors.muted }]}>
-                      Separate private messages
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <View style={styles.deliveryHelperRow}>
-                  <UsersRound size={16} color={colors.muted} />
-                  <Text style={[styles.helperText, { color: colors.muted }]}>
-                    {sendIndividualMessages
-                      ? "Canvas sends one private copy to each selected person."
-                      : "Everyone receives the same shared conversation thread."}
-                  </Text>
-                </View>
-              </SectionCard>
-
-              <SectionCard title="Message">
-                <View style={styles.messageSection}>
-                  <View style={styles.fieldGroup}>
-                    <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Subject</Text>
-                    <TextInput
-                      maxLength={255}
-                      onChangeText={setSubject}
-                      placeholder="Message subject"
-                      placeholderTextColor={colors.muted}
-                      style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
-                      value={subject}
-                    />
-                  </View>
-
-                  <View style={styles.fieldGroup}>
-                    <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Message</Text>
-                    <TextInput
-                      multiline
-                      onChangeText={setBody}
-                      placeholder="Write your message"
-                      placeholderTextColor={colors.muted}
-                      style={[styles.multilineInput, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
-                      textAlignVertical="top"
-                      value={body}
-                    />
-                  </View>
-                </View>
-              </SectionCard>
-
-              <SectionCard title="Current selection">
-                <View style={styles.summaryBlock}>
-                  <View style={styles.summaryRow}>
-                    <MailPlus size={16} color={colors.muted} />
-                    <Text style={[styles.summaryText, { color: colors.foreground }]}>
-                      {selectedCourse ? formatSubjectName(selectedCourse.name) : "No subject selected"}
-                    </Text>
-                  </View>
-                  <Text style={[styles.helperText, { color: colors.muted }]}>
-                    {selectedCourse?.course_code ?? "Choose a subject to target the message."}
-                  </Text>
-                  <Text style={[styles.helperText, { color: colors.muted }]}>
-                    {selectedRecipientIds.length === 0
-                      ? "No recipients selected yet."
-                      : `${selectedRecipientIds.length} recipient${selectedRecipientIds.length === 1 ? "" : "s"} selected`}
-                  </Text>
-                </View>
-              </SectionCard>
-
-              {submitError ? (
-                <View style={[styles.errorCard, { borderColor: colors.danger, backgroundColor: `${colors.danger}14` }]}>
-                  <Text style={[styles.errorCardText, { color: colors.danger }]}>{submitError}</Text>
-                </View>
-              ) : null}
-
-              <PrimaryButton
-                disabled={!canSend || sending}
-                label={sending ? "Sending..." : "Send message"}
-                onPress={handleSend}
-              />
             </View>
-          ) : null}
-        </RestorableScrollView>
+            <SplitPaneScrollLayout
+              enabled
+              leading={{
+                content: selectionPane,
+                contentContainerStyle: [styles.scrollContentTablet, styles.splitPaneContent],
+                refreshControl: <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />,
+                storageKey: "compose-selection-pane",
+              }}
+              leadingFlex={0.95}
+              leadingStyle={styles.primaryPane}
+              trailing={{
+                content: composerPane,
+                contentContainerStyle: [styles.scrollContentTablet, styles.splitPaneContent],
+                storageKey: "compose-editor-pane",
+              }}
+              trailingFlex={1.05}
+              trailingStyle={styles.secondaryPane}
+            />
+          </View>
+        ) : (
+          <RestorableScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
+            {!shellData && shellLoading ? <LoadingState label="Loading compose screen..." /> : null}
+            {showShellError ? <ErrorState error={shellError.message} onRetry={shellRefetch} /> : null}
+
+            {shellData ? (
+              <View style={styles.container}>
+                <View style={[styles.pageHeader, { borderBottomColor: colors.border }]}>
+                  <Pressable
+                    onPress={() => {
+                      triggerSelectionHaptic();
+                      goBackOrPush(router, "/inbox");
+                    }}
+                    style={[styles.backButton, { borderColor: colors.border, backgroundColor: colors.card }]}
+                  >
+                    <ArrowLeft size={16} color={colors.foreground} />
+                  </Pressable>
+                  <View style={styles.pageHeaderText}>
+                    <Text style={[styles.pageTitle, { color: colors.foreground }]}>New message</Text>
+                    <Text style={[styles.pageSubtitle, { color: colors.muted }]}>
+                      Start a Canvas conversation without leaving the app.
+                    </Text>
+                  </View>
+                </View>
+                {selectionPane}
+                {composerPane}
+              </View>
+            ) : null}
+          </RestorableScrollView>
+        )}
       </AppScreen>
     </RequireCanvasConfig>
   );
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    flex: 1,
+    minHeight: 0,
+  },
   backButton: {
     alignItems: "center",
     borderRadius: 14,
@@ -506,12 +562,20 @@ const styles = StyleSheet.create({
   container: {
     gap: 16,
   },
+  splitContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
   courseCard: {
     borderRadius: 16,
     borderWidth: 1,
     minWidth: "48%",
     paddingHorizontal: 14,
     paddingVertical: 14,
+  },
+  courseCardTablet: {
+    minWidth: "100%",
   },
   courseCardRow: {
     flexDirection: "row",
@@ -694,6 +758,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
   },
+  scrollContentTablet: {
+    paddingBottom: 112,
+  },
   searchField: {
     alignItems: "center",
     borderRadius: 16,
@@ -707,6 +774,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     paddingVertical: 10,
+  },
+  primaryPane: {
+    alignSelf: "stretch",
   },
   selectedRecipients: {
     flexDirection: "row",
@@ -726,6 +796,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
+  },
+  secondaryPane: {
+    alignSelf: "stretch",
+  },
+  splitPaneContent: {
+    paddingBottom: 24,
   },
   summaryText: {
     flex: 1,

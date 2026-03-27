@@ -22,9 +22,11 @@ import {
   RequireCanvasConfig,
   SectionCard,
 } from "../../src/components/app-ui";
+import { SplitPaneScrollLayout } from "../../src/components/split-pane-scroll-layout";
 import { RestorableScrollView } from "../../src/components/restorable-scroll-view";
 import { primeCalendarQuery, useCalendar } from "../../src/hooks/use-canvas-queries";
 import { useRefreshControl } from "../../src/hooks/use-refresh-control";
+import { useTabletLayout } from "../../src/hooks/use-tablet-layout";
 import { useAppPreferences } from "../../src/providers/app-preferences";
 import { useCanvasSession } from "../../src/providers/canvas-session";
 import { formatDateTime } from "../../src/lib/format";
@@ -121,8 +123,15 @@ export default function CalendarTab() {
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [hasLoadedViewMode, setHasLoadedViewMode] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const { height, isTabletLandscape } = useTabletLayout();
   const weekdayLabels = useMemo(() => getWeekdayLabels(resolvedLocale, "short"), [resolvedLocale]);
   const mobileWeekdayLabels = useMemo(() => getWeekdayLabels(resolvedLocale, "narrow"), [resolvedLocale]);
+  const displayedWeekdayLabels = isTabletLandscape ? weekdayLabels : mobileWeekdayLabels;
+  const isCondensedLandscapeCalendar = isTabletLandscape && viewMode === "calendar";
+  const condensedDayCellHeight = useMemo(
+    () => Math.max(46, Math.min(58, Math.floor(height * 0.072))),
+    [height],
+  );
 
   const { month, year } = useMemo(
     () => normalizeMonth(currentYear, currentMonth),
@@ -278,17 +287,33 @@ export default function CalendarTab() {
   };
 
   const renderCalendarView = () => (
-    <View style={styles.calendarWrapper}>
+    <View style={[styles.calendarWrapper, isCondensedLandscapeCalendar && styles.calendarWrapperCondensed]}>
       <View style={styles.calendarGrid}>
         {weekdayLabels.map((weekDay, index) => (
-          <Text key={weekDay} style={[styles.weekDayHeader, { color: colors.mutedForeground }]}>
-            {mobileWeekdayLabels[index]}
+          <Text
+            key={weekDay}
+            style={[
+              styles.weekDayHeader,
+              isCondensedLandscapeCalendar && styles.weekDayHeaderCondensed,
+              { color: colors.mutedForeground },
+            ]}
+          >
+            {displayedWeekdayLabels[index]}
           </Text>
         ))}
 
         {calendarCells.map((cell, index) => {
           if (!cell) {
-            return <View key={`empty-${index}`} style={styles.emptyCell} />;
+            return (
+              <View
+                key={`empty-${index}`}
+                style={[
+                  styles.emptyCell,
+                  isCondensedLandscapeCalendar && styles.emptyCellCondensed,
+                  isCondensedLandscapeCalendar && { aspectRatio: undefined, height: condensedDayCellHeight },
+                ]}
+              />
+            );
           }
 
           const isSelected = selectedDay === cell.dayNumber;
@@ -299,21 +324,51 @@ export default function CalendarTab() {
             <Pressable
               key={cell.dayNumber}
               onPress={() => handleDayPress(cell.dayNumber)}
-              style={[styles.dayCell, { backgroundColor: bgColor, borderColor }]}
+              style={[
+                styles.dayCell,
+                isCondensedLandscapeCalendar && styles.dayCellCondensed,
+                isCondensedLandscapeCalendar && { aspectRatio: undefined, height: condensedDayCellHeight },
+                { backgroundColor: bgColor, borderColor },
+              ]}
             >
               <View style={styles.dayCellHeader}>
-                <Text style={[styles.dayNumber, { color: colors.foreground }]}>{cell.dayNumber}</Text>
+                <Text
+                  style={[
+                    styles.dayNumber,
+                    isCondensedLandscapeCalendar && styles.dayNumberCondensed,
+                    { color: colors.foreground },
+                  ]}
+                >
+                  {cell.dayNumber}
+                </Text>
                 {cell.entries.length > 0 && (
-                  <Text style={[styles.dayEntryCount, { color: colors.muted }]}>{cell.entries.length}</Text>
+                  <Text
+                    style={[
+                      styles.dayEntryCount,
+                      isCondensedLandscapeCalendar && styles.dayEntryCountCondensed,
+                      { color: colors.muted },
+                    ]}
+                  >
+                    {cell.entries.length}
+                  </Text>
                 )}
               </View>
-              <View style={styles.dotsContainer}>
-                {cell.entries.slice(0, 8).map((entry) => {
+              <View style={[styles.dotsContainer, isCondensedLandscapeCalendar && styles.dotsContainerCondensed]}>
+                {cell.entries.slice(0, isCondensedLandscapeCalendar ? 6 : 8).map((entry) => {
                   const palette = getSubjectColorPalette(
                     entry.contextName,
                     entry.courseId ? subjectPreferences.colors[entry.courseId] : undefined,
                   );
-                  return <View key={entry.id} style={[styles.entryDot, { backgroundColor: palette.borderColor }]} />;
+                  return (
+                    <View
+                      key={entry.id}
+                      style={[
+                        styles.entryDot,
+                        isCondensedLandscapeCalendar && styles.entryDotCondensed,
+                        { backgroundColor: palette.borderColor },
+                      ]}
+                    />
+                  );
                 })}
               </View>
             </Pressable>
@@ -455,113 +510,250 @@ export default function CalendarTab() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen title={t(resolvedLocale, "calendar.title")} scroll={false}>
-        <RestorableScrollView 
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 112 }]}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.mutedForeground}
+      <AppScreen contentStyle={styles.screenContent} title={t(resolvedLocale, "calendar.title")} scroll={false}>
+        {isTabletLandscape && data ? (
+          <View style={[styles.container, styles.splitContainer, { paddingBottom: insets.bottom + 24 }]}>
+            <SplitPaneScrollLayout
+              enabled
+              leading={{
+                content: (
+                  <View style={[styles.calendarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.calendarCardHeader, { borderBottomColor: colors.border }]}>
+                      <View style={styles.cardHeaderRow}>
+                        <View style={styles.titleSection}>
+                          <Text style={[styles.monthLabel, isCondensedLandscapeCalendar && styles.monthLabelCondensed, { color: colors.foreground }]}>
+                            {getMonthLabel(year, month, resolvedLocale)}
+                          </Text>
+                          <Text style={[styles.scheduledItems, isCondensedLandscapeCalendar && styles.scheduledItemsCondensed, { color: colors.muted }]}>
+                            {t(resolvedLocale, "calendar.scheduledItems", { count: visibleEntries.length })}
+                          </Text>
+                        </View>
+                        <View style={styles.navButtons}>
+                          <Pressable
+                            onPress={() => navigateMonth(-1)}
+                            style={[
+                              styles.navButton,
+                              isCondensedLandscapeCalendar && styles.navButtonCondensed,
+                              { backgroundColor: colors.card, borderColor: colors.buttonBorder },
+                            ]}
+                          >
+                            <ChevronLeft size={18} color={colors.foreground} />
+                          </Pressable>
+                          <Pressable
+                            onPress={() => navigateMonth(1)}
+                            style={[
+                              styles.navButton,
+                              isCondensedLandscapeCalendar && styles.navButtonCondensed,
+                              { backgroundColor: colors.card, borderColor: colors.buttonBorder },
+                            ]}
+                          >
+                            <ChevronRight size={18} color={colors.foreground} />
+                          </Pressable>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={[styles.calendarCardContent, isCondensedLandscapeCalendar && styles.calendarCardContentCondensed]}>
+                      <View style={[styles.viewToggle, { backgroundColor: colors.buttonBg, borderColor: colors.buttonBorder }]}>
+                        <Pressable
+                          onPress={() => {
+                            triggerSelectionHaptic();
+                            setViewMode("calendar");
+                          }}
+                          style={[
+                            styles.toggleButton,
+                            styles.toggleButtonMobile,
+                            isCondensedLandscapeCalendar && styles.toggleButtonCondensed,
+                            viewMode === "calendar" && { backgroundColor: colors.primaryButton },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.toggleText,
+                              { color: viewMode === "calendar" ? colors.primaryButtonText : colors.muted },
+                            ]}
+                          >
+                            {t(resolvedLocale, "calendar.viewCalendar")}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            triggerSelectionHaptic();
+                            setViewMode("list");
+                          }}
+                          style={[
+                            styles.toggleButton,
+                            styles.toggleButtonMobile,
+                            isCondensedLandscapeCalendar && styles.toggleButtonCondensed,
+                            viewMode === "list" && { backgroundColor: colors.primaryButton },
+                          ]}
+                        >
+                          <Text
+                            style={[styles.toggleText, { color: viewMode === "list" ? colors.primaryButtonText : colors.muted }]}
+                          >
+                            {t(resolvedLocale, "calendar.viewList")}
+                          </Text>
+                        </Pressable>
+                      </View>
+
+                      <View style={[styles.viewContainer, isCondensedLandscapeCalendar && styles.viewContainerCondensed]}>
+                        {viewMode === "calendar" ? renderCalendarView() : renderListView()}
+                      </View>
+                    </View>
+                  </View>
+                ),
+                contentContainerStyle: styles.splitPaneContent,
+                refreshControl: (
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={colors.mutedForeground}
+                  />
+                ),
+                storageKey: "calendar-primary-pane",
+              }}
+              leadingFlex={isCondensedLandscapeCalendar ? 1.05 : 1.25}
+              leadingStyle={styles.primaryPane}
+              trailing={{
+                content: renderSidePanel(),
+                contentContainerStyle: styles.splitPaneContent,
+                storageKey: "calendar-secondary-pane",
+              }}
+              trailingFlex={isCondensedLandscapeCalendar ? 0.95 : 0.85}
+              trailingStyle={styles.secondaryPane}
             />
-          }
-        >
-          <View style={styles.container}>
-            <View style={[styles.calendarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.calendarCardHeader, { borderBottomColor: colors.border }]}>
-                <View style={styles.cardHeaderRow}>
-                  <View style={styles.titleSection}>
-                    <Text style={[styles.monthLabel, { color: colors.foreground }]}>
-                      {getMonthLabel(year, month, resolvedLocale)}
-                    </Text>
-                    <Text style={[styles.scheduledItems, { color: colors.muted }]}>
-                      {t(resolvedLocale, "calendar.scheduledItems", { count: visibleEntries.length })}
-                    </Text>
-                  </View>
-                  <View style={styles.navButtons}>
-                    <Pressable
-                      onPress={() => navigateMonth(-1)}
-                      style={[styles.navButton, { backgroundColor: colors.card, borderColor: colors.buttonBorder }]}
-                    >
-                      <ChevronLeft size={18} color={colors.foreground} />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => navigateMonth(1)}
-                      style={[styles.navButton, { backgroundColor: colors.card, borderColor: colors.buttonBorder }]}
-                    >
-                      <ChevronRight size={18} color={colors.foreground} />
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.calendarCardContent}>
-                <View style={[styles.viewToggle, { backgroundColor: colors.buttonBg, borderColor: colors.buttonBorder }]}>
-                  <Pressable
-                    onPress={() => {
-                      triggerSelectionHaptic();
-                      setViewMode("calendar");
-                    }}
-                    style={[
-                      styles.toggleButton,
-                      styles.toggleButtonMobile,
-                      viewMode === "calendar" && { backgroundColor: colors.primaryButton },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.toggleText,
-                        { color: viewMode === "calendar" ? colors.primaryButtonText : colors.muted },
-                      ]}
-                    >
-                      {t(resolvedLocale, "calendar.viewCalendar")}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      triggerSelectionHaptic();
-                      setViewMode("list");
-                    }}
-                    style={[
-                      styles.toggleButton,
-                      styles.toggleButtonMobile,
-                      viewMode === "list" && { backgroundColor: colors.primaryButton },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.toggleText, { color: viewMode === "list" ? colors.primaryButtonText : colors.muted }]}
-                    >
-                      {t(resolvedLocale, "calendar.viewList")}
-                    </Text>
-                  </Pressable>
-                </View>
-
-                {showColdLoading ? <LoadingState label={t(resolvedLocale, "common.loading")} /> : null}
-                {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
-
-                {data ? (
-                  <View style={styles.viewContainer}>
-                    {viewMode === "calendar" ? renderCalendarView() : renderListView()}
-                  </View>
-                ) : null}
-              </View>
-            </View>
-
-            {data ? renderSidePanel() : null}
           </View>
-        </RestorableScrollView>
+        ) : (
+          <RestorableScrollView 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: insets.bottom + 112 },
+            ]}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.mutedForeground}
+              />
+            }
+          >
+            <View style={styles.container}>
+              <View style={[styles.calendarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.calendarCardHeader, { borderBottomColor: colors.border }]}>
+                    <View style={styles.cardHeaderRow}>
+                      <View style={styles.titleSection}>
+                      <Text style={[styles.monthLabel, isCondensedLandscapeCalendar && styles.monthLabelCondensed, { color: colors.foreground }]}>
+                        {getMonthLabel(year, month, resolvedLocale)}
+                      </Text>
+                      <Text style={[styles.scheduledItems, isCondensedLandscapeCalendar && styles.scheduledItemsCondensed, { color: colors.muted }]}>
+                        {t(resolvedLocale, "calendar.scheduledItems", { count: visibleEntries.length })}
+                      </Text>
+                    </View>
+                    <View style={styles.navButtons}>
+                      <Pressable
+                        onPress={() => navigateMonth(-1)}
+                        style={[
+                          styles.navButton,
+                          isCondensedLandscapeCalendar && styles.navButtonCondensed,
+                          { backgroundColor: colors.card, borderColor: colors.buttonBorder },
+                        ]}
+                      >
+                        <ChevronLeft size={18} color={colors.foreground} />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => navigateMonth(1)}
+                        style={[
+                          styles.navButton,
+                          isCondensedLandscapeCalendar && styles.navButtonCondensed,
+                          { backgroundColor: colors.card, borderColor: colors.buttonBorder },
+                        ]}
+                      >
+                        <ChevronRight size={18} color={colors.foreground} />
+                      </Pressable>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={[styles.calendarCardContent, isCondensedLandscapeCalendar && styles.calendarCardContentCondensed]}>
+                    <View style={[styles.viewToggle, { backgroundColor: colors.buttonBg, borderColor: colors.buttonBorder }]}>
+                      <Pressable
+                        onPress={() => {
+                          triggerSelectionHaptic();
+                          setViewMode("calendar");
+                        }}
+                        style={[
+                          styles.toggleButton,
+                          styles.toggleButtonMobile,
+                          isCondensedLandscapeCalendar && styles.toggleButtonCondensed,
+                          viewMode === "calendar" && { backgroundColor: colors.primaryButton },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.toggleText,
+                            { color: viewMode === "calendar" ? colors.primaryButtonText : colors.muted },
+                          ]}
+                        >
+                          {t(resolvedLocale, "calendar.viewCalendar")}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          triggerSelectionHaptic();
+                          setViewMode("list");
+                        }}
+                        style={[
+                          styles.toggleButton,
+                          styles.toggleButtonMobile,
+                          isCondensedLandscapeCalendar && styles.toggleButtonCondensed,
+                          viewMode === "list" && { backgroundColor: colors.primaryButton },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.toggleText, { color: viewMode === "list" ? colors.primaryButtonText : colors.muted }]}
+                        >
+                          {t(resolvedLocale, "calendar.viewList")}
+                        </Text>
+                      </Pressable>
+                    </View>
+
+                    {showColdLoading ? <LoadingState label={t(resolvedLocale, "common.loading")} /> : null}
+                    {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
+
+                    {data ? (
+                      <View style={[styles.viewContainer, isCondensedLandscapeCalendar && styles.viewContainerCondensed]}>
+                        {viewMode === "calendar" ? renderCalendarView() : renderListView()}
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              {data ? renderSidePanel() : null}
+            </View>
+          </RestorableScrollView>
+        )}
       </AppScreen>
     </RequireCanvasConfig>
   );
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    flex: 1,
+    minHeight: 0,
+  },
   scrollContent: {
     paddingHorizontal: 0,
   },
+  scrollContentTablet: {
+    paddingBottom: 20,
+  },
   container: {
     gap: 16,
+    paddingTop: 6,
+  },
+  splitContainer: {
+    flex: 1,
     paddingTop: 6,
   },
   calendarCard: {
@@ -574,6 +766,12 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     paddingHorizontal: 14,
     paddingTop: 12,
+  },
+  calendarCardContentCondensed: {
+    gap: 10,
+    paddingBottom: 12,
+    paddingHorizontal: 12,
+    paddingTop: 10,
   },
   calendarCardHeader: {
     borderBottomWidth: 1,
@@ -596,9 +794,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: -0.3,
   },
+  monthLabelCondensed: {
+    fontSize: 16,
+  },
   scheduledItems: {
     fontSize: 13,
     fontWeight: "400",
+  },
+  scheduledItemsCondensed: {
+    fontSize: 12,
   },
   viewToggle: {
     flexDirection: "row",
@@ -610,6 +814,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 999,
+  },
+  toggleButtonCondensed: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
   toggleButtonMobile: {
     flex: 1,
@@ -632,12 +840,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  navButtonCondensed: {
+    height: 32,
+    width: 32,
+  },
   viewContainer: {
     marginTop: 14,
+  },
+  viewContainerCondensed: {
+    marginTop: 8,
   },
   calendarWrapper: {
     paddingHorizontal: 2,
     paddingVertical: 2,
+  },
+  calendarWrapperCondensed: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   calendarGrid: {
     flexDirection: "row",
@@ -653,6 +872,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 8,
   },
+  weekDayHeaderCondensed: {
+    fontSize: 10,
+    letterSpacing: 0.3,
+    marginBottom: 6,
+  },
   dayCell: {
     width: "13.4%",
     aspectRatio: 1,
@@ -662,10 +886,20 @@ const styles = StyleSheet.create({
     padding: 5,
     justifyContent: "space-between",
   },
+  dayCellCondensed: {
+    aspectRatio: 0.72,
+    borderRadius: 7,
+    marginBottom: 4,
+    padding: 6,
+  },
   emptyCell: {
     width: "13.4%",
     aspectRatio: 1,
     marginBottom: 6,
+  },
+  emptyCellCondensed: {
+    aspectRatio: 0.72,
+    marginBottom: 4,
   },
   dayCellHeader: {
     flexDirection: "row",
@@ -676,19 +910,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
+  dayNumberCondensed: {
+    fontSize: 13,
+  },
   dayEntryCount: {
     fontSize: 9,
     fontWeight: "500",
+  },
+  dayEntryCountCondensed: {
+    fontSize: 10,
   },
   dotsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 2,
   },
+  dotsContainerCondensed: {
+    gap: 2,
+  },
   entryDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
+  },
+  entryDotCondensed: {
+    borderRadius: 2.5,
+    height: 5,
+    width: 5,
   },
   emptyListContainer: {
     paddingVertical: 24,
@@ -777,5 +1025,14 @@ const styles = StyleSheet.create({
   panelSubtitle: {
     fontSize: 13,
     marginBottom: 12,
+  },
+  primaryPane: {
+    alignSelf: "stretch",
+  },
+  secondaryPane: {
+    alignSelf: "stretch",
+  },
+  splitPaneContent: {
+    paddingBottom: 24,
   },
 });

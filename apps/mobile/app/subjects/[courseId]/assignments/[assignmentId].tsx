@@ -238,14 +238,14 @@ export default function AssignmentDetailScreen() {
                   </View>
                   <View style={styles.cardContent}>
                     {assignment.description ? (
-                      <RichText currentCourseId={courseId} html={assignment.description} providerUrl={config?.apiBase} />
+                      <RichText currentCourseId={courseId} fallbackCanvasUrl={assignment.html_url} html={assignment.description} providerUrl={config?.apiBase} />
                     ) : showInlineRefresh ? (
                       <>
                         <PlaceholderBlock height={84} />
                         <PlaceholderBlock height={144} />
                       </>
                     ) : (
-                      <RichText currentCourseId={courseId} html={`<p>${t(resolvedLocale, "subjects.noAssignmentDescription")}</p>`} providerUrl={config?.apiBase} />
+                      <RichText currentCourseId={courseId} fallbackCanvasUrl={assignment.html_url} html={`<p>${t(resolvedLocale, "subjects.noAssignmentDescription")}</p>`} providerUrl={config?.apiBase} />
                     )}
                     {assignment.html_url && (
                       <Pressable onPress={() => void openCanvasUrl(assignment.html_url)}>

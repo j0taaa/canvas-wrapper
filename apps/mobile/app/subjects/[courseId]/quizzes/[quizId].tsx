@@ -167,14 +167,14 @@ export default function QuizDetailScreen() {
                   </View>
                   <View style={styles.cardContent}>
                     {quiz.description ? (
-                      <RichText currentCourseId={courseId} html={quiz.description} providerUrl={config?.apiBase} />
+                      <RichText currentCourseId={courseId} fallbackCanvasUrl={quiz.html_url} html={quiz.description} providerUrl={config?.apiBase} />
                     ) : showInlineRefresh ? (
                       <>
                         <PlaceholderBlock height={84} />
                         <PlaceholderBlock height={132} />
                       </>
                     ) : (
-                      <RichText currentCourseId={courseId} html={`<p>${t(resolvedLocale, "subjects.noQuizDescription")}</p>`} providerUrl={config?.apiBase} />
+                      <RichText currentCourseId={courseId} fallbackCanvasUrl={quiz.html_url} html={`<p>${t(resolvedLocale, "subjects.noQuizDescription")}</p>`} providerUrl={config?.apiBase} />
                     )}
                     {quiz.html_url && (
                       <Pressable onPress={() => void openCanvasUrl(quiz.html_url)} style={[styles.openButton, { borderColor: colors.border }]}>
@@ -212,7 +212,7 @@ export default function QuizDetailScreen() {
                               </Text>
                             )}
                           </View>
-                          <RichText currentCourseId={courseId} html={question.question_text || `<p>${t(resolvedLocale, "subjects.noQuestionText")}</p>`} providerUrl={config?.apiBase} />
+                          <RichText currentCourseId={courseId} fallbackCanvasUrl={quiz.html_url} html={question.question_text || `<p>${t(resolvedLocale, "subjects.noQuestionText")}</p>`} providerUrl={config?.apiBase} />
                           {question.answers && question.answers.length > 0 && (
                             <View style={styles.answersList}>
                               {question.answers.map((answer, answerIndex) => (

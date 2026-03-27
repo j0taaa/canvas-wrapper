@@ -3,17 +3,31 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { APP_WELCOME_STORAGE_KEY, t, type AppLocale } from "@canvas/shared";
 import {
+  APP_WELCOME_STORAGE_KEY,
+  getCanvasConnectGuideSections,
+  getCanvasConnectHighlights,
+  normalizeCanvasProviderUrl,
+  t,
+  type AppLocale,
+} from "@canvas/shared";
+import {
+  Eye,
+  EyeOff,
   BookOpen,
   Briefcase,
   Calculator,
   Code2,
   FlaskConical,
   Globe,
+  KeyRound,
   Landmark,
+  Link2,
+  LockKeyhole,
   PenSquare,
+  ShieldCheck,
   Sigma,
+  Sparkles,
 } from "lucide-react";
 import {
   Card,
@@ -43,6 +57,15 @@ const DASHBOARD_REFRESH_MIN_AGE_MS = 45_000;
 const BOOTSTRAP_CACHE_MAX_AGE_MS = 5 * 60_000;
 const PREFETCH_SUBJECT_LIMIT = 8;
 const PREFETCH_ASSIGNMENT_LIMIT = 6;
+const connectHighlightIcons = {
+  device: ShieldCheck,
+  direct: Globe,
+  quick: Sparkles,
+} as const;
+const connectGuideIcons = {
+  apiKey: KeyRound,
+  url: Link2,
+} as const;
 
 type HomeClientProps = {
   initialData: CanvasDashboardData | null;
@@ -216,10 +239,10 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
   });
   const [providerUrl, setProviderUrl] = useState(() => {
     if (typeof window === "undefined") {
-      return "";
+      return normalizeCanvasProviderUrl(undefined);
     }
 
-    return localStorage.getItem(CANVAS_API_BASE_STORAGE)?.trim() ?? "";
+    return localStorage.getItem(CANVAS_API_BASE_STORAGE)?.trim() ?? normalizeCanvasProviderUrl(undefined);
   });
   const [hasSeenWelcome, setHasSeenWelcome] = useState(() => {
     if (typeof window === "undefined") {
@@ -254,7 +277,11 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
   const [loading, setLoading] = useState(false);
   const [showPastCourses, setShowPastCourses] = useState(false);
   const [preferences, setPreferences] = useState(initialPreferences);
+  const [showApiKey, setShowApiKey] = useState(false);
   const hasSavedKey = apiKey.trim().length > 0;
+  const normalizedProviderUrl = normalizeCanvasProviderUrl(providerUrl);
+  const connectHighlights = getCanvasConnectHighlights(resolvedLocale);
+  const connectGuideSections = getCanvasConnectGuideSections(resolvedLocale);
 
   const loadDashboard = async (key: string, provider: string) => {
     setLoading(true);
@@ -403,66 +430,189 @@ export default function HomeClient({ initialData, initialPreferences }: HomeClie
     }
 
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
-          <Card className="w-full max-w-xl border-border/80 bg-card">
-          <CardHeader>
-            <CardTitle>{t(resolvedLocale, "connect.accountTitle")}</CardTitle>
-            <CardDescription>{t(resolvedLocale, "connect.accountSubtitle")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 rounded-2xl border border-border/70 bg-muted/35 p-4">
-              <p className="mb-2 text-sm font-medium text-foreground">{t(resolvedLocale, "connect.howToGetKeyTitle")}</p>
-              <ol className="space-y-1 text-sm text-muted-foreground">
-                <li>{t(resolvedLocale, "connect.keyStep1")}</li>
-                <li>{t(resolvedLocale, "connect.keyStep2")}</li>
-                <li>{t(resolvedLocale, "connect.keyStep3")}</li>
-                <li>{t(resolvedLocale, "connect.keyStep4")}</li>
-                <li>{t(resolvedLocale, "connect.keyStep5")}</li>
-              </ol>
-              <p className="mb-2 mt-4 text-sm font-medium text-foreground">{t(resolvedLocale, "connect.whatUrlTitle")}</p>
-              <ol className="space-y-1 text-sm text-muted-foreground">
-                <li>{t(resolvedLocale, "connect.urlStep1")}</li>
-                <li>{t(resolvedLocale, "connect.urlStep2")}</li>
-                <li>{t(resolvedLocale, "connect.urlStep3")}</li>
-                <li>{t(resolvedLocale, "connect.urlStep4")}</li>
-              </ol>
-              <a
-                href="https://developerdocs.instructure.com/services/canvas/oauth2/file.oauth"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-              >
-                {t(resolvedLocale, "connect.docsLink")}
-              </a>
-              <a
-                href="/privacy"
-                className="ml-4 mt-3 inline-flex text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-              >
-                {t(resolvedLocale, "common.privacyPolicy")}
-              </a>
-            </div>
-            <form onSubmit={onSubmit} className="space-y-3">
-              <input
-                type="text"
-                placeholder={t(resolvedLocale, "connect.urlPlaceholder")}
-                value={providerUrl}
-                onChange={(event) => setProviderUrl(event.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              />
-              <input
-                type="password"
-                placeholder={t(resolvedLocale, "connect.apiKeyPlaceholder")}
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              />
-              <Button type="submit" disabled={!hasSavedKey || loading}>
-                {loading ? t(resolvedLocale, "connect.connecting") : t(resolvedLocale, "connect.saveAndConnect")}
-              </Button>
-            </form>
-            {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
-          </CardContent>
-        </Card>
+      <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_34%),radial-gradient(circle_at_top_right,rgba(45,212,191,0.12),transparent_30%),linear-gradient(180deg,rgba(255,247,237,0.62)_0%,rgba(255,255,255,0.96)_42%,rgba(240,249,255,0.84)_100%)] px-4 py-8 text-foreground dark:bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.12),transparent_32%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.1),transparent_28%),linear-gradient(180deg,rgba(41,20,0,0.28)_0%,rgba(2,6,23,0.96)_50%,rgba(8,47,73,0.3)_100%)] sm:px-6">
+        <div className="pointer-events-none absolute left-[-5rem] top-10 h-52 w-52 rounded-full bg-amber-300/25 blur-3xl dark:bg-amber-200/10" />
+        <div className="pointer-events-none absolute bottom-0 right-[-4rem] h-64 w-64 rounded-full bg-cyan-300/20 blur-3xl dark:bg-cyan-300/10" />
+
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center">
+          <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,430px)]">
+            <section className="relative overflow-hidden rounded-[2.4rem] border border-black/8 bg-white/72 p-5 shadow-[0_28px_90px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-white/[0.06] sm:p-7">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.55),transparent_68%)] dark:bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_72%)]" />
+
+              <div className="relative space-y-6">
+                <div className="space-y-4">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/80 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-foreground/72 uppercase dark:border-white/10 dark:bg-white/[0.08] dark:text-foreground/82">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    {t(resolvedLocale, "connect.setupEyebrow")}
+                  </span>
+
+                  <div className="max-w-2xl space-y-3">
+                    <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground sm:text-4xl">
+                      {t(resolvedLocale, "connect.accountTitle")}
+                    </h1>
+                    <p className="max-w-xl text-sm leading-6 text-muted-foreground sm:text-[15px]">
+                      {t(resolvedLocale, "connect.accountSubtitle")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  {connectHighlights.map((highlight) => {
+                    const Icon = connectHighlightIcons[highlight.id];
+                    const accentClassName = highlight.id === "device"
+                      ? "bg-amber-50 text-amber-700 dark:bg-amber-400/12 dark:text-amber-100"
+                      : highlight.id === "direct"
+                        ? "bg-cyan-50 text-cyan-700 dark:bg-cyan-400/12 dark:text-cyan-100"
+                        : "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-100";
+
+                    return (
+                      <div
+                        key={highlight.id}
+                        className="rounded-[1.6rem] border border-black/8 bg-white/78 p-4 backdrop-blur dark:border-white/10 dark:bg-white/[0.05]"
+                      >
+                        <div className={`mb-3 inline-flex rounded-2xl p-2.5 ${accentClassName}`}>
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <p className="text-sm font-semibold text-foreground">{highlight.title}</p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">{highlight.description}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {connectGuideSections.map((section) => {
+                    const Icon = connectGuideIcons[section.id];
+
+                    return (
+                      <div
+                        key={section.id}
+                        className="rounded-[1.8rem] border border-black/8 bg-white/80 p-5 backdrop-blur dark:border-white/10 dark:bg-white/[0.05]"
+                      >
+                        <div className="mb-4 flex items-center gap-3">
+                          <div className="rounded-2xl border border-black/8 bg-white/90 p-2 dark:border-white/10 dark:bg-white/[0.08]">
+                            <Icon className="h-4 w-4 text-foreground" />
+                          </div>
+                          <p className="text-sm font-semibold text-foreground">{section.title}</p>
+                        </div>
+
+                        <ol className="space-y-2 text-sm leading-6 text-muted-foreground">
+                          {section.steps.map((step) => (
+                            <li key={step}>{step}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <a
+                    href="https://developerdocs.instructure.com/services/canvas/oauth2/file.oauth"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center rounded-full border border-black/10 bg-white/78 px-4 py-2 text-sm text-muted-foreground transition hover:border-black/15 hover:text-foreground dark:border-white/10 dark:bg-white/[0.06] dark:hover:border-white/16"
+                  >
+                    {t(resolvedLocale, "connect.docsLink")}
+                  </a>
+                  <Link
+                    href="/privacy"
+                    className="inline-flex items-center rounded-full border border-black/10 bg-white/78 px-4 py-2 text-sm text-muted-foreground transition hover:border-black/15 hover:text-foreground dark:border-white/10 dark:bg-white/[0.06] dark:hover:border-white/16"
+                  >
+                    {t(resolvedLocale, "common.privacyPolicy")}
+                  </Link>
+                </div>
+              </div>
+            </section>
+
+            <Card className="relative overflow-hidden rounded-[2.4rem] border border-black/8 bg-white/84 shadow-[0_28px_90px_rgba(15,23,42,0.1)] backdrop-blur dark:border-white/10 dark:bg-black/60">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.18),transparent_68%)] dark:bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_72%)]" />
+
+              <CardHeader className="relative space-y-4 p-6 sm:p-7">
+                <span className="inline-flex w-fit items-center gap-2 rounded-full border border-black/8 bg-white/78 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-foreground/72 uppercase dark:border-white/10 dark:bg-white/[0.08] dark:text-foreground/82">
+                  <LockKeyhole className="h-3.5 w-3.5" />
+                  {t(resolvedLocale, "connect.credentialsTitle")}
+                </span>
+                <div className="space-y-2">
+                  <CardTitle className="text-2xl tracking-[-0.04em] sm:text-[2rem]">
+                    {t(resolvedLocale, "connect.saveAndConnect")}
+                  </CardTitle>
+                  <CardDescription className="text-sm leading-6 text-muted-foreground sm:text-[15px]">
+                    {t(resolvedLocale, "connect.accountSubtitle")}
+                  </CardDescription>
+                </div>
+              </CardHeader>
+
+              <CardContent className="relative space-y-5 p-6 pt-0 sm:p-7 sm:pt-0">
+                <form onSubmit={onSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground" htmlFor="canvas-url">
+                      {t(resolvedLocale, "connect.urlLabel")}
+                    </label>
+                    <input
+                      id="canvas-url"
+                      type="text"
+                      autoCapitalize="none"
+                      autoComplete="url"
+                      spellCheck={false}
+                      placeholder={t(resolvedLocale, "connect.urlPlaceholder")}
+                      value={providerUrl}
+                      onChange={(event) => setProviderUrl(event.target.value)}
+                      className="h-12 w-full rounded-[1.15rem] border border-black/10 bg-white/86 px-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/75 focus:border-foreground/20 focus:ring-4 focus:ring-foreground/10 dark:border-white/12 dark:bg-white/[0.06]"
+                    />
+                    <div className="rounded-[1.15rem] border border-black/8 bg-amber-50/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/[0.05]">
+                      <p className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+                        {t(resolvedLocale, "connect.apiEndpointLabel")}
+                      </p>
+                      <p className="mt-1 break-all text-sm text-foreground">{normalizedProviderUrl}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground" htmlFor="canvas-key">
+                      {t(resolvedLocale, "connect.apiKeyLabel")}
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="canvas-key"
+                        type={showApiKey ? "text" : "password"}
+                        autoCapitalize="none"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder={t(resolvedLocale, "connect.apiKeyPlaceholder")}
+                        value={apiKey}
+                        onChange={(event) => setApiKey(event.target.value)}
+                        className="h-12 w-full rounded-[1.15rem] border border-black/10 bg-white/86 px-4 pr-20 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/75 focus:border-foreground/20 focus:ring-4 focus:ring-foreground/10 dark:border-white/12 dark:bg-white/[0.06]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey((current) => !current)}
+                        className="absolute inset-y-2 right-2 inline-flex items-center gap-1 rounded-xl border border-black/8 bg-white/88 px-3 text-xs font-medium text-muted-foreground transition hover:text-foreground dark:border-white/10 dark:bg-white/[0.08]"
+                      >
+                        {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        {showApiKey ? t(resolvedLocale, "common.hide") : t(resolvedLocale, "common.show")}
+                      </button>
+                    </div>
+                  </div>
+
+                  {error ? (
+                    <div className="rounded-[1.15rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/30 dark:bg-red-950/30 dark:text-red-200">
+                      {error}
+                    </div>
+                  ) : null}
+
+                  <Button
+                    type="submit"
+                    className="h-12 w-full rounded-[1.15rem] text-sm font-semibold"
+                    disabled={!hasSavedKey || loading}
+                  >
+                    {loading ? t(resolvedLocale, "connect.connecting") : t(resolvedLocale, "connect.saveAndConnect")}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   }

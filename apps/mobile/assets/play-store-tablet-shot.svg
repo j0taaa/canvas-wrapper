@@ -1,0 +1,138 @@
+<svg width="1000" height="1600" viewBox="0 0 1000 1600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="500" y1="0" x2="500" y2="1600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF8EF" />
+      <stop offset="0.55" stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#F7FBFF" />
+    </linearGradient>
+    <filter id="blur" x="0" y="0" width="1000" height="1600" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feGaussianBlur stdDeviation="48" result="effect1_foregroundBlur_0_1" />
+    </filter>
+    <filter id="shadow" x="0" y="0" width="1000" height="1600" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix" />
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+      <feOffset dy="18" />
+      <feGaussianBlur stdDeviation="28" />
+      <feComposite in2="hardAlpha" operator="out" />
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0588235 0 0 0 0 0.0901961 0 0 0 0 0.164706 0 0 0 0.12 0" />
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1" />
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape" />
+    </filter>
+  </defs>
+
+  <rect width="1000" height="1600" fill="url(#bg)" />
+
+  <g filter="url(#blur)">
+    <circle cx="186" cy="208" r="150" fill="#FCD34D" fill-opacity="0.30" />
+    <circle cx="840" cy="1270" r="180" fill="#67E8F9" fill-opacity="0.22" />
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="72" y="72" width="856" height="1456" rx="56" fill="#FFFFFF" fill-opacity="0.54" />
+    <rect x="72.5" y="72.5" width="855" height="1455" rx="55.5" stroke="#FFFFFF" stroke-opacity="0.42" />
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="150" y="180" width="240" height="150" rx="34" fill="#FFFFFF" fill-opacity="0.90" />
+    <rect x="150.5" y="180.5" width="239" height="149" rx="33.5" stroke="#0F172A" stroke-opacity="0.08" />
+  </g>
+  <rect x="182" y="212" width="48" height="48" rx="18" fill="#FEF3C7" />
+  <text fill="#0F172A" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="22" font-weight="700">
+    <tspan x="182" y="290.5">Deadlines</tspan>
+  </text>
+  <text fill="#64748B" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="17" font-weight="500">
+    <tspan x="182" y="317.5">Today and this week</tspan>
+  </text>
+
+  <g filter="url(#shadow)">
+    <rect x="610" y="320" width="250" height="156" rx="34" fill="#FFFFFF" fill-opacity="0.90" />
+    <rect x="610.5" y="320.5" width="249" height="155" rx="33.5" stroke="#0F172A" stroke-opacity="0.08" />
+  </g>
+  <rect x="642" y="352" width="48" height="48" rx="18" fill="#CFFAFE" />
+  <text fill="#0F172A" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="22" font-weight="700">
+    <tspan x="642" y="430.5">Messages</tspan>
+  </text>
+  <text fill="#64748B" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="17" font-weight="500">
+    <tspan x="642" y="457.5">Reply faster with less friction</tspan>
+  </text>
+
+  <g filter="url(#shadow)">
+    <rect x="216" y="282" width="568" height="386" rx="48" fill="#FFFFFF" fill-opacity="0.94" />
+    <rect x="216.5" y="282.5" width="567" height="385" rx="47.5" stroke="#0F172A" stroke-opacity="0.08" />
+  </g>
+  <circle cx="500" cy="372" r="48" fill="#0F172A" />
+  <g transform="translate(404 276)">
+    <g transform="translate(96 96) scale(0.44) translate(-256 -256)">
+      <circle cx="256" cy="256" r="148" fill="#E5E7EB" fill-opacity="0.08" />
+      <g transform="translate(256 256)">
+        <rect x="-29" y="-162" width="58" height="112" rx="29" fill="#F8FAFC" />
+        <rect x="-29" y="-162" width="58" height="112" rx="29" transform="rotate(60)" fill="#D1D5DB" />
+        <rect x="-29" y="-162" width="58" height="112" rx="29" transform="rotate(120)" fill="#F8FAFC" />
+        <rect x="-29" y="-162" width="58" height="112" rx="29" transform="rotate(180)" fill="#D1D5DB" />
+        <rect x="-29" y="-162" width="58" height="112" rx="29" transform="rotate(240)" fill="#F8FAFC" />
+        <rect x="-29" y="-162" width="58" height="112" rx="29" transform="rotate(300)" fill="#D1D5DB" />
+      </g>
+      <circle cx="256" cy="256" r="74" fill="#111827" />
+      <circle cx="256" cy="256" r="32" fill="#F8FAFC" />
+    </g>
+  </g>
+  <text fill="#0F172A" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="-0.04em">
+    <tspan x="362" y="468.5">Janvas</tspan>
+  </text>
+  <text fill="#64748B" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="24" font-weight="500">
+    <tspan x="323" y="509.5">A calmer home for Canvas</tspan>
+  </text>
+  <g filter="url(#shadow)">
+    <rect x="330" y="556" width="150" height="46" rx="23" fill="#FFF7ED" />
+    <rect x="496" y="556" width="174" height="46" rx="23" fill="#ECFEFF" />
+  </g>
+  <text fill="#9A3412" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="18" font-weight="600">
+    <tspan x="376" y="585.5">Subjects</tspan>
+  </text>
+  <text fill="#155E75" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="18" font-weight="600">
+    <tspan x="545" y="585.5">Calendar</tspan>
+  </text>
+
+  <text fill="#0F172A" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="66" font-weight="700" letter-spacing="-0.06em">
+    <tspan x="130" y="826.5">Welcome to Janvas</tspan>
+  </text>
+  <text fill="#64748B" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="28" font-weight="500">
+    <tspan x="130" y="876.5">A calmer way to keep up with Canvas, deadlines, messages,</tspan>
+    <tspan x="130" y="914.5">and everything happening across your subjects.</tspan>
+  </text>
+
+  <g filter="url(#shadow)">
+    <rect x="130" y="978" width="740" height="122" rx="32" fill="#FFFFFF" fill-opacity="0.78" />
+    <rect x="130.5" y="978.5" width="739" height="121" rx="31.5" stroke="#0F172A" stroke-opacity="0.06" />
+  </g>
+  <text fill="#0F172A" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="27" font-weight="700">
+    <tspan x="168" y="1035.5">Much faster than Canvas</tspan>
+  </text>
+  <text fill="#64748B" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="22" font-weight="500">
+    <tspan x="168" y="1070.5">Open subjects, files, assignments, pages, and messages with less friction.</tspan>
+  </text>
+
+  <g filter="url(#shadow)">
+    <rect x="130" y="1124" width="740" height="122" rx="32" fill="#FFFFFF" fill-opacity="0.78" />
+    <rect x="130.5" y="1124.5" width="739" height="121" rx="31.5" stroke="#0F172A" stroke-opacity="0.06" />
+  </g>
+  <text fill="#0F172A" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="27" font-weight="700">
+    <tspan x="168" y="1181.5">Extra features like bookmarks</tspan>
+  </text>
+  <text fill="#64748B" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="22" font-weight="500">
+    <tspan x="168" y="1216.5">Save important pages, files, quizzes, and assignments for later.</tspan>
+  </text>
+
+  <g filter="url(#shadow)">
+    <rect x="130" y="1270" width="740" height="122" rx="32" fill="#FFFFFF" fill-opacity="0.78" />
+    <rect x="130.5" y="1270.5" width="739" height="121" rx="31.5" stroke="#0F172A" stroke-opacity="0.06" />
+  </g>
+  <text fill="#0F172A" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="27" font-weight="700">
+    <tspan x="168" y="1327.5">Calendar and notifications sync</tspan>
+  </text>
+  <text fill="#64748B" xml:space="preserve" style="white-space: pre" font-family="Avenir Next, Avenir, Helvetica, Arial, sans-serif" font-size="22" font-weight="500">
+    <tspan x="168" y="1362.5">Bring upcoming work into your calendar and get reminders.</tspan>
+  </text>
+</svg>
