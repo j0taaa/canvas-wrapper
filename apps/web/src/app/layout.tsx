@@ -5,6 +5,7 @@ import { LocaleProvider } from "@/components/locale-provider";
 import { GlobalHaptics } from "@/components/global-haptics";
 import { getRequestLocale } from "@/lib/request-locale";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
+import { getSiteOrigin } from "@/lib/site-url";
 import { ThemeSync } from "@/components/theme-sync";
 import {
   DARK_THEME_SURFACE,
@@ -19,7 +20,11 @@ import {
 export const metadata: Metadata = {
   title: "Janvas",
   description: "Janvas brings your Canvas subjects, deadlines, calendar, and messages into one calmer dashboard.",
+  metadataBase: getSiteOrigin(),
   manifest: "/manifest.webmanifest",
+  alternates: {
+    canonical: "/",
+  },
   icons: {
     icon: "/canvas-icon.svg",
     apple: "/canvas-icon.svg",
@@ -28,6 +33,13 @@ export const metadata: Metadata = {
     capable: true,
     title: "Janvas",
     statusBarStyle: "default",
+  },
+  openGraph: {
+    title: "Janvas",
+    description: "Janvas brings your Canvas subjects, deadlines, calendar, and messages into one calmer dashboard.",
+    url: "/",
+    siteName: "Janvas",
+    type: "website",
   },
 };
 

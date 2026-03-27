@@ -1,5 +1,20 @@
+import type { Metadata } from "next";
 import { getPrivacyPolicyContent, PRIVACY_POLICY_CONTACT_EMAIL, PRIVACY_POLICY_EFFECTIVE_DATE, t } from "@canvas/shared";
 import { getRequestLocale } from "@/lib/request-locale";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy | Janvas",
+  description: "Privacy Policy for Janvas.",
+  alternates: {
+    canonical: "/privacy",
+  },
+  openGraph: {
+    title: "Privacy Policy | Janvas",
+    description: "Privacy Policy for Janvas.",
+    url: "/privacy",
+    type: "article",
+  },
+};
 
 export default async function PrivacyPage() {
   const { resolvedLocale } = await getRequestLocale();
