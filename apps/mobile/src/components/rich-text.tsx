@@ -8,6 +8,8 @@ import {
   isCanvasHostedVideoUrl,
   rewriteCanvasHref,
   rewriteCanvasHtmlEmbeddedMedia,
+  t,
+  type AppLocale,
 } from "@canvas/shared";
 import { openAppHref, openCanvasUrl } from "../lib/navigation";
 import { useAppPreferences } from "../providers/app-preferences";
@@ -56,11 +58,13 @@ function EmbeddedMedia({
   fallbackCanvasUrl,
   providerUrl,
   resolvedTheme,
+  resolvedLocale,
   sourceUrl,
   targetHeight,
 }: {
   fallbackCanvasUrl?: string;
   providerUrl?: string;
+  resolvedLocale: AppLocale;
   resolvedTheme: "dark" | "light";
   sourceUrl: string;
   targetHeight: number;
@@ -80,14 +84,14 @@ function EmbeddedMedia({
       <View style={[styles.embedContainer, styles.embedFallbackButton]}>
         <View style={[styles.embedBadge, { backgroundColor: resolvedTheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.06)" }]}>
           <Text style={[styles.embedBadgeText, { color: resolvedTheme === "dark" ? "#e2e8f0" : "#0f172a" }]}>
-            Canvas video
+            {t(resolvedLocale, "subjects.canvasVideo")}
           </Text>
         </View>
         <Text style={[styles.embedTitle, { color: resolvedTheme === "dark" ? "#f8fafc" : "#0f172a" }]}>
-          This video can't be played inside Janvas.
+          {t(resolvedLocale, "subjects.canvasVideoUnavailable")}
         </Text>
         <Text style={[styles.embedStatus, { color: resolvedTheme === "dark" ? "#cbd5e1" : "#334155" }]}>
-          Open the original Canvas page to watch it in the official player.
+          {t(resolvedLocale, "subjects.canvasVideoOpenOriginal")}
         </Text>
         <Pressable
           onPress={() => void openCanvasUrl(targetUrl)}
@@ -97,7 +101,7 @@ function EmbeddedMedia({
           }]}
         >
           <Text style={[styles.embedActionText, { color: "#0f172a" }]}>
-            Open in Canvas
+            {t(resolvedLocale, "subjects.openInCanvas")}
           </Text>
         </Pressable>
       </View>
@@ -108,7 +112,7 @@ function EmbeddedMedia({
     return (
       <Pressable onPress={() => void Linking.openURL(targetUrl)}>
         <Text style={[styles.embedLink, { color: resolvedTheme === "dark" ? "#93c5fd" : "#2563eb" }]}>
-          Open embedded media
+          {t(resolvedLocale, "subjects.openEmbeddedMedia")}
         </Text>
       </Pressable>
     );
@@ -156,7 +160,7 @@ export function RichText({
 }) {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { resolvedTheme } = useAppPreferences();
+  const { resolvedLocale, resolvedTheme } = useAppPreferences();
   const contentWidth = Math.max(240, width - 64);
   const tableBorderColor = resolvedTheme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.12)";
   const tableHeaderBackgroundColor = resolvedTheme === "dark" ? "rgba(255,255,255,0.05)" : "rgba(15,23,42,0.04)";
@@ -185,6 +189,7 @@ export function RichText({
             <EmbeddedMedia
               fallbackCanvasUrl={fallbackCanvasUrl}
               providerUrl={providerUrl}
+              resolvedLocale={resolvedLocale}
               resolvedTheme={resolvedTheme}
               sourceUrl={src}
               targetHeight={getEmbedHeight(tnode.attributes)}
@@ -201,6 +206,7 @@ export function RichText({
             <EmbeddedMedia
               fallbackCanvasUrl={fallbackCanvasUrl}
               providerUrl={providerUrl}
+              resolvedLocale={resolvedLocale}
               resolvedTheme={resolvedTheme}
               sourceUrl={src}
               targetHeight={getEmbedHeight(tnode.attributes)}
@@ -217,6 +223,7 @@ export function RichText({
             <EmbeddedMedia
               fallbackCanvasUrl={fallbackCanvasUrl}
               providerUrl={providerUrl}
+              resolvedLocale={resolvedLocale}
               resolvedTheme={resolvedTheme}
               sourceUrl={data}
               targetHeight={getEmbedHeight(tnode.attributes)}
@@ -234,6 +241,7 @@ export function RichText({
             <EmbeddedMedia
               fallbackCanvasUrl={fallbackCanvasUrl}
               providerUrl={providerUrl}
+              resolvedLocale={resolvedLocale}
               resolvedTheme={resolvedTheme}
               sourceUrl={src}
               targetHeight={getEmbedHeight(tnode.attributes)}
@@ -251,6 +259,7 @@ export function RichText({
             <EmbeddedMedia
               fallbackCanvasUrl={fallbackCanvasUrl}
               providerUrl={providerUrl}
+              resolvedLocale={resolvedLocale}
               resolvedTheme={resolvedTheme}
               sourceUrl={src}
               targetHeight={getEmbedHeight(tnode.attributes)}

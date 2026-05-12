@@ -60,6 +60,7 @@ export default async function QuizPage({
     courseShellData.apiBase,
     parsedCourseId,
     quizResult.html_url,
+    resolvedLocale,
   );
   const navigation = getSubjectContentNavigation(parsedCourseId, courseContent, files, {
     identifier: parsedQuizId,
@@ -171,6 +172,7 @@ export default async function QuizPage({
                         courseShellData.apiBase,
                         parsedCourseId,
                         quizResult.html_url,
+                        resolvedLocale,
                       ),
                     }}
                   />

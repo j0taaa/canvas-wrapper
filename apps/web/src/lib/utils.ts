@@ -214,20 +214,29 @@ function getVisibleHtmlText(html: string) {
     .trim()
 }
 
-function buildEmbeddedMediaFallbackHtml(targetHref: string) {
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+function buildEmbeddedMediaFallbackHtml(targetHref: string, locale: AppLocale) {
   return `<div style="margin: 1rem 0; overflow: hidden; border: 1px solid rgba(15,23,42,0.1); border-radius: 22px; background: linear-gradient(180deg, rgba(248,250,252,0.98) 0%, rgba(241,245,249,0.96) 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);">
   <div style="padding: 1rem 1rem 0.85rem 1rem; border-bottom: 1px solid rgba(15,23,42,0.08);">
-    <div style="display: inline-flex; align-items: center; border-radius: 999px; background: rgba(15,23,42,0.06); padding: 0.35rem 0.65rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">Canvas video</div>
-    <p style="margin: 0.85rem 0 0 0; font-size: 1rem; font-weight: 700; line-height: 1.4; color: rgb(15,23,42);">This video can&apos;t be played inside Janvas.</p>
-    <p style="margin: 0.45rem 0 0 0; font-size: 0.92rem; line-height: 1.55; color: rgba(15,23,42,0.72);">Open the original Canvas page to watch it in the official player.</p>
+    <div style="display: inline-flex; align-items: center; border-radius: 999px; background: rgba(15,23,42,0.06); padding: 0.35rem 0.65rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">${escapeHtml(t(locale, "subjects.canvasVideo"))}</div>
+    <p style="margin: 0.85rem 0 0 0; font-size: 1rem; font-weight: 700; line-height: 1.4; color: rgb(15,23,42);">${escapeHtml(t(locale, "subjects.canvasVideoUnavailable"))}</p>
+    <p style="margin: 0.45rem 0 0 0; font-size: 0.92rem; line-height: 1.55; color: rgba(15,23,42,0.72);">${escapeHtml(t(locale, "subjects.canvasVideoOpenOriginal"))}</p>
   </div>
   <div style="padding: 0.9rem 1rem 1rem 1rem;">
-    <a href="${targetHref}" target="_blank" rel="noreferrer" data-embed-fallback-link="true" style="display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid rgba(15,23,42,0.14); padding: 0.7rem 1rem; color: rgb(15,23,42); text-decoration: none; font-weight: 700; background: #ffffff;">Open in Canvas</a>
+    <a href="${escapeHtml(targetHref)}" target="_blank" rel="noreferrer" data-embed-fallback-link="true" style="display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid rgba(15,23,42,0.14); padding: 0.7rem 1rem; color: rgb(15,23,42); text-decoration: none; font-weight: 700; background: #ffffff;">${escapeHtml(t(locale, "subjects.openInCanvas"))}</a>
   </div>
 </div>`
 }
 
-function rewriteCanvasHtmlEmbeddedMediaForWebWithFallback(html: string, apiBase?: string, embeddedMediaFallbackHref?: string) {
+function rewriteCanvasHtmlEmbeddedMediaForWebWithFallback(html: string, apiBase?: string, embeddedMediaFallbackHref?: string, locale: AppLocale = "en") {
   const rewriteMediaAttribute = () => (
     match: string,
     _quote: string,
@@ -239,7 +248,7 @@ function rewriteCanvasHtmlEmbeddedMediaForWebWithFallback(html: string, apiBase?
       return match
     }
 
-    return buildEmbeddedMediaFallbackHtml(embeddedMediaFallbackHref ?? launchTarget)
+    return buildEmbeddedMediaFallbackHtml(embeddedMediaFallbackHref ?? launchTarget, locale)
   }
 
   return html
@@ -250,8 +259,8 @@ function rewriteCanvasHtmlEmbeddedMediaForWebWithFallback(html: string, apiBase?
     .replace(/<source\b[^>]*?src=(["'])(.*?)\1[^>]*?>/gi, rewriteMediaAttribute())
 }
 
-export function rewriteCanvasHtmlLinks(html: string, apiBase?: string, currentCourseId?: number, embeddedMediaFallbackHref?: string) {
-  return rewriteCanvasHtmlEmbeddedMediaForWebWithFallback(html, apiBase, embeddedMediaFallbackHref).replace(/<a\b([^>]*?)href=(["'])(.*?)\2([^>]*)>([\s\S]*?)<\/a>/gi, (match, beforeHref: string, quote: string, href: string, afterHref: string, innerHtml: string) => {
+export function rewriteCanvasHtmlLinks(html: string, apiBase?: string, currentCourseId?: number, embeddedMediaFallbackHref?: string, locale: AppLocale = "en") {
+  return rewriteCanvasHtmlEmbeddedMediaForWebWithFallback(html, apiBase, embeddedMediaFallbackHref, locale).replace(/<a\b([^>]*?)href=(["'])(.*?)\2([^>]*)>([\s\S]*?)<\/a>/gi, (match, beforeHref: string, quote: string, href: string, afterHref: string, innerHtml: string) => {
     if (`${beforeHref}${afterHref}`.includes("data-embed-fallback-link=")) {
       return match
     }

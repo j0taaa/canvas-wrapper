@@ -189,6 +189,9 @@ export default async function InboxConversationPage({
                         __html: rewriteCanvasHtmlLinks(
                           message.body || `<p>${t(resolvedLocale, "inbox.noMessageBody")}</p>`,
                           shellData.apiBase,
+                          undefined,
+                          undefined,
+                          resolvedLocale,
                         ),
                       }}
                     />

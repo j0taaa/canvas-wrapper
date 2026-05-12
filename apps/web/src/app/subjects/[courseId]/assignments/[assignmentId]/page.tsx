@@ -127,6 +127,7 @@ export default async function AssignmentPage({
     courseShellData.apiBase,
     parsedCourseId,
     assignment.html_url,
+    resolvedLocale,
   );
   const navigation = getSubjectContentNavigation(parsedCourseId, courseContent, files, {
     identifier: parsedAssignmentId,

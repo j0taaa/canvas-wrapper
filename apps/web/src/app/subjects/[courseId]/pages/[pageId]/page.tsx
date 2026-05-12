@@ -57,6 +57,7 @@ export default async function SubjectContentPage({
     courseShellData.apiBase,
     parsedCourseId,
     page.html_url,
+    resolvedLocale,
   );
   const navigation = getSubjectContentNavigation(parsedCourseId, courseContent, files, {
     identifier: pageId,
