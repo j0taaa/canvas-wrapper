@@ -9,6 +9,7 @@ const DEFAULT_CANVAS_API_BASE = "https://pucminas.instructure.com/api/v1";
 const DATA_REVALIDATE_SECONDS = 300;
 const CANVAS_API_BASE_COOKIE = "canvasApiBase";
 const CANVAS_FETCH_CONCURRENCY = 4;
+const TODO_OVERDUE_GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
 
 const envCanvasApiKey = process.env.CANVAS_KEY ?? process.env.CANVAS_API_KEY;
 
@@ -601,6 +602,22 @@ function isCompletedSubmission(submission?: CanvasSubmission) {
   ].includes(submission.workflow_state ?? "");
 }
 
+function isWithinTodoWindow(item: CanvasTodoItem, now = Date.now()) {
+  const dueAt = item.assignment?.due_at;
+
+  if (!dueAt) {
+    return true;
+  }
+
+  const dueTime = Date.parse(dueAt);
+
+  if (!Number.isFinite(dueTime)) {
+    return true;
+  }
+
+  return dueTime + TODO_OVERDUE_GRACE_PERIOD_MS >= now;
+}
+
 async function getAssignmentCompletionMap(
   assignments: CourseAssignmentReference[],
   apiKey: string,
@@ -726,6 +743,7 @@ export async function getDashboardData(apiKey?: string, apiBase?: string): Promi
         };
       })
       .filter((item) => !item.assignment?.completed)
+      .filter((item) => isWithinTodoWindow(item))
       .filter((item, index, items) => {
         if (!item.assignment?.id || !item.assignment.course_id) {
           return true;
