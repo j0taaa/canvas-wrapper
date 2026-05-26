@@ -11,7 +11,7 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "config": {
         "usesNonExemptEncryption": false
       },
