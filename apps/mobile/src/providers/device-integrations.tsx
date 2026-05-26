@@ -11,7 +11,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { AppState, type AppStateStatus } from "react-native";
+import { AppState, Platform, type AppStateStatus } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ActivityReminderOffset } from "@canvas/shared";
 import { readDeviceIntegrationState } from "../lib/device-integration-state";
@@ -188,6 +188,10 @@ export function DeviceIntegrationProvider({ children }: { children: ReactNode })
   }, [config, refreshLocalStatus, syncNow]);
 
   useEffect(() => {
+    if (Platform.OS === "web") {
+      return;
+    }
+
     const handleNotificationHref = (href?: string | null, responseId?: string | null) => {
       if (!href || (responseId && lastHandledResponseId.current === responseId)) {
         return;
