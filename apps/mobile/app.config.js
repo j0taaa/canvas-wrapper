@@ -7,7 +7,7 @@ const androidVersionCode = Number.parseInt(
   10,
 );
 const iosBundleIdentifier =
-  process.env.EXPO_IOS_BUNDLE_IDENTIFIER || "com.j0taaa.janvas";
+  process.env.EXPO_IOS_BUNDLE_IDENTIFIER || "com.jota.janvas";
 const iosBuildNumberValue = Number.parseInt(
   process.env.EXPO_IOS_BUILD_NUMBER || "1",
   10,
