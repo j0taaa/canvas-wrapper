@@ -56,7 +56,7 @@ export default function InboxTab() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen scroll={false}>
+      <AppScreen contentStyle={styles.screenContent} scroll={false}>
         <RestorableScrollView 
           showsVerticalScrollIndicator={false} 
           contentContainerStyle={styles.scrollContent}
@@ -181,6 +181,9 @@ export default function InboxTab() {
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
   },
