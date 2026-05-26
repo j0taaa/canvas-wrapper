@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { formatSubjectName, getSubjectColorPalette, t } from "@canvas/shared";
@@ -32,6 +32,7 @@ function resolveConversationPalette(
 
 export default function InboxTab() {
   const router = useRouter();
+  const { width: viewportWidth } = useWindowDimensions();
   const { resolvedLocale, resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
   const { data: shellData } = useAppShell();
   const { data, error, isLoading, isFetching, refetch } = useInbox();
@@ -39,6 +40,9 @@ export default function InboxTab() {
   const showColdLoading = isLoading && !data && !error;
   const showBlockingError = !!error && !data;
   const showInlineRefresh = !!data && (isFetching || isLoading);
+  const fabPosition = viewportWidth < 600
+    ? { left: Math.max(16, viewportWidth - 160) }
+    : { right: 16 };
 
   const colors = useMemo(() => {
     const isDark = resolvedTheme === "dark";
@@ -56,7 +60,7 @@ export default function InboxTab() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen contentStyle={styles.screenContent} scroll={false}>
+      <AppScreen contentStyle={[styles.screenContent, { width: Math.max(0, viewportWidth - 32) }]} scroll={false}>
         <RestorableScrollView 
           showsVerticalScrollIndicator={false} 
           contentContainerStyle={styles.scrollContent}
@@ -170,6 +174,7 @@ export default function InboxTab() {
           style={({ pressed }) => [
             styles.fab,
             { backgroundColor: colors.primary },
+            fabPosition,
             pressed && styles.fabPressed,
           ]}
         >
@@ -183,12 +188,19 @@ export default function InboxTab() {
 const styles = StyleSheet.create({
   screenContent: {
     flex: 1,
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
   },
   scrollContent: {
     flexGrow: 1,
+    maxWidth: "100%",
+    minWidth: 0,
   },
   container: {
     gap: 14,
+    maxWidth: "100%",
+    minWidth: 0,
     paddingHorizontal: 10,
     paddingTop: 16,
   },
@@ -209,6 +221,8 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: 12,
+    maxWidth: "100%",
+    minWidth: 0,
   },
   emptyText: {
     fontSize: 14,
@@ -218,11 +232,14 @@ const styles = StyleSheet.create({
   conversationItem: {
     borderRadius: 16,
     borderWidth: 1,
+    maxWidth: "100%",
+    minWidth: 0,
     padding: 14,
   },
   conversationShell: {
     flexDirection: "row",
     gap: 12,
+    minWidth: 0,
   },
   conversationAccent: {
     alignSelf: "stretch",
@@ -232,15 +249,18 @@ const styles = StyleSheet.create({
   conversationContent: {
     flex: 1,
     gap: 12,
+    minWidth: 0,
   },
   conversationHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
+    minWidth: 0,
   },
   conversationInfo: {
     flex: 1,
     gap: 6,
+    minWidth: 0,
   },
   conversationContextRow: {
     alignItems: "center",
@@ -282,14 +302,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 12,
+    minWidth: 0,
   },
   metaText: {
+    flexShrink: 1,
     fontSize: 12,
   },
   fab: {
     position: "absolute",
     bottom: 20,
-    right: 16,
     width: 56,
     height: 56,
     borderRadius: 28,
