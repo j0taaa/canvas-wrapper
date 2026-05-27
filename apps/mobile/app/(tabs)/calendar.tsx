@@ -66,15 +66,18 @@ function getZonedDateParts(value: Date | string) {
   return { year, month, day, weekdayIndex: Math.max(weekdayIndex, 0) };
 }
 
+function getMonthStartWeekdayIndex(year: number, month: number) {
+  return new Date(Date.UTC(year, month - 1, 1, 12)).getUTCDay();
+}
+
 function buildCalendarCells(
   entriesByDayKey: Map<string, CalendarEntry[]>,
   month: number,
   year: number,
 ) {
   const today = getZonedDateParts(new Date());
-  const firstOfMonth = getZonedDateParts(new Date(Date.UTC(year, month - 1, 1)));
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const leadingEmptyDays = firstOfMonth.weekdayIndex;
+  const leadingEmptyDays = getMonthStartWeekdayIndex(year, month);
   const totalVisibleDays = leadingEmptyDays + daysInMonth;
   const trailingEmptyDays = (7 - (totalVisibleDays % 7)) % 7;
   const totalCells = totalVisibleDays + trailingEmptyDays;
@@ -117,9 +120,9 @@ export default function CalendarTab() {
   const insets = useSafeAreaInsets();
   const { config } = useCanvasSession();
   const { resolvedLocale, resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
-  const today = new Date();
-  const [currentMonth, setCurrentMonth] = useState(today.getUTCMonth() + 1);
-  const [currentYear, setCurrentYear] = useState(today.getUTCFullYear());
+  const initialToday = getZonedDateParts(new Date());
+  const [currentMonth, setCurrentMonth] = useState(initialToday.month);
+  const [currentYear, setCurrentYear] = useState(initialToday.year);
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [hasLoadedViewMode, setHasLoadedViewMode] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);

@@ -69,11 +69,14 @@ function getZonedDateParts(value: Date | string) {
   return { year, month, day, weekdayIndex: Math.max(weekdayIndex, 0) };
 }
 
+function getMonthStartWeekdayIndex(year: number, month: number) {
+  return new Date(Date.UTC(year, month - 1, 1, 12)).getUTCDay();
+}
+
 function buildCalendarCells(entries: CalendarEntry[], month: number, year: number) {
   const today = getZonedDateParts(new Date());
-  const firstOfMonth = getZonedDateParts(new Date(Date.UTC(year, month - 1, 1)));
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const leadingEmptyDays = firstOfMonth.weekdayIndex;
+  const leadingEmptyDays = getMonthStartWeekdayIndex(year, month);
   const totalVisibleDays = leadingEmptyDays + daysInMonth;
   const trailingEmptyDays = (7 - (totalVisibleDays % 7)) % 7;
   const totalCells = totalVisibleDays + trailingEmptyDays;
