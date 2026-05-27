@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Pressable, RefreshControl, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { formatSubjectName, getSubjectColorPalette, t } from "@canvas/shared";
@@ -32,7 +32,6 @@ function resolveConversationPalette(
 
 export default function InboxTab() {
   const router = useRouter();
-  const { width: viewportWidth } = useWindowDimensions();
   const { resolvedLocale, resolvedTheme, subjectPreferences, triggerSelectionHaptic } = useAppPreferences();
   const { data: shellData } = useAppShell();
   const { data, error, isLoading, isFetching, refetch } = useInbox();
@@ -40,9 +39,6 @@ export default function InboxTab() {
   const showColdLoading = isLoading && !data && !error;
   const showBlockingError = !!error && !data;
   const showInlineRefresh = !!data && (isFetching || isLoading);
-  const fabPosition = viewportWidth < 600
-    ? { left: Math.max(16, viewportWidth - 160) }
-    : { right: 16 };
 
   const colors = useMemo(() => {
     const isDark = resolvedTheme === "dark";
@@ -60,9 +56,10 @@ export default function InboxTab() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen contentStyle={[styles.screenContent, { width: Math.max(0, viewportWidth - 32) }]} scroll={false}>
+      <AppScreen contentStyle={styles.screenContent} scroll={false}>
         <RestorableScrollView 
           showsVerticalScrollIndicator={false} 
+          style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           refreshControl={
             <RefreshControl
@@ -174,7 +171,6 @@ export default function InboxTab() {
           style={({ pressed }) => [
             styles.fab,
             { backgroundColor: colors.primary },
-            fabPosition,
             pressed && styles.fabPressed,
           ]}
         >
@@ -187,15 +183,24 @@ export default function InboxTab() {
 
 const styles = StyleSheet.create({
   screenContent: {
+    alignSelf: "stretch",
     flex: 1,
     maxWidth: "100%",
     minWidth: 0,
     overflow: "hidden",
+    position: "relative",
+    width: "100%",
+  },
+  scrollView: {
+    flex: 1,
+    width: "100%",
   },
   scrollContent: {
     flexGrow: 1,
     maxWidth: "100%",
     minWidth: 0,
+    paddingBottom: 96,
+    width: "100%",
   },
   container: {
     gap: 14,
@@ -312,6 +317,7 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     bottom: 20,
+    right: 16,
     width: 56,
     height: 56,
     borderRadius: 28,
