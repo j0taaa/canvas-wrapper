@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { ReactNode } from "react";
 import { PropsWithChildren, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   Animated,
@@ -94,28 +96,69 @@ function useAppColors() {
   };
 }
 
+export function ScreenHeader({
+  showBottomBorder = false,
+  subtitle,
+  title,
+  trailing,
+}: {
+  showBottomBorder?: boolean;
+  subtitle?: string;
+  title: string;
+  trailing?: ReactNode;
+}) {
+  const colors = useAppColors();
+
+  return (
+    <View
+      style={[
+        styles.screenHeaderRoot,
+        showBottomBorder
+          ? { borderBottomColor: colors.border, borderBottomWidth: 1, marginBottom: 4, paddingBottom: 14 }
+          : null,
+      ]}
+    >
+      <View style={styles.screenHeaderRow}>
+        <View style={styles.screenHeaderTextBlock}>
+          <Text style={[styles.screenHeaderTitle, { color: colors.foreground }]}>{title}</Text>
+          {subtitle ? (
+            <Text style={[styles.screenHeaderSubtitle, { color: colors.subtitle }]}>{subtitle}</Text>
+          ) : null}
+        </View>
+        {trailing ? <View style={styles.screenHeaderTrailing}>{trailing}</View> : null}
+      </View>
+    </View>
+  );
+}
+
 export function AppScreen({
   children,
   contentStyle,
   scroll = true,
+  skipTopSafeArea = false,
   subtitle,
   title,
-}: PropsWithChildren<{ contentStyle?: StyleProp<ViewStyle>; scroll?: boolean; subtitle?: string; title?: string }>) {
+}: PropsWithChildren<{
+  contentStyle?: StyleProp<ViewStyle>;
+  scroll?: boolean;
+  /** Tab routes and screens that apply their own top inset (e.g. subject header). */
+  skipTopSafeArea?: boolean;
+  subtitle?: string;
+  title?: string;
+}>) {
   const colors = useAppColors();
+  const insets = useSafeAreaInsets();
+  const topPad = skipTopSafeArea ? 0 : insets.top;
+
   const content = (
     <View style={[styles.content, contentStyle]}>
-      {title ? (
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
-          {subtitle ? <Text style={[styles.subtitle, { color: colors.subtitle }]}>{subtitle}</Text> : null}
-        </View>
-      ) : null}
+      {title ? <ScreenHeader subtitle={subtitle} title={title} /> : null}
       {children}
     </View>
   );
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.screen }]}>
+    <View style={[styles.screen, { backgroundColor: colors.screen, paddingTop: topPad }]}>
       {scroll ? (
         <RestorableScrollView contentContainerStyle={styles.scrollContent}>
           {content}
@@ -214,19 +257,34 @@ export function EmptyState({ label }: { label: string }) {
 export function ErrorState({
   error,
   onRetry,
+  showChangeApiKey = true,
 }: {
   error: string;
   onRetry?: () => void;
+  /** When true (default), offers navigation to Settings to update the Canvas API key. */
+  showChangeApiKey?: boolean;
 }) {
   const colors = useAppColors();
   const { resolvedLocale } = useAppPreferences();
+  const router = useRouter();
+
   return (
     <View style={styles.centerState}>
       <Text style={[styles.errorTitle, { color: colors.foreground }]}>{t(resolvedLocale, "common.errorTitle")}</Text>
       <Text style={[styles.stateText, { color: colors.subtitle }]}>{error}</Text>
-      {onRetry ? (
-        <PrimaryButton label={t(resolvedLocale, "common.retry")} onPress={onRetry} />
-      ) : null}
+      <View style={styles.errorStateActions}>
+        {onRetry ? (
+          <PrimaryButton label={t(resolvedLocale, "common.retry")} onPress={onRetry} />
+        ) : null}
+        {showChangeApiKey ? (
+          <SecondaryButton
+            label={t(resolvedLocale, "common.changeApiKey")}
+            onPress={() => {
+              router.push("/settings");
+            }}
+          />
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -600,7 +658,7 @@ export function RequireCanvasConfig({ children }: PropsWithChildren) {
 
   if (!configured && !hasSeenWelcome) {
     return (
-      <AppScreen contentStyle={styles.welcomeScreenContent}>
+      <AppScreen contentStyle={styles.welcomeScreenContent} skipTopSafeArea>
         <WelcomeSplash
           onContinue={() => {
             void AsyncStorage.setItem(APP_WELCOME_STORAGE_KEY, "true").finally(() => {
@@ -614,10 +672,15 @@ export function RequireCanvasConfig({ children }: PropsWithChildren) {
 
   if (!configured) {
     return (
-      <AppScreen
-        contentStyle={styles.connectScreenContent}
-      >
-        <CanvasConfigForm mode="connect" />
+      <AppScreen contentStyle={styles.connectScreenContent} skipTopSafeArea>
+        <CanvasConfigForm
+          mode="connect"
+          onBackToWelcome={() => {
+            void AsyncStorage.removeItem(APP_WELCOME_STORAGE_KEY).finally(() => {
+              setHasSeenWelcome(false);
+            });
+          }}
+        />
       </AppScreen>
     );
   }
@@ -628,9 +691,11 @@ export function RequireCanvasConfig({ children }: PropsWithChildren) {
 export function CanvasConfigForm({
   mode = "settings",
   showClear = false,
+  onBackToWelcome,
 }: {
   mode?: "connect" | "settings";
   showClear?: boolean;
+  onBackToWelcome?: () => void;
 }) {
   const colors = useAppColors();
   const { resolvedLocale } = useAppPreferences();
@@ -728,6 +793,10 @@ export function CanvasConfigForm({
             });
         }}
       />
+
+      {isConnectMode && onBackToWelcome ? (
+        <SecondaryButton label={t(resolvedLocale, "connect.backToWelcome")} onPress={onBackToWelcome} />
+      ) : null}
 
       {showClear ? <SecondaryButton label={t(resolvedLocale, "connect.clearCredentials")} onPress={() => void clearConfig()} /> : null}
     </>
@@ -901,8 +970,18 @@ const styles = StyleSheet.create({
     minHeight: 260,
     paddingHorizontal: 24,
   },
+  errorStateActions: {
+    alignSelf: "stretch",
+    gap: 10,
+    marginTop: 4,
+    maxWidth: 360,
+    width: "100%",
+  },
   content: {
+    alignSelf: "stretch",
     gap: 18,
+    maxWidth: "100%",
+    minWidth: 0,
     padding: 16,
   },
   connectScreenContent: {
@@ -1098,9 +1177,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
-  header: {
-    gap: 8,
-  },
   helperText: {
     color: "rgba(15,23,42,0.56)",
     fontSize: 13,
@@ -1233,6 +1309,35 @@ const styles = StyleSheet.create({
   },
   screen: {
     flex: 1,
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
+  },
+  screenHeaderRoot: {
+    width: "100%",
+  },
+  screenHeaderRow: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  screenHeaderSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  screenHeaderTextBlock: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
+  screenHeaderTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    letterSpacing: -0.4,
+  },
+  screenHeaderTrailing: {
+    flexShrink: 0,
   },
   scrollContent: {
     flexGrow: 1,
@@ -1260,17 +1365,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     textAlign: "center",
-  },
-  subtitle: {
-    color: "rgba(15,23,42,0.54)",
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  title: {
-    color: "#0f172a",
-    fontSize: 26,
-    fontWeight: "700",
-    letterSpacing: -0.6,
   },
   welcomeBadge: {
     borderRadius: 22,

@@ -134,7 +134,7 @@ export function MobileChrome() {
             backgroundColor: colors.bar,
             borderColor: colors.border,
             paddingBottom: Math.max(insets.bottom, 16),
-            paddingTop: Math.max(insets.top, 16),
+            paddingTop: insets.top,
           },
         ]}
       >
@@ -243,7 +243,7 @@ export function MobileChrome() {
   }
 
   return (
-    <View>
+    <View style={styles.mobileChrome}>
       {showSubjectBar ? (
         <View
           style={[
@@ -254,7 +254,12 @@ export function MobileChrome() {
             },
           ]}
         >
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subjectBarContent}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.subjectBarScroll}
+            contentContainerStyle={styles.subjectBarContent}
+          >
             <View
               style={[
                 styles.libraryBadge,
@@ -304,7 +309,7 @@ export function MobileChrome() {
             backgroundColor: colors.bar,
             borderColor: colors.border,
             borderTopWidth: showSubjectBar ? 0 : 1,
-            paddingBottom: Math.max(insets.bottom, 8),
+            paddingBottom: insets.bottom,
           },
         ]}
       >
@@ -326,6 +331,7 @@ export function MobileChrome() {
           return (
             <Pressable
               key={item.key}
+              hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               onPress={() => {
                 if (active && !dashboardReturnsHome) {
                   return;
@@ -363,6 +369,12 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.84,
+  },
+  mobileChrome: {
+    alignSelf: "stretch",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
   },
   sidebar: {
     borderRightWidth: 1,
@@ -441,8 +453,16 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   subjectBar: {
+    alignSelf: "stretch",
     borderBottomWidth: 1,
     borderTopWidth: 1,
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
+  },
+  subjectBarScroll: {
+    maxWidth: "100%",
+    minWidth: 0,
   },
   subjectBarContent: {
     alignItems: "center",
@@ -469,19 +489,24 @@ const styles = StyleSheet.create({
     width: 8,
   },
   tabBar: {
+    alignSelf: "stretch",
     flexDirection: "row",
     gap: 4,
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
     paddingHorizontal: 8,
-    paddingTop: 6,
+    paddingTop: 2,
   },
   tabItem: {
     alignItems: "center",
     borderRadius: 22,
     flex: 1,
-    gap: 4,
+    gap: 2,
     justifyContent: "center",
+    minWidth: 0,
     paddingHorizontal: 4,
-    paddingVertical: 7,
+    paddingVertical: 4,
   },
   tabLabel: {
     fontSize: 11,

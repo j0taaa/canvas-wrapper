@@ -5,6 +5,7 @@ import {
   type NativeSyntheticEvent,
   ScrollView,
   type ScrollViewProps,
+  StyleSheet,
 } from "react-native";
 
 const routeScrollOffsets = new Map<string, number>();
@@ -83,6 +84,8 @@ export function RestorableScrollView({
     <ScrollView
       {...props}
       ref={scrollRef}
+      style={[styles.scrollView, props.style]}
+      contentContainerStyle={[styles.scrollContent, props.contentContainerStyle]}
       onContentSizeChange={(width, height) => {
         onContentSizeChange?.(width, height);
 
@@ -108,3 +111,14 @@ export function RestorableScrollView({
     />
   );
 }
+
+const styles = StyleSheet.create({
+  scrollContent: {
+    maxWidth: "100%",
+    minWidth: 0,
+  },
+  scrollView: {
+    maxWidth: "100%",
+    minWidth: 0,
+  },
+});

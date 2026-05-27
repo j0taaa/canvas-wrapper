@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { CanvasBootstrapPrefetcher } from "../src/components/canvas-bootstrap-prefetcher";
 import { MobileChrome } from "../src/components/mobile-chrome";
 import { QueryProvider } from "../src/components/query-provider";
@@ -10,13 +11,15 @@ import { CanvasSessionProvider } from "../src/providers/canvas-session";
 
 export default function RootLayout() {
   return (
-    <AppPreferencesProvider>
-      <CanvasSessionProvider>
-        <QueryProvider>
-          <RootNavigator />
-        </QueryProvider>
-      </CanvasSessionProvider>
-    </AppPreferencesProvider>
+    <SafeAreaProvider>
+      <AppPreferencesProvider>
+        <CanvasSessionProvider>
+          <QueryProvider>
+            <RootNavigator />
+          </QueryProvider>
+        </CanvasSessionProvider>
+      </AppPreferencesProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -29,8 +32,10 @@ function RootNavigator() {
     <View
       style={{
         flex: 1,
+        maxWidth: "100%",
         minHeight: 0,
         minWidth: 0,
+        overflow: "hidden",
         ...(isTabletLandscape ? { width: 0 } : null),
       }}
     >
@@ -64,7 +69,7 @@ function RootNavigator() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor }}>
+    <View style={{ flex: 1, alignSelf: "stretch", backgroundColor, maxWidth: "100%", minWidth: 0, overflow: "hidden" }}>
       {navigator}
       <MobileChrome />
     </View>

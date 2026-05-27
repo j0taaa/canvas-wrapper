@@ -9,6 +9,7 @@ import {
   ErrorState,
   LoadingState,
   RequireCanvasConfig,
+  ScreenHeader,
 } from "../../src/components/app-ui";
 import { useRefreshControl } from "../../src/hooks/use-refresh-control";
 import { RestorableScrollView } from "../../src/components/restorable-scroll-view";
@@ -56,7 +57,11 @@ export default function InboxTab() {
 
   return (
     <RequireCanvasConfig>
-      <AppScreen contentStyle={styles.screenContent} scroll={false}>
+      <AppScreen
+        contentStyle={styles.screenContent}
+        scroll={false}
+        skipTopSafeArea
+      >
         <RestorableScrollView 
           showsVerticalScrollIndicator={false} 
           style={styles.scrollView}
@@ -70,17 +75,17 @@ export default function InboxTab() {
           }
         >
           <View style={styles.container}>
-            {/* Header */}
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-              <View>
-                <Text style={[styles.title, { color: colors.foreground }]}>{t(resolvedLocale, "inbox.title")}</Text>
-              </View>
-              {data ? (
-                <Text style={[styles.count, { color: colors.mutedForeground }]}>
-                  {t(resolvedLocale, "inbox.messageCount", { count: data.conversations.length })}
-                </Text>
-              ) : null}
-            </View>
+            <ScreenHeader
+              showBottomBorder
+              title={t(resolvedLocale, "inbox.title")}
+              trailing={
+                data ? (
+                  <Text style={[styles.count, { color: colors.mutedForeground }]}>
+                    {t(resolvedLocale, "inbox.messageCount", { count: data.conversations.length })}
+                  </Text>
+                ) : null
+              }
+            />
 
             {showColdLoading ? <LoadingState label={`${t(resolvedLocale, "common.loading")} ${t(resolvedLocale, "inbox.title").toLowerCase()}...`} /> : null}
             {showBlockingError ? <ErrorState error={error.message} onRetry={refetch} /> : null}
@@ -185,40 +190,22 @@ const styles = StyleSheet.create({
   screenContent: {
     alignSelf: "stretch",
     flex: 1,
-    maxWidth: "100%",
-    minWidth: 0,
-    overflow: "hidden",
     position: "relative",
-    width: "100%",
   },
   scrollView: {
+    alignSelf: "stretch",
     flex: 1,
-    width: "100%",
   },
   scrollContent: {
     flexGrow: 1,
-    maxWidth: "100%",
-    minWidth: 0,
     paddingBottom: 96,
-    width: "100%",
   },
   container: {
     gap: 14,
     maxWidth: "100%",
     minWidth: 0,
-    paddingHorizontal: 10,
-    paddingTop: 16,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
   count: {
     fontSize: 14,
